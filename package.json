@@ -1,0 +1,13 @@
+{
+  "name": "shift-scheduler-v2",
+  "version": "2.0.0",
+  "description": "学工部助理排班系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "mongodb": "^6.12.0"
+  }
+}
