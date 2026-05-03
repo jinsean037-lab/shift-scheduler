@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>学工部助理排班</title>
+<title>学工办助理排班</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -518,7 +518,7 @@ body {
 <!-- 登录页 -->
 <div class="login-page" id="loginPage">
   <div class="login-card">
-    <h1>📋 学工部助理排班</h1>
+    <h1>📋 学工办助理排班</h1>
     <p>输入姓名和密码登录</p>
     <input type="text" id="nameInput" placeholder="请输入你的姓名" maxlength="20">
     <input type="password" id="passwordInput" placeholder="请输入密码" maxlength="20">
@@ -549,6 +549,7 @@ body {
   <div class="confirm-box">
     <h3 id="confirmTitle">确认选择</h3>
     <p id="confirmMsg">确定选择该班次吗？</p>
+    <div id="confirmExtra"></div>
     <div class="btns">
       <button class="cancel" onclick="closeConfirm()">取消</button>
       <button class="confirm" id="confirmBtn" onclick="confirmAction()">确定</button>
@@ -616,6 +617,30 @@ body {
       </div>
       <ul class="member-list" id="memberList"></ul>
     </div>
+    <div class="admin-section">
+      <h3>📌 为成员分配班次</h3>
+      <div class="add-row">
+        <select id="assignMember" style="flex:1;padding:10px;border:2px solid #e0e6ef;border-radius:10px;font-size:14px">
+          <option value="">选择成员</option>
+        </select>
+        <select id="assignDay" style="padding:10px;border:2px solid #e0e6ef;border-radius:10px;font-size:14px">
+          <option value="">选择日期</option>
+          <option value="周一">周一</option>
+          <option value="周二">周二</option>
+          <option value="周三">周三</option>
+          <option value="周四">周四</option>
+          <option value="周五">周五</option>
+        </select>
+        <select id="assignSlot" style="padding:10px;border:2px solid #e0e6ef;border-radius:10px;font-size:14px">
+          <option value="">选择时段</option>
+          <option value="am1">8:00-10:00</option>
+          <option value="am2">10:00-12:00</option>
+          <option value="pm1">14:30-16:00</option>
+          <option value="pm2">16:00-17:30</option>
+        </select>
+        <button onclick="adminAssign()">分配</button>
+      </div>
+    </div>
     <div class="admin-section reset-section">
       <h3>⚠️ 重置排班</h3>
       <p style="color:#999;font-size:13px;margin-bottom:16px;">清空所有人的排班选择和候补</p>
@@ -655,6 +680,7 @@ function showConfirm(title, msg, action) {
 
 function closeConfirm() {
   document.getElementById('confirmModal').classList.remove('show')
+  document.getElementById('confirmExtra').innerHTML = ''
   pendingAction = null
 }
 
@@ -789,6 +815,7 @@ async function loadSchedule() {
     configData.timeSlots = data.timeSlots
     configData.days = data.days
     configData.maxPerSlot = data.maxPerSlot
+    configData.members = data.members
     scheduleData = data.schedule
     waitlistData = data.waitlist || []
     cancelRequests = data.cancelRequests || []
@@ -798,6 +825,7 @@ async function loadSchedule() {
       renderWaitlistPending()
       renderCancelPending()
       loadMembers()
+      updateAssignMemberList()
     }
   } catch (e) {
     showToast('加载排班失败，服务可能正在启动', 'error')
@@ -941,16 +969,33 @@ async function cancelWaitlist(day, slotId) {
   }
 }
 
-// ========== 取消班次申请 ==========
-async function requestCancel(day, slotId) {
+// ========== 取消班次申请（弹窗输入理由）==========
+function requestCancel(day, slotId) {
+  const slot = configData.timeSlots.find(s => s.id === slotId)
+  document.getElementById('confirmTitle').textContent = '申请取消班次'
+  document.getElementById('confirmMsg').textContent = `${day} ${slot.label}`
+  document.getElementById('confirmExtra').innerHTML = `<input type="text" id="cancelReason" placeholder="请输入取消理由（必填）" style="width:100%;padding:10px;border:2px solid #e0e6ef;border-radius:8px;margin-top:12px" maxlength="100">`
+  pendingAction = () => {
+    const reason = document.getElementById('cancelReason').value.trim()
+    if (!reason) {
+      showToast('请输入取消理由', 'error')
+      return
+    }
+    doRequestCancel(day, slotId, reason)
+  }
+  document.getElementById('confirmModal').classList.add('show')
+}
+
+async function doRequestCancel(day, slotId, reason) {
   try {
     const res = await fetchWithTimeout(API + '/cancel-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, day, slotId })
+      body: JSON.stringify({ name: currentUser, day, slotId, reason })
     }, 15000)
     const data = await res.json()
     if (data.ok) {
+      closeConfirm()
       showToast('取消申请已提交', 'success')
       await loadSchedule()
     } else {
@@ -1156,8 +1201,9 @@ function renderCancelPending() {
   let html = ''
   for (const r of pending) {
     const slot = configData.timeSlots.find(s => s.id === r.slotId)
+    const reasonText = r.reason ? `<br><span style="color:#888;font-size:12px">理由：${r.reason}</span>` : ''
     html += `<li>
-      <span><strong>${r.name}</strong> 申请取消 ${r.day} ${slot ? slot.label : r.slotId}</span>
+      <span><strong>${r.name}</strong> 申请取消 ${r.day} ${slot ? slot.label : r.slotId}${reasonText}</span>
       <div>
         <button class="approve-btn" onclick="approveCancel('${r.name}','${r.day}','${r.slotId}')">批准</button>
         <button class="reject-btn" onclick="rejectCancel('${r.name}','${r.day}','${r.slotId}')">拒绝</button>
@@ -1279,6 +1325,42 @@ async function removeMember(name) {
     }
   } catch (e) {
     showToast('操作失败', 'error')
+  }
+}
+
+// 管理员分配班次
+async function adminAssign() {
+  const name = document.getElementById('assignMember').value
+  const day = document.getElementById('assignDay').value
+  const slotId = document.getElementById('assignSlot').value
+  if (!name || !day || !slotId) {
+    showToast('请选择成员、日期和时段', 'error')
+    return
+  }
+  try {
+    const res = await fetchWithTimeout(API + '/admin/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, day, slotId })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      showToast(`已为 ${name} 分配班次`, 'success')
+      await loadSchedule()
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('分配失败', 'error')
+  }
+}
+
+function updateAssignMemberList() {
+  const select = document.getElementById('assignMember')
+  if (!select) return
+  select.innerHTML = '<option value="">选择成员</option>'
+  for (const name of configData.members || []) {
+    select.innerHTML += `<option value="${name}">${name}</option>`
   }
 }
 
