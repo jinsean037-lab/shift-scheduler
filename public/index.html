@@ -685,8 +685,13 @@ function closeConfirm() {
 }
 
 function confirmAction() {
-  closeConfirm()
-  if (pendingAction) pendingAction()
+  console.log('confirmAction called, pendingAction:', pendingAction)
+  if (pendingAction) {
+    pendingAction()
+    closeConfirm()
+  } else {
+    console.log('ERROR: pendingAction is null!')
+  }
 }
 
 // ========== 带超时的 fetch ==========
@@ -915,6 +920,7 @@ function toggleSlot(day, slotId) {
 }
 
 async function doSelect(day, slotId) {
+  console.log('doSelect called:', { day, slotId, currentUser })
   try {
     const res = await fetchWithTimeout(API + '/select', {
       method: 'POST',
@@ -922,6 +928,7 @@ async function doSelect(day, slotId) {
       body: JSON.stringify({ name: currentUser, day, slotId })
     }, 15000)
     const data = await res.json()
+    console.log('select response:', data)
     if (data.ok) {
       scheduleData = data.schedule
       renderSchedule()
@@ -931,6 +938,7 @@ async function doSelect(day, slotId) {
       showToast(data.msg, 'error')
     }
   } catch (e) {
+    console.error('select error:', e)
     showToast('操作失败', 'error')
   }
 }
@@ -987,6 +995,7 @@ function requestCancel(day, slotId) {
 }
 
 async function doRequestCancel(day, slotId, reason) {
+  console.log('doRequestCancel:', { day, slotId, reason, currentUser })
   try {
     const res = await fetchWithTimeout(API + '/cancel-request', {
       method: 'POST',
@@ -994,6 +1003,7 @@ async function doRequestCancel(day, slotId, reason) {
       body: JSON.stringify({ name: currentUser, day, slotId, reason })
     }, 15000)
     const data = await res.json()
+    console.log('cancel-request response:', data)
     if (data.ok) {
       closeConfirm()
       showToast('取消申请已提交', 'success')
@@ -1002,6 +1012,7 @@ async function doRequestCancel(day, slotId, reason) {
       showToast(data.msg, 'error')
     }
   } catch (e) {
+    console.error('cancel-request error:', e)
     showToast('申请失败', 'error')
   }
 }
