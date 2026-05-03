@@ -569,7 +569,7 @@ body {
 
   <div class="tabs" id="tabsBar">
     <div class="tab active" onclick="switchTab('schedule')">排班表</div>
-    <div class="tab" onclick="switchTab('stats')">我的班次</div>
+    <div class="tab" id="myShiftsTab" onclick="switchTab('stats')">我的班次</div>
     <div class="tab" id="adminTab" style="display:none" onclick="switchTab('admin')">管理</div>
   </div>
 
@@ -804,8 +804,10 @@ async function enterMain() {
 
   if (isAdmin) {
     document.getElementById('adminTab').style.display = 'block'
+    document.getElementById('myShiftsTab').style.display = 'none'
   } else {
     document.getElementById('adminTab').style.display = 'none'
+    document.getElementById('myShiftsTab').style.display = 'block'
   }
 
   await loadConfig()
