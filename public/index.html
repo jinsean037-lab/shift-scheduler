@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学工部助理排班</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f0f4fa;
+  color: #333;
+  min-height: 100vh;
+}
+
+/* 登录页 */
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+.login-card {
+  background: white;
+  border-radius: 20px;
+  padding: 48px 40px;
+  box-shadow: 0 8px 32px rgba(74,144,217,0.12);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+.login-card h1 {
+  font-size: 28px;
+  color: #4A90D9;
+  margin-bottom: 8px;
+}
+.login-card p {
+  color: #999;
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+.login-card input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 2px solid #e0e6ef;
+  border-radius: 12px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #f8fafd;
+}
+.login-card input:focus {
+  border-color: #4A90D9;
+  background: white;
+}
+.login-card button {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #4A90D9, #3a80c9);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: opacity 0.2s;
+}
+.login-card button:hover { opacity: 0.9; }
+.login-card .error {
+  color: #e74c3c;
+  font-size: 14px;
+  margin-top: 12px;
+  min-height: 20px;
+}
+.admin-link {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #eee;
+}
+.admin-link a {
+  color: #4A90D9;
+  font-size: 14px;
+  text-decoration: none;
+}
+.admin-link a:hover { text-decoration: underline; }
+
+/* 主页 */
+.main-page { display: none; padding-bottom: 80px; }
+
+/* 顶栏 */
+.top-bar {
+  background: linear-gradient(135deg, #4A90D9, #6BA3E0);
+  padding: 20px 24px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.top-bar h1 { font-size: 22px; }
+.top-bar .user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.top-bar .logout {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* 标签切换 */
+.tabs {
+  display: flex;
+  background: white;
+  border-bottom: 2px solid #f0f4fa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.tab {
+  flex: 1;
+  padding: 14px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #999;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+.tab.active {
+  color: #4A90D9;
+  border-bottom-color: #4A90D9;
+}
+
+/* 排班表视图 */
+.schedule-view { padding: 16px; }
+.schedule-view .tip {
+  background: #fff8e1;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #8d6e00;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+/* 表格 */
+.schedule-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.schedule-table th {
+  background: #f5f8fc;
+  padding: 12px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  border-bottom: 2px solid #e8edf5;
+}
+.schedule-table th:first-child {
+  width: 56px;
+}
+.schedule-table td {
+  padding: 8px 6px;
+  text-align: center;
+  border-bottom: 1px solid #f0f4fa;
+  vertical-align: top;
+}
+.schedule-table tr:last-child td { border-bottom: none; }
+
+/* 时段标签 */
+.period-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  padding: 2px 6px;
+  border-radius: 8px;
+  display: inline-block;
+  margin-bottom: 2px;
+}
+.period-label.am { background: #fff3e0; color: #e67e22; }
+.period-label.pm { background: #e3f2fd; color: #2980b9; }
+
+/* 格子 */
+.cell {
+  min-height: 60px;
+  border-radius: 10px;
+  padding: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: #f8fafd;
+  border: 2px solid #e8edf5;
+  position: relative;
+}
+.cell:hover { border-color: #4A90D9; }
+.cell.mine {
+  background: linear-gradient(135deg, #4A90D9, #5b9fe0);
+  border-color: #3a80c9;
+  color: white;
+}
+.cell.mine .period-label { background: rgba(255,255,255,0.2); color: white; }
+.cell.full {
+  background: #f0f0f0;
+  border-color: #ddd;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.cell .names {
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 2px;
+  min-height: 18px;
+}
+.cell .count {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 11px;
+  color: #aaa;
+  font-weight: 600;
+}
+.cell.mine .count { color: rgba(255,255,255,0.7); }
+.cell .time {
+  font-size: 12px;
+  font-weight: 500;
+}
+.cell .check {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 13px;
+}
+.waitlist-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 10px;
+  background: #ff9800;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.waitlist-btn:hover { background: #f57c00; }
+
+/* 统计视图 */
+.stats-view { padding: 16px; display: none; }
+.my-shifts {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.my-shifts h3 {
+  font-size: 16px;
+  color: #4A90D9;
+  margin-bottom: 16px;
+}
+.shift-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f4fa;
+}
+.shift-item:last-child { border-bottom: none; }
+.shift-item .info { font-size: 14px; }
+.shift-item .info .day { font-weight: 600; }
+.shift-item .info .time { color: #888; font-size: 13px; }
+.shift-item .cancel-btn {
+  background: #fff0f0;
+  color: #e74c3c;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.shift-empty {
+  text-align: center;
+  color: #999;
+  padding: 40px 0;
+  font-size: 14px;
+}
+.my-waitlist {
+  background: #fff8e1;
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.my-waitlist h3 {
+  font-size: 16px;
+  color: #f57c00;
+  margin-bottom: 16px;
+}
+.waitlist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #ffe0b2;
+  font-size: 14px;
+}
+.waitlist-item:last-child { border-bottom: none; }
+
+/* 管理视图 */
+.admin-view { padding: 16px; display: none; }
+.admin-section {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.admin-section h3 {
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 16px;
+}
+.admin-section .add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.admin-section input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 2px solid #e0e6ef;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+}
+.admin-section input:focus { border-color: #4A90D9; }
+.admin-section button {
+  padding: 10px 20px;
+  background: #4A90D9;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.admin-section button:hover { opacity: 0.9; }
+.admin-section button.danger {
+  background: #e74c3c;
+}
+.member-list {
+  list-style: none;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.member-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f4fa;
+  font-size: 14px;
+}
+.member-list li:last-child { border-bottom: none; }
+.member-list .remove-btn {
+  background: none;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.reset-section {
+  text-align: center;
+}
+.reset-section button {
+  background: #e74c3c;
+  padding: 12px 32px;
+  border-radius: 50px;
+  font-size: 15px;
+}
+.waitlist-section {
+  background: #fff8e1;
+}
+.waitlist-section h3 { color: #f57c00; }
+.waitlist-pending {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.waitlist-pending li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #ffe0b2;
+  font-size: 14px;
+}
+.waitlist-pending li:last-child { border-bottom: none; }
+.waitlist-pending .approve-btn {
+  background: #4A90D9;
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 8px;
+}
+.waitlist-pending .reject-btn {
+  background: none;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* toast */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100px);
+  background: #333;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  z-index: 999;
+  transition: transform 0.3s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.error { background: #e74c3c; }
+.toast.success { background: #27ae60; }
+
+/* 响应式 */
+@media (max-width: 600px) {
+  .schedule-table th, .schedule-table td { padding: 6px 4px; }
+  .cell { min-height: 52px; padding: 4px; }
+  .cell .time { font-size: 11px; }
+  .cell .names { font-size: 11px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 登录页 -->
+<div class="login-page" id="loginPage">
+  <div class="login-card">
+    <h1>📋 学工部助理排班</h1>
+    <p>输入姓名登录，选择空闲时段</p>
+    <input type="text" id="nameInput" placeholder="请输入你的姓名" maxlength="20">
+    <button onclick="doLogin()">进入排班</button>
+    <div class="error" id="loginError"></div>
+    <div class="admin-link">
+      <a href="#" onclick="showAdminLogin(); return false;">管理员入口</a>
+    </div>
+  </div>
+</div>
+
+<!-- 管理员登录弹窗 -->
+<div id="adminLoginModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;">
+  <div class="login-card">
+    <h1>🔐 管理员登录</h1>
+    <p>请输入管理员密码</p>
+    <input type="password" id="adminPassword" placeholder="管理员密码" maxlength="50">
+    <button onclick="doAdminLogin()">进入管理</button>
+    <div class="error" id="adminLoginError"></div>
+    <div style="margin-top:16px">
+      <a href="#" onclick="hideAdminLogin(); return false;" style="color:#999;font-size:14px;">返回</a>
+    </div>
+  </div>
+</div>
+
+<!-- 主页 -->
+<div class="main-page" id="mainPage">
+  <div class="top-bar">
+    <h1>📋 助理排班</h1>
+    <div class="user-info">
+      <span id="userName"></span>
+      <button class="logout" onclick="doLogout()">退出</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabsBar">
+    <div class="tab active" onclick="switchTab('schedule')">排班表</div>
+    <div class="tab" onclick="switchTab('stats')">我的班次</div>
+    <div class="tab" id="adminTab" style="display:none" onclick="switchTab('admin')">管理</div>
+  </div>
+
+  <!-- 排班表 -->
+  <div class="schedule-view" id="scheduleView">
+    <div class="tip">💡 点击格子选择时段（先抢先得），再点一次取消。每时段最多 <span id="maxHint">2</span> 人。满了可申请候补。</div>
+    <div id="scheduleGrid"></div>
+  </div>
+
+  <!-- 我的班次 -->
+  <div class="stats-view" id="statsView">
+    <div class="my-shifts">
+      <h3>📌 我的班次</h3>
+      <div id="myShifts"></div>
+    </div>
+    <div class="my-waitlist" id="myWaitlistSection" style="display:none">
+      <h3>⏳ 我的候补</h3>
+      <div id="myWaitlist"></div>
+    </div>
+  </div>
+
+  <!-- 管理 -->
+  <div class="admin-view" id="adminView">
+    <div class="admin-section waitlist-section">
+      <h3>⏳ 候补申请</h3>
+      <ul class="waitlist-pending" id="waitlistPending">
+        <li style="color:#999">暂无候补申请</li>
+      </ul>
+    </div>
+    <div class="admin-section">
+      <h3>👤 成员管理</h3>
+      <div class="add-row">
+        <input type="text" id="newMemberInput" placeholder="输入姓名" maxlength="20">
+        <button onclick="addMember()">添加</button>
+      </div>
+      <ul class="member-list" id="memberList"></ul>
+    </div>
+    <div class="admin-section reset-section">
+      <h3>⚠️ 重置排班</h3>
+      <p style="color:#999;font-size:13px;margin-bottom:16px;">清空所有人的排班选择和候补</p>
+      <button class="danger" onclick="resetSchedule()">重置所有排班</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '/api'
+let currentUser = ''
+let isAdmin = false
+let scheduleData = {}
+let configData = {}
+let waitlistData = []
+
+// ========== Toast ==========
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.className = 'toast show ' + type
+  setTimeout(() => t.className = 'toast', 2000)
+}
+
+// ========== 带超时的 fetch ==========
+async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeout)
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    clearTimeout(id)
+    return response
+  } catch (e) {
+    clearTimeout(id)
+    throw e
+  }
+}
+
+// ========== 登录 ==========
+async function doLogin() {
+  const name = document.getElementById('nameInput').value.trim()
+  if (!name) { showToast('请输入姓名', 'error'); return }
+  try {
+    const res = await fetchWithTimeout(API + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      currentUser = data.name
+      isAdmin = false
+      localStorage.setItem('shiftUser', currentUser)
+      enterMain()
+    } else {
+      document.getElementById('loginError').textContent = data.msg
+    }
+  } catch (e) {
+    showToast('网络错误或服务启动中，请稍后重试', 'error')
+  }
+}
+
+function showAdminLogin() {
+  document.getElementById('adminLoginModal').style.display = 'flex'
+}
+
+function hideAdminLogin() {
+  document.getElementById('adminLoginModal').style.display = 'none'
+  document.getElementById('adminPassword').value = ''
+  document.getElementById('adminLoginError').textContent = ''
+}
+
+async function doAdminLogin() {
+  const password = document.getElementById('adminPassword').value
+  if (!password) { showToast('请输入密码', 'error'); return }
+  try {
+    const res = await fetchWithTimeout(API + '/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      currentUser = '管理员'
+      isAdmin = true
+      hideAdminLogin()
+      enterMain()
+    } else {
+      document.getElementById('adminLoginError').textContent = data.msg
+    }
+  } catch (e) {
+    showToast('网络错误', 'error')
+  }
+}
+
+function doLogout() {
+  currentUser = ''
+  isAdmin = false
+  localStorage.removeItem('shiftUser')
+  document.getElementById('loginPage').style.display = 'flex'
+  document.getElementById('mainPage').style.display = 'none'
+}
+
+// 回车登录
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin()
+})
+document.getElementById('adminPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doAdminLogin()
+})
+
+// ========== 进入主页 ==========
+async function enterMain() {
+  document.getElementById('loginPage').style.display = 'none'
+  document.getElementById('mainPage').style.display = 'block'
+  document.getElementById('userName').textContent = currentUser
+
+  // 管理员显示管理 tab
+  if (isAdmin) {
+    document.getElementById('adminTab').style.display = 'block'
+  } else {
+    document.getElementById('adminTab').style.display = 'none'
+  }
+
+  await loadConfig()
+  await loadSchedule()
+}
+
+// ========== 数据加载 ==========
+async function loadConfig() {
+  try {
+    const res = await fetchWithTimeout(API + '/config', {}, 15000)
+    configData = await res.json()
+    document.getElementById('maxHint').textContent = configData.maxPerSlot
+  } catch (e) {
+    showToast('加载配置失败，服务可能正在启动', 'error')
+  }
+}
+
+async function loadSchedule() {
+  try {
+    const res = await fetchWithTimeout(API + '/schedule', {}, 15000)
+    const data = await res.json()
+    configData.timeSlots = data.timeSlots
+    configData.days = data.days
+    configData.maxPerSlot = data.maxPerSlot
+    scheduleData = data.schedule
+    waitlistData = data.waitlist || []
+    renderSchedule()
+    renderMyShifts()
+    if (isAdmin) {
+      renderWaitlistPending()
+      loadMembers()
+    }
+  } catch (e) {
+    showToast('加载排班失败，服务可能正在启动', 'error')
+  }
+}
+
+// ========== 渲染排班表 ==========
+function renderSchedule() {
+  const { timeSlots, days, maxPerSlot } = configData
+  let html = '<table class="schedule-table">'
+
+  // 表头
+  html += '<tr><th></th>'
+  for (const day of days) {
+    html += `<th>${day}</th>`
+  }
+  html += '</tr>'
+
+  // 每个时段一行
+  for (const slot of timeSlots) {
+    const periodClass = slot.period === '上午' ? 'am' : 'pm'
+    html += '<tr>'
+    html += `<td><span class="period-label ${periodClass}">${slot.period}</span><br><span style="font-size:11px;color:#888">${slot.label}</span></td>`
+
+    for (const day of days) {
+      const key = `${day}|${slot.id}`
+      const names = scheduleData[key] || []
+      const isMine = names.includes(currentUser)
+      const isFull = names.length >= maxPerSlot
+
+      let cellClass = 'cell'
+      if (isMine) cellClass += ' mine'
+      else if (isFull) cellClass += ' full'
+
+      const namesHtml = names.map(n =>
+        n === currentUser ? `<strong>${n}</strong>` : n
+      ).join('<br>')
+
+      // 检查是否在候补名单
+      const isWaitlisted = waitlistData.find(w => w.name === currentUser && w.day === day && w.slotId === slot.id)
+
+      html += `<td>
+        <div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
+          ${isMine ? '<span class="check">✓</span>' : ''}
+          <span class="count">${names.length}/${maxPerSlot}</span>
+          <span class="time">${slot.label}</span>
+          <div class="names">${namesHtml || '<span style="color:#ccc">空</span>'}</div>
+          ${!isMine && isFull && !isAdmin ? `<button class="waitlist-btn" onclick="event.stopPropagation();applyWaitlist('${day}','${slot.id}')">${isWaitlisted ? '已候补' : '候补'}</button>` : ''}
+        </div>
+      </td>`
+    }
+    html += '</tr>'
+  }
+  html += '</table>'
+  document.getElementById('scheduleGrid').innerHTML = html
+}
+
+// ========== 选择/取消 ==========
+async function toggleSlot(day, slotId) {
+  if (isAdmin) {
+    showToast('管理员不能选班次', 'error')
+    return
+  }
+  try {
+    const res = await fetchWithTimeout(API + '/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, day, slotId })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      scheduleData = data.schedule
+      renderSchedule()
+      renderMyShifts()
+      if (data.action === 'added') showToast('已选择该时段', 'success')
+      else showToast('已取消该时段', '')
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
+// ========== 候补 ==========
+async function applyWaitlist(day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, day, slotId })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      showToast('候补申请已提交', 'success')
+      await loadSchedule()
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('申请失败', 'error')
+  }
+}
+
+async function cancelWaitlist(day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/waitlist/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, day, slotId })
+    }, 15000)
+    await loadSchedule()
+    showToast('已取消候补', '')
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
+// ========== 我的班次 ==========
+function renderMyShifts() {
+  const { timeSlots, days } = configData
+  const mySlots = []
+
+  for (const day of days) {
+    for (const slot of timeSlots) {
+      const key = `${day}|${slot.id}`
+      const names = scheduleData[key] || []
+      if (names.includes(currentUser)) {
+        mySlots.push({ day, slot, key })
+      }
+    }
+  }
+
+  if (mySlots.length === 0) {
+    document.getElementById('myShifts').innerHTML = '<div class="shift-empty">暂未选择任何时段</div>'
+  } else {
+    let html = ''
+    for (const s of mySlots) {
+      html += `<div class="shift-item">
+        <div class="info">
+          <span class="day">${s.day}</span>
+          <span class="time">${s.slot.period} ${s.slot.label}</span>
+        </div>
+        <button class="cancel-btn" onclick="toggleSlot('${s.day}','${s.slot.id}')">取消</button>
+      </div>`
+    }
+    document.getElementById('myShifts').innerHTML = html
+  }
+
+  // 我的候补
+  const myWaitlist = waitlistData.filter(w => w.name === currentUser)
+  if (myWaitlist.length > 0) {
+    document.getElementById('myWaitlistSection').style.display = 'block'
+    let html = ''
+    for (const w of myWaitlist) {
+      const slot = timeSlots.find(s => s.id === w.slotId)
+      html += `<div class="waitlist-item">
+        <span>${w.day} ${slot ? slot.label : w.slotId}</span>
+        <button class="cancel-btn" onclick="cancelWaitlist('${w.day}','${w.slotId}')">取消</button>
+      </div>`
+    }
+    document.getElementById('myWaitlist').innerHTML = html
+  } else {
+    document.getElementById('myWaitlistSection').style.display = 'none'
+  }
+}
+
+// ========== Tab 切换 ==========
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.schedule-view, .stats-view, .admin-view').forEach(v => v.style.display = 'none')
+
+  if (tab === 'schedule') {
+    document.querySelectorAll('.tab')[0].classList.add('active')
+    document.getElementById('scheduleView').style.display = 'block'
+  } else if (tab === 'stats') {
+    document.querySelectorAll('.tab')[1].classList.add('active')
+    document.getElementById('statsView').style.display = 'block'
+  } else if (tab === 'admin') {
+    document.getElementById('adminTab').classList.add('active')
+    document.getElementById('adminView').style.display = 'block'
+  }
+}
+
+// ========== 管理功能 ==========
+async function loadMembers() {
+  try {
+    const res = await fetchWithTimeout(API + '/admin/members', {}, 15000)
+    const data = await res.json()
+    let html = ''
+    for (const name of data.members) {
+      html += `<li>
+        <span>${name}</span>
+        <button class="remove-btn" onclick="removeMember('${name}')">移除</button>
+      </li>`
+    }
+    document.getElementById('memberList').innerHTML = html || '<li style="color:#999">暂无成员</li>'
+  } catch (e) {
+    showToast('加载成员失败', 'error')
+  }
+}
+
+function renderWaitlistPending() {
+  if (waitlistData.length === 0) {
+    document.getElementById('waitlistPending').innerHTML = '<li style="color:#999">暂无候补申请</li>'
+    return
+  }
+  let html = ''
+  for (const w of waitlistData) {
+    const slot = configData.timeSlots.find(s => s.id === w.slotId)
+    html += `<li>
+      <span><strong>${w.name}</strong> 申请 ${w.day} ${slot ? slot.label : w.slotId}</span>
+      <div>
+        <button class="approve-btn" onclick="approveWaitlist('${w.name}','${w.day}','${w.slotId}')">批准</button>
+        <button class="reject-btn" onclick="rejectWaitlist('${w.name}','${w.day}','${w.slotId}')">拒绝</button>
+      </div>
+    </li>`
+  }
+  document.getElementById('waitlistPending').innerHTML = html
+}
+
+async function approveWaitlist(name, day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/admin/waitlist/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, day, slotId })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      showToast('已批准', 'success')
+      await loadSchedule()
+      renderWaitlistPending()
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
+async function rejectWaitlist(name, day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/waitlist/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, day, slotId })
+    }, 15000)
+    showToast('已拒绝', '')
+    await loadSchedule()
+    renderWaitlistPending()
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
+async function addMember() {
+  const input = document.getElementById('newMemberInput')
+  const name = input.value.trim()
+  if (!name) return
+  try {
+    const res = await fetchWithTimeout(API + '/admin/member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      input.value = ''
+      loadMembers()
+      loadConfig()
+      showToast('添加成功', 'success')
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('添加失败', 'error')
+  }
+}
+
+async function removeMember(name) {
+  if (!confirm(`确定移除 ${name}？将同时清除其排班和候补。`)) return
+  try {
+    const res = await fetchWithTimeout(API + '/admin/member/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      loadMembers()
+      loadSchedule()
+      showToast('已移除', '')
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
+async function resetSchedule() {
+  if (!confirm('确定重置所有排班和候补？此操作不可恢复！')) return
+  try {
+    const res = await fetchWithTimeout(API + '/admin/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      await loadSchedule()
+      renderWaitlistPending()
+      showToast('排班已重置', 'success')
+    }
+  } catch (e) {
+    showToast('重置失败', 'error')
+  }
+}
+
+// ========== 自动登录 ==========
+(async function init() {
+  const saved = localStorage.getItem('shiftUser')
+  if (saved && saved !== '管理员') {
+    try {
+      const res = await fetchWithTimeout(API + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: saved })
+      }, 15000)
+      const data = await res.json()
+      if (data.ok) {
+        currentUser = data.name
+        isAdmin = false
+        await enterMain()
+        return
+      }
+    } catch (e) {}
+  }
+  document.getElementById('loginPage').style.display = 'flex'
+})()
+</script>
+</body>
+</html>
