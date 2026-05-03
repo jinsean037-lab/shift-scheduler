@@ -74,6 +74,17 @@ body {
   margin-top: 12px;
   min-height: 20px;
 }
+.admin-link {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #eee;
+}
+.admin-link a {
+  color: #4A90D9;
+  font-size: 14px;
+  text-decoration: none;
+}
+.admin-link a:hover { text-decoration: underline; }
 
 /* 主页 */
 .main-page { display: none; padding-bottom: 80px; }
@@ -232,6 +243,19 @@ body {
   left: 6px;
   font-size: 13px;
 }
+.waitlist-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 10px;
+  background: #ff9800;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.waitlist-btn:hover { background: #f57c00; }
 
 /* 统计视图 */
 .stats-view { padding: 16px; display: none; }
@@ -272,34 +296,27 @@ body {
   padding: 40px 0;
   font-size: 14px;
 }
-.all-stats {
-  background: white;
+.my-waitlist {
+  background: #fff8e1;
   border-radius: 16px;
   padding: 20px;
   margin-top: 16px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
 }
-.all-stats h3 {
+.my-waitlist h3 {
   font-size: 16px;
-  color: #333;
+  color: #f57c00;
   margin-bottom: 16px;
 }
-.stat-row {
+.waitlist-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 0;
+  padding: 10px 0;
+  border-bottom: 1px solid #ffe0b2;
   font-size: 14px;
 }
-.stat-row .name { font-weight: 500; }
-.stat-row .badge {
-  background: #e3f2fd;
-  color: #2980b9;
-  padding: 2px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 600;
-}
+.waitlist-item:last-child { border-bottom: none; }
 
 /* 管理视图 */
 .admin-view { padding: 16px; display: none; }
@@ -346,6 +363,8 @@ body {
 }
 .member-list {
   list-style: none;
+  max-height: 300px;
+  overflow-y: auto;
 }
 .member-list li {
   display: flex;
@@ -373,6 +392,42 @@ body {
   padding: 12px 32px;
   border-radius: 50px;
   font-size: 15px;
+}
+.waitlist-section {
+  background: #fff8e1;
+}
+.waitlist-section h3 { color: #f57c00; }
+.waitlist-pending {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.waitlist-pending li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #ffe0b2;
+  font-size: 14px;
+}
+.waitlist-pending li:last-child { border-bottom: none; }
+.waitlist-pending .approve-btn {
+  background: #4A90D9;
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 8px;
+}
+.waitlist-pending .reject-btn {
+  background: none;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
 }
 
 /* toast */
@@ -413,6 +468,23 @@ body {
     <input type="text" id="nameInput" placeholder="请输入你的姓名" maxlength="20">
     <button onclick="doLogin()">进入排班</button>
     <div class="error" id="loginError"></div>
+    <div class="admin-link">
+      <a href="#" onclick="showAdminLogin(); return false;">管理员入口</a>
+    </div>
+  </div>
+</div>
+
+<!-- 管理员登录弹窗 -->
+<div id="adminLoginModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;">
+  <div class="login-card">
+    <h1>🔐 管理员登录</h1>
+    <p>请输入管理员密码</p>
+    <input type="password" id="adminPassword" placeholder="管理员密码" maxlength="50">
+    <button onclick="doAdminLogin()">进入管理</button>
+    <div class="error" id="adminLoginError"></div>
+    <div style="margin-top:16px">
+      <a href="#" onclick="hideAdminLogin(); return false;" style="color:#999;font-size:14px;">返回</a>
+    </div>
   </div>
 </div>
 
@@ -426,15 +498,15 @@ body {
     </div>
   </div>
 
-  <div class="tabs">
+  <div class="tabs" id="tabsBar">
     <div class="tab active" onclick="switchTab('schedule')">排班表</div>
     <div class="tab" onclick="switchTab('stats')">我的班次</div>
-    <div class="tab" onclick="switchTab('admin')">管理</div>
+    <div class="tab" id="adminTab" style="display:none" onclick="switchTab('admin')">管理</div>
   </div>
 
   <!-- 排班表 -->
   <div class="schedule-view" id="scheduleView">
-    <div class="tip">💡 点击格子选择时段（先抢先得），再点一次取消。每时段最多 <span id="maxHint">2</span> 人。</div>
+    <div class="tip">💡 点击格子选择时段（先抢先得），再点一次取消。每时段最多 <span id="maxHint">2</span> 人。满了可申请候补。</div>
     <div id="scheduleGrid"></div>
   </div>
 
@@ -444,14 +516,20 @@ body {
       <h3>📌 我的班次</h3>
       <div id="myShifts"></div>
     </div>
-    <div class="all-stats">
-      <h3>📊 各人班次统计</h3>
-      <div id="allStats"></div>
+    <div class="my-waitlist" id="myWaitlistSection" style="display:none">
+      <h3>⏳ 我的候补</h3>
+      <div id="myWaitlist"></div>
     </div>
   </div>
 
   <!-- 管理 -->
   <div class="admin-view" id="adminView">
+    <div class="admin-section waitlist-section">
+      <h3>⏳ 候补申请</h3>
+      <ul class="waitlist-pending" id="waitlistPending">
+        <li style="color:#999">暂无候补申请</li>
+      </ul>
+    </div>
     <div class="admin-section">
       <h3>👤 成员管理</h3>
       <div class="add-row">
@@ -462,7 +540,7 @@ body {
     </div>
     <div class="admin-section reset-section">
       <h3>⚠️ 重置排班</h3>
-      <p style="color:#999;font-size:13px;margin-bottom:16px;">清空所有人的排班选择</p>
+      <p style="color:#999;font-size:13px;margin-bottom:16px;">清空所有人的排班选择和候补</p>
       <button class="danger" onclick="resetSchedule()">重置所有排班</button>
     </div>
   </div>
@@ -474,8 +552,10 @@ body {
 <script>
 const API = '/api'
 let currentUser = ''
+let isAdmin = false
 let scheduleData = {}
 let configData = {}
+let waitlistData = []
 
 // ========== Toast ==========
 function showToast(msg, type = '') {
@@ -485,31 +565,80 @@ function showToast(msg, type = '') {
   setTimeout(() => t.className = 'toast', 2000)
 }
 
+// ========== 带超时的 fetch ==========
+async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeout)
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    clearTimeout(id)
+    return response
+  } catch (e) {
+    clearTimeout(id)
+    throw e
+  }
+}
+
 // ========== 登录 ==========
 async function doLogin() {
   const name = document.getElementById('nameInput').value.trim()
   if (!name) { showToast('请输入姓名', 'error'); return }
   try {
-    const res = await fetch(API + '/login', {
+    const res = await fetchWithTimeout(API + '/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
-    })
+    }, 15000)
     const data = await res.json()
     if (data.ok) {
       currentUser = data.name
+      isAdmin = false
       localStorage.setItem('shiftUser', currentUser)
       enterMain()
     } else {
       document.getElementById('loginError').textContent = data.msg
     }
   } catch (e) {
-    showToast('网络错误，请检查后端是否启动', 'error')
+    showToast('网络错误或服务启动中，请稍后重试', 'error')
+  }
+}
+
+function showAdminLogin() {
+  document.getElementById('adminLoginModal').style.display = 'flex'
+}
+
+function hideAdminLogin() {
+  document.getElementById('adminLoginModal').style.display = 'none'
+  document.getElementById('adminPassword').value = ''
+  document.getElementById('adminLoginError').textContent = ''
+}
+
+async function doAdminLogin() {
+  const password = document.getElementById('adminPassword').value
+  if (!password) { showToast('请输入密码', 'error'); return }
+  try {
+    const res = await fetchWithTimeout(API + '/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      currentUser = '管理员'
+      isAdmin = true
+      hideAdminLogin()
+      enterMain()
+    } else {
+      document.getElementById('adminLoginError').textContent = data.msg
+    }
+  } catch (e) {
+    showToast('网络错误', 'error')
   }
 }
 
 function doLogout() {
   currentUser = ''
+  isAdmin = false
   localStorage.removeItem('shiftUser')
   document.getElementById('loginPage').style.display = 'flex'
   document.getElementById('mainPage').style.display = 'none'
@@ -519,12 +648,23 @@ function doLogout() {
 document.getElementById('nameInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin()
 })
+document.getElementById('adminPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doAdminLogin()
+})
 
 // ========== 进入主页 ==========
 async function enterMain() {
   document.getElementById('loginPage').style.display = 'none'
   document.getElementById('mainPage').style.display = 'block'
   document.getElementById('userName').textContent = currentUser
+
+  // 管理员显示管理 tab
+  if (isAdmin) {
+    document.getElementById('adminTab').style.display = 'block'
+  } else {
+    document.getElementById('adminTab').style.display = 'none'
+  }
+
   await loadConfig()
   await loadSchedule()
 }
@@ -532,27 +672,31 @@ async function enterMain() {
 // ========== 数据加载 ==========
 async function loadConfig() {
   try {
-    const res = await fetch(API + '/config')
+    const res = await fetchWithTimeout(API + '/config', {}, 15000)
     configData = await res.json()
     document.getElementById('maxHint').textContent = configData.maxPerSlot
   } catch (e) {
-    showToast('加载配置失败', 'error')
+    showToast('加载配置失败，服务可能正在启动', 'error')
   }
 }
 
 async function loadSchedule() {
   try {
-    const res = await fetch(API + '/schedule')
+    const res = await fetchWithTimeout(API + '/schedule', {}, 15000)
     const data = await res.json()
     configData.timeSlots = data.timeSlots
     configData.days = data.days
     configData.maxPerSlot = data.maxPerSlot
     scheduleData = data.schedule
+    waitlistData = data.waitlist || []
     renderSchedule()
     renderMyShifts()
-    renderAllStats()
+    if (isAdmin) {
+      renderWaitlistPending()
+      loadMembers()
+    }
   } catch (e) {
-    showToast('加载排班失败', 'error')
+    showToast('加载排班失败，服务可能正在启动', 'error')
   }
 }
 
@@ -588,12 +732,16 @@ function renderSchedule() {
         n === currentUser ? `<strong>${n}</strong>` : n
       ).join('<br>')
 
+      // 检查是否在候补名单
+      const isWaitlisted = waitlistData.find(w => w.name === currentUser && w.day === day && w.slotId === slot.id)
+
       html += `<td>
         <div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
           ${isMine ? '<span class="check">✓</span>' : ''}
           <span class="count">${names.length}/${maxPerSlot}</span>
           <span class="time">${slot.label}</span>
           <div class="names">${namesHtml || '<span style="color:#ccc">空</span>'}</div>
+          ${!isMine && isFull && !isAdmin ? `<button class="waitlist-btn" onclick="event.stopPropagation();applyWaitlist('${day}','${slot.id}')">${isWaitlisted ? '已候补' : '候补'}</button>` : ''}
         </div>
       </td>`
     }
@@ -605,23 +753,60 @@ function renderSchedule() {
 
 // ========== 选择/取消 ==========
 async function toggleSlot(day, slotId) {
+  if (isAdmin) {
+    showToast('管理员不能选班次', 'error')
+    return
+  }
   try {
-    const res = await fetch(API + '/select', {
+    const res = await fetchWithTimeout(API + '/select', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: currentUser, day, slotId })
-    })
+    }, 15000)
     const data = await res.json()
     if (data.ok) {
       scheduleData = data.schedule
       renderSchedule()
       renderMyShifts()
-      renderAllStats()
       if (data.action === 'added') showToast('已选择该时段', 'success')
       else showToast('已取消该时段', '')
     } else {
       showToast(data.msg, 'error')
     }
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
+// ========== 候补 ==========
+async function applyWaitlist(day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, day, slotId })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      showToast('候补申请已提交', 'success')
+      await loadSchedule()
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('申请失败', 'error')
+  }
+}
+
+async function cancelWaitlist(day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/waitlist/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, day, slotId })
+    }, 15000)
+    await loadSchedule()
+    showToast('已取消候补', '')
   } catch (e) {
     showToast('操作失败', 'error')
   }
@@ -644,42 +829,36 @@ function renderMyShifts() {
 
   if (mySlots.length === 0) {
     document.getElementById('myShifts').innerHTML = '<div class="shift-empty">暂未选择任何时段</div>'
-    return
-  }
-
-  let html = ''
-  for (const s of mySlots) {
-    html += `<div class="shift-item">
-      <div class="info">
-        <span class="day">${s.day}</span>
-        <span class="time">${s.slot.period} ${s.slot.label}</span>
-      </div>
-      <button class="cancel-btn" onclick="toggleSlot('${s.day}','${s.slot.id}')">取消</button>
-    </div>`
-  }
-  document.getElementById('myShifts').innerHTML = html
-}
-
-// ========== 统计 ==========
-function renderAllStats() {
-  const { timeSlots, days, members, maxPerSlot } = configData
-  const counts = {}
-  for (const m of (members || [])) counts[m] = 0
-  for (const key of Object.keys(scheduleData)) {
-    for (const name of scheduleData[key]) {
-      counts[name] = (counts[name] || 0) + 1
+  } else {
+    let html = ''
+    for (const s of mySlots) {
+      html += `<div class="shift-item">
+        <div class="info">
+          <span class="day">${s.day}</span>
+          <span class="time">${s.slot.period} ${s.slot.label}</span>
+        </div>
+        <button class="cancel-btn" onclick="toggleSlot('${s.day}','${s.slot.id}')">取消</button>
+      </div>`
     }
+    document.getElementById('myShifts').innerHTML = html
   }
 
-  let html = ''
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
-  for (const [name, count] of sorted) {
-    html += `<div class="stat-row">
-      <span class="name">${name}</span>
-      <span class="badge">${count} 个班次</span>
-    </div>`
+  // 我的候补
+  const myWaitlist = waitlistData.filter(w => w.name === currentUser)
+  if (myWaitlist.length > 0) {
+    document.getElementById('myWaitlistSection').style.display = 'block'
+    let html = ''
+    for (const w of myWaitlist) {
+      const slot = timeSlots.find(s => s.id === w.slotId)
+      html += `<div class="waitlist-item">
+        <span>${w.day} ${slot ? slot.label : w.slotId}</span>
+        <button class="cancel-btn" onclick="cancelWaitlist('${w.day}','${w.slotId}')">取消</button>
+      </div>`
+    }
+    document.getElementById('myWaitlist').innerHTML = html
+  } else {
+    document.getElementById('myWaitlistSection').style.display = 'none'
   }
-  document.getElementById('allStats').innerHTML = html
 }
 
 // ========== Tab 切换 ==========
@@ -694,16 +873,15 @@ function switchTab(tab) {
     document.querySelectorAll('.tab')[1].classList.add('active')
     document.getElementById('statsView').style.display = 'block'
   } else if (tab === 'admin') {
-    document.querySelectorAll('.tab')[2].classList.add('active')
+    document.getElementById('adminTab').classList.add('active')
     document.getElementById('adminView').style.display = 'block'
-    loadMembers()
   }
 }
 
 // ========== 管理功能 ==========
 async function loadMembers() {
   try {
-    const res = await fetch(API + '/admin/members')
+    const res = await fetchWithTimeout(API + '/admin/members', {}, 15000)
     const data = await res.json()
     let html = ''
     for (const name of data.members) {
@@ -718,16 +896,70 @@ async function loadMembers() {
   }
 }
 
+function renderWaitlistPending() {
+  if (waitlistData.length === 0) {
+    document.getElementById('waitlistPending').innerHTML = '<li style="color:#999">暂无候补申请</li>'
+    return
+  }
+  let html = ''
+  for (const w of waitlistData) {
+    const slot = configData.timeSlots.find(s => s.id === w.slotId)
+    html += `<li>
+      <span><strong>${w.name}</strong> 申请 ${w.day} ${slot ? slot.label : w.slotId}</span>
+      <div>
+        <button class="approve-btn" onclick="approveWaitlist('${w.name}','${w.day}','${w.slotId}')">批准</button>
+        <button class="reject-btn" onclick="rejectWaitlist('${w.name}','${w.day}','${w.slotId}')">拒绝</button>
+      </div>
+    </li>`
+  }
+  document.getElementById('waitlistPending').innerHTML = html
+}
+
+async function approveWaitlist(name, day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/admin/waitlist/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, day, slotId })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      showToast('已批准', 'success')
+      await loadSchedule()
+      renderWaitlistPending()
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
+async function rejectWaitlist(name, day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/waitlist/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, day, slotId })
+    }, 15000)
+    showToast('已拒绝', '')
+    await loadSchedule()
+    renderWaitlistPending()
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
 async function addMember() {
   const input = document.getElementById('newMemberInput')
   const name = input.value.trim()
   if (!name) return
   try {
-    const res = await fetch(API + '/admin/member', {
+    const res = await fetchWithTimeout(API + '/admin/member', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
-    })
+    }, 15000)
     const data = await res.json()
     if (data.ok) {
       input.value = ''
@@ -743,13 +975,13 @@ async function addMember() {
 }
 
 async function removeMember(name) {
-  if (!confirm(`确定移除 ${name}？将同时清除其排班。`)) return
+  if (!confirm(`确定移除 ${name}？将同时清除其排班和候补。`)) return
   try {
-    const res = await fetch(API + '/admin/member/remove', {
+    const res = await fetchWithTimeout(API + '/admin/member/remove', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
-    })
+    }, 15000)
     const data = await res.json()
     if (data.ok) {
       loadMembers()
@@ -764,15 +996,16 @@ async function removeMember(name) {
 }
 
 async function resetSchedule() {
-  if (!confirm('确定重置所有排班？此操作不可恢复！')) return
+  if (!confirm('确定重置所有排班和候补？此操作不可恢复！')) return
   try {
-    const res = await fetch(API + '/admin/reset', {
+    const res = await fetchWithTimeout(API + '/admin/reset', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
-    })
+    }, 15000)
     const data = await res.json()
     if (data.ok) {
       await loadSchedule()
+      renderWaitlistPending()
       showToast('排班已重置', 'success')
     }
   } catch (e) {
@@ -783,17 +1016,17 @@ async function resetSchedule() {
 // ========== 自动登录 ==========
 (async function init() {
   const saved = localStorage.getItem('shiftUser')
-  if (saved) {
-    // 验证是否还在名单中
+  if (saved && saved !== '管理员') {
     try {
-      const res = await fetch(API + '/login', {
+      const res = await fetchWithTimeout(API + '/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: saved })
-      })
+      }, 15000)
       const data = await res.json()
       if (data.ok) {
         currentUser = data.name
+        isAdmin = false
         await enterMain()
         return
       }
