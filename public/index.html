@@ -597,6 +597,16 @@ body {
 
   <!-- 管理 -->
   <div class="admin-view" id="adminView">
+    <div class="admin-section" id="startTimeSection">
+      <h3>⏰ 排班开始时间</h3>
+      <p style="color:#999;font-size:13px;margin-bottom:12px">设置后，成员在指定时间之前无法选班次。留空则不限制。</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="datetime-local" id="startTimeInput" style="padding:10px;border:2px solid #e0e6ef;border-radius:10px;font-size:14px;min-width:220px">
+        <button onclick="saveStartTime()" style="padding:10px 20px;background:#27ae60;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600">保存</button>
+        <button onclick="clearStartTime()" style="padding:10px 20px;background:#e0e0e0;color:#666;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600">清除限制</button>
+      </div>
+      <div id="startTimeStatus" style="margin-top:10px;font-size:13px;color:#888"></div>
+    </div>
     <div class="admin-section waitlist-section">
       <h3>⏳ 候补申请</h3>
       <ul class="waitlist-pending" id="waitlistPending">
@@ -808,6 +818,13 @@ async function loadConfig() {
     const res = await fetchWithTimeout(API + '/config', {}, 15000)
     configData = await res.json()
     document.getElementById('maxHint').textContent = configData.maxPerSlot
+    if (configData.startTime) {
+      const startDate = new Date(configData.startTime)
+      const nowBeijingMs = Date.now() + 8 * 60 * 60 * 1000
+      if (nowBeijingMs < startDate.getTime()) {
+        showToast('排班尚未开始，请等待管理员开放', 'error')
+      }
+    }
   } catch (e) {
     showToast('加载配置失败，服务可能正在启动', 'error')
   }
@@ -821,6 +838,7 @@ async function loadSchedule() {
     configData.days = data.days
     configData.maxPerSlot = data.maxPerSlot
     configData.members = data.members
+    configData.startTime = data.startTime || null
     scheduleData = data.schedule
     waitlistData = data.waitlist || []
     cancelRequests = data.cancelRequests || []
@@ -831,6 +849,7 @@ async function loadSchedule() {
       renderCancelPending()
       loadMembers()
       updateAssignMemberList()
+      loadAdminStartTime()
     }
   } catch (e) {
     showToast('加载排班失败，服务可能正在启动', 'error')
@@ -1375,6 +1394,70 @@ function updateAssignMemberList() {
   }
 }
 
+// ========== 开始时间设置 ==========
+async function loadAdminStartTime() {
+  try {
+    const res = await fetchWithTimeout(API + '/admin/start-time', {}, 15000)
+    const data = await res.json()
+    const statusEl = document.getElementById('startTimeStatus')
+    if (data.startTime) {
+      const d = new Date(data.startTime)
+      const beijing = new Date(d.getTime() - 8 * 60 * 60 * 1000)
+      const str = beijing.getFullYear() + '年' + (beijing.getMonth() + 1) + '月' + beijing.getDate() + '日 '
+        + String(beijing.getHours()).padStart(2, '0') + ':' + String(beijing.getMinutes()).padStart(2, '0')
+      statusEl.textContent = '当前设置：北京时间 ' + str
+    } else {
+      statusEl.textContent = '当前：无限制'
+    }
+  } catch (e) { }
+}
+
+async function saveStartTime() {
+  const val = document.getElementById('startTimeInput').value
+  let startTime = null
+  if (val) {
+    const localMs = new Date(val).getTime()
+    const beijingOffset = 8 * 60 * 60 * 1000
+    startTime = new Date(localMs + beijingOffset).toISOString()
+  }
+  try {
+    const res = await fetchWithTimeout(API + '/admin/start-time', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startTime })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      showToast('保存成功', 'success')
+      loadAdminStartTime()
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('保存失败', 'error')
+  }
+}
+
+async function clearStartTime() {
+  if (!confirm('确定清除限制？成员将可以立即开始选班次。')) return
+  try {
+    const res = await fetchWithTimeout(API + '/admin/start-time', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startTime: null })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      document.getElementById('startTimeInput').value = ''
+      showToast('已清除限制', 'success')
+      loadAdminStartTime()
+    }
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
+// ========== 重置排班 ==========
 async function resetSchedule() {
   if (!confirm('确定重置所有排班和候补？此操作不可恢复！')) return
   try {
