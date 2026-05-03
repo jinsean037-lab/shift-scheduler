@@ -256,7 +256,7 @@ app.get('/api/admin/waitlist', async (req, res) => {
   }
 })
 
-// 管理员：批准候补（直接添加到排班）
+// 管理员：批准候补（直接添加到排班，允许突破上限到3人）
 app.post('/api/admin/waitlist/approve', async (req, res) => {
   try {
     const { name, day, slotId } = req.body
@@ -264,8 +264,9 @@ app.post('/api/admin/waitlist/approve', async (req, res) => {
     const key = `${day}|${slotId}`
     if (!store.schedule[key]) store.schedule[key] = []
     const list = store.schedule[key]
-    if (list.length >= store.maxPerSlot) {
-      return res.json({ ok: false, msg: '该时段已满' })
+    // 管理员批准候补时，允许突破 maxPerSlot 限制（最多3人）
+    if (list.length >= 3) {
+      return res.json({ ok: false, msg: '该时段已有3人，无法继续添加' })
     }
     if (!list.includes(name)) list.push(name)
     // 从候补名单移除
