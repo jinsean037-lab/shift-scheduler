@@ -18,6 +18,7 @@ const store = {
   ],
   days: ['周一', '周二', '周三', '周四', '周五'],
   maxPerSlot: 2,
+  startTime: null, // 排班开始时间（北京时间 ISO 字符串），null 表示不限制
   members: [
     '赫敏然', '吴卓泓', '周子曦', '施金', '蔡心玥', '冯一诺', '刘锐曦', '罗璐', '周田', '张新源',
     '马衍茹', '邹绪扬', '熊卓然', '方悠', '黄畅锋', '孙歌瑶', '王梓豪', '姚雅洁', '陈宇涵', '彭德东', '王润橦'
@@ -52,12 +53,46 @@ app.get('/api/config', async (req, res) => {
     res.json({
       timeSlots: store.timeSlots,
       days: store.days,
-      maxPerSlot: store.maxPerSlot
+      maxPerSlot: store.maxPerSlot,
+      startTime: store.startTime
     })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
 })
+
+// 管理员：获取开始时间设置
+app.get('/api/admin/start-time', async (req, res) => {
+  try {
+    const store = readStore()
+    res.json({ startTime: store.startTime })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：设置开始时间
+app.post('/api/admin/start-time', async (req, res) => {
+  try {
+    const { startTime } = req.body
+    const store = readStore()
+    // startTime 为 null 表示不限制，字符串表示北京时间 ISO 格式
+    store.startTime = startTime || null
+    writeStore(store)
+    res.json({ ok: true, startTime: store.startTime })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 检查是否在排班开始时间前
+function isBeforeStartTime(store) {
+  if (!store.startTime) return false // 不限制
+  // 将北京时间 startTime 转为 UTC Date 对比
+  const startDate = new Date(store.startTime)
+  const nowBeijingMs = Date.now() + 8 * 60 * 60 * 1000 // 当前北京时间转 UTC
+  return nowBeijingMs < startDate.getTime()
+}
 
 // 登录验证（姓名+密码）
 app.post('/api/login', async (req, res) => {
@@ -95,7 +130,8 @@ app.get('/api/schedule', async (req, res) => {
       schedule: store.schedule,
       members: store.members,
       waitlist: store.waitlist,
-      cancelRequests: store.cancelRequests || []
+      cancelRequests: store.cancelRequests || [],
+      startTime: store.startTime
     })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
@@ -111,6 +147,11 @@ app.post('/api/select', async (req, res) => {
     }
 
     const store = readStore()
+
+    // 检查是否在排班开始时间前
+    if (isBeforeStartTime(store)) {
+      return res.json({ ok: false, msg: '排班尚未开始，请等待管理员设置开始时间' })
+    }
 
     if (!store.members.includes(name)) {
       return res.json({ ok: false, msg: '用户不存在' })
@@ -190,6 +231,10 @@ app.post('/api/waitlist', async (req, res) => {
       return res.json({ ok: false, msg: '参数缺失' })
     }
     const store = readStore()
+    // 检查是否在排班开始时间前
+    if (isBeforeStartTime(store)) {
+      return res.json({ ok: false, msg: '排班尚未开始，请等待管理员设置开始时间' })
+    }
     if (!store.members.includes(name)) {
       return res.json({ ok: false, msg: '用户不存在' })
     }
@@ -295,12 +340,13 @@ app.post('/api/admin/member/remove', async (req, res) => {
   }
 })
 
-// 管理员：重置排班
+// 管理员：重置排班（保留开始时间设置）
 app.post('/api/admin/reset', async (req, res) => {
   try {
     const store = readStore()
     store.schedule = {}
     store.waitlist = []
+    store.cancelRequests = []
     writeStore(store)
     res.json({ ok: true })
   } catch (e) {
