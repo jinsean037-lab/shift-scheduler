@@ -143,7 +143,7 @@ app.post('/api/select', async (req, res) => {
 // 申请取消班次
 app.post('/api/cancel-request', async (req, res) => {
   try {
-    const { name, day, slotId } = req.body
+    const { name, day, slotId, reason } = req.body
     if (!name || !day || !slotId) {
       return res.json({ ok: false, msg: '参数缺失' })
     }
@@ -158,7 +158,7 @@ app.post('/api/cancel-request', async (req, res) => {
     if (exists) {
       return res.json({ ok: false, msg: '已提交取消申请' })
     }
-    store.cancelRequests.push({ name, day, slotId, time: new Date().toISOString(), status: 'pending' })
+    store.cancelRequests.push({ name, day, slotId, reason: reason || '', time: new Date().toISOString(), status: 'pending' })
     writeStore(store)
     res.json({ ok: true, msg: '取消申请已提交，等待管理员审批' })
   } catch (e) {
@@ -369,6 +369,50 @@ app.post('/api/admin/cancel/reject', async (req, res) => {
     if (item) item.status = 'rejected'
     writeStore(store)
     res.json({ ok: true, cancelRequests: store.cancelRequests })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：为成员分配班次
+app.post('/api/admin/assign', async (req, res) => {
+  try {
+    const { name, day, slotId } = req.body
+    if (!name || !day || !slotId) {
+      return res.json({ ok: false, msg: '参数缺失' })
+    }
+    const store = readStore()
+    if (!store.members.includes(name)) {
+      return res.json({ ok: false, msg: '成员不存在' })
+    }
+    const key = `${day}|${slotId}`
+    if (!store.schedule[key]) store.schedule[key] = []
+    const list = store.schedule[key]
+    if (list.includes(name)) {
+      return res.json({ ok: false, msg: '该成员已在此班次' })
+    }
+    list.push(name)
+    writeStore(store)
+    res.json({ ok: true, schedule: store.schedule })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：移除成员班次
+app.post('/api/admin/unassign', async (req, res) => {
+  try {
+    const { name, day, slotId } = req.body
+    const store = readStore()
+    const key = `${day}|${slotId}`
+    const list = store.schedule[key] || []
+    const idx = list.indexOf(name)
+    if (idx >= 0) {
+      list.splice(idx, 1)
+      if (list.length === 0) delete store.schedule[key]
+    }
+    writeStore(store)
+    res.json({ ok: true, schedule: store.schedule })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
