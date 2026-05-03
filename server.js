@@ -1,22 +1,15 @@
 const express = require('express')
-const fs = require('fs')
 const path = require('path')
 
 const app = express()
 const PORT = process.env.PORT || 3000
-const MONGODB_URI = process.env.MONGODB_URI
-const STORE_PATH = path.join(__dirname, 'data', 'store.json')
 
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
 
-// ========== 存储层：支持 MongoDB 和 JSON 文件两种模式 ==========
+// ========== 内存存储（Render 免费版适用）==========
 
-let db = null
-let collection = null
-let useMongo = false
-
-const DEFAULT_DATA = {
+const store = {
   timeSlots: [
     { id: 'am1', label: '8:00-10:00', period: '上午' },
     { id: 'am2', label: '10:00-12:00', period: '上午' },
@@ -29,55 +22,12 @@ const DEFAULT_DATA = {
   schedule: {}
 }
 
-async function initDB() {
-  if (!MONGODB_URI) {
-    // 本地 JSON 模式
-    if (!fs.existsSync(STORE_PATH)) {
-      fs.writeFileSync(STORE_PATH, JSON.stringify(DEFAULT_DATA, null, 2), 'utf-8')
-    }
-    console.log('存储模式: JSON 文件 (本地开发)')
-    return
-  }
-
-  // MongoDB 模式
-  const { MongoClient } = require('mongodb')
-  try {
-    const client = new MongoClient(MONGODB_URI)
-    await client.connect()
-    db = client.db('shift_scheduler')
-    collection = db.collection('store')
-    useMongo = true
-
-    // 如果没有数据，初始化
-    const existing = await collection.findOne({ _id: 'main' })
-    if (!existing) {
-      await collection.insertOne({ _id: 'main', ...DEFAULT_DATA })
-    }
-    console.log('存储模式: MongoDB (线上)')
-  } catch (e) {
-    console.error('MongoDB 连接失败，回退到 JSON 模式:', e.message)
-    if (!fs.existsSync(STORE_PATH)) {
-      fs.writeFileSync(STORE_PATH, JSON.stringify(DEFAULT_DATA, null, 2), 'utf-8')
-    }
-  }
+function readStore() {
+  return store
 }
 
-async function readStore() {
-  if (useMongo) {
-    const doc = await collection.findOne({ _id: 'main' })
-    if (!doc) return { ...DEFAULT_DATA }
-    const { _id, ...rest } = doc
-    return rest
-  }
-  return JSON.parse(fs.readFileSync(STORE_PATH, 'utf-8'))
-}
-
-async function writeStore(data) {
-  if (useMongo) {
-    await collection.replaceOne({ _id: 'main' }, { _id: 'main', ...data })
-  } else {
-    fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf-8')
-  }
+function writeStore(data) {
+  Object.assign(store, data)
 }
 
 // ========== API 路由 ==========
@@ -235,8 +185,6 @@ app.get('/api/admin/members', async (req, res) => {
 })
 
 // 启动
-initDB().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`排班系统运行中: http://localhost:${PORT}`)
-  })
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`排班系统运行中: http://localhost:${PORT}`)
 })
