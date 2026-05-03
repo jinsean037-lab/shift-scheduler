@@ -477,6 +477,20 @@ let currentUser = ''
 let scheduleData = {}
 let configData = {}
 
+// ========== 带超时的 fetch ==========
+async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeout)
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    clearTimeout(id)
+    return response
+  } catch (e) {
+    clearTimeout(id)
+    throw e
+  }
+}
+
 // ========== Toast ==========
 function showToast(msg, type = '') {
   const t = document.getElementById('toast')
@@ -490,11 +504,11 @@ async function doLogin() {
   const name = document.getElementById('nameInput').value.trim()
   if (!name) { showToast('请输入姓名', 'error'); return }
   try {
-    const res = await fetch(API + '/login', {
+    const res = await fetchWithTimeout(API + '/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
-    })
+    }, 15000)
     const data = await res.json()
     if (data.ok) {
       currentUser = data.name
@@ -504,7 +518,7 @@ async function doLogin() {
       document.getElementById('loginError').textContent = data.msg
     }
   } catch (e) {
-    showToast('网络错误，请检查后端是否启动', 'error')
+    showToast('网络错误或服务启动中，请稍后重试', 'error')
   }
 }
 
@@ -532,17 +546,17 @@ async function enterMain() {
 // ========== 数据加载 ==========
 async function loadConfig() {
   try {
-    const res = await fetch(API + '/config')
+    const res = await fetchWithTimeout(API + '/config', {}, 15000)
     configData = await res.json()
     document.getElementById('maxHint').textContent = configData.maxPerSlot
   } catch (e) {
-    showToast('加载配置失败', 'error')
+    showToast('加载配置失败，服务可能正在启动', 'error')
   }
 }
 
 async function loadSchedule() {
   try {
-    const res = await fetch(API + '/schedule')
+    const res = await fetchWithTimeout(API + '/schedule', {}, 15000)
     const data = await res.json()
     configData.timeSlots = data.timeSlots
     configData.days = data.days
@@ -552,7 +566,7 @@ async function loadSchedule() {
     renderMyShifts()
     renderAllStats()
   } catch (e) {
-    showToast('加载排班失败', 'error')
+    showToast('加载排班失败，服务可能正在启动', 'error')
   }
 }
 
@@ -786,18 +800,20 @@ async function resetSchedule() {
   if (saved) {
     // 验证是否还在名单中
     try {
-      const res = await fetch(API + '/login', {
+      const res = await fetchWithTimeout(API + '/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: saved })
-      })
+      }, 15000)
       const data = await res.json()
       if (data.ok) {
         currentUser = data.name
         await enterMain()
         return
       }
-    } catch (e) {}
+    } catch (e) {
+      // 自动登录失败，显示登录页
+    }
   }
   document.getElementById('loginPage').style.display = 'flex'
 })()
