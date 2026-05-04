@@ -576,7 +576,7 @@ body {
 
   <!-- 排班表 -->
   <div class="schedule-view" id="scheduleView">
-    <div class="tip">💡 点击格子选择时段（先抢先得），选择后不可主动取消。每时段最多 <span id="maxHint">2</span> 人。满了可申请候补。 <button onclick="loadSchedule()" style="margin-left:10px;padding:3px 10px;background:#e8f0fb;color:#4A90D9;border:1px solid #c0d8f0;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔄 刷新</button></div>
+    <div class="tip">💡 点击格子选择时段（先抢先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟如需取消请提交申请。每时段最多 <span id="maxHint">2</span> 人。满了可申请候补。 <button onclick="loadSchedule()" style="margin-left:10px;padding:3px 10px;background:#e8f0fb;color:#4A90D9;border:1px solid #c0d8f0;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔄 刷新</button></div>
     <div id="scheduleGrid"></div>
   </div>
 
@@ -910,20 +910,34 @@ function renderSchedule() {
         }
       }
 
-      html += `<td>
+      if (isMine) {
+        const entryTime = window._entryTimes ? window._entryTimes[`${day}|${slot.id}`] : null
+        let cancelInfo = ''
+        if (entryTime) {
+          const elapsed = Date.now() - entryTime
+          if (elapsed <= 3 * 60 * 1000) {
+            const left = Math.ceil((3 * 60 * 1000 - elapsed) / 1000)
+            cancelInfo = `<span style="font-size:10px;color:#27ae60">(${left}s内可取消)</span>`
+          }
+        }
+        html += `<td>
         <div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
-          ${isMine ? '<span class="check">✓</span>' : ''}
+          <span class="check">✓</span>
+          <span class="count">${names.length}/${maxPerSlot}</span>
+          <span class="time">${slot.label}${cancelInfo}</span>
+          <div class="names">${namesHtml}</div>
+        </div>
+      </td>`
+      } else {
+        html += `<td>
+        <div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
           <span class="count">${names.length}/${maxPerSlot}</span>
           <span class="time">${slot.label}</span>
           <div class="names">${namesHtml || '<span style="color:#ccc">空</span>'}</div>
           ${waitlistBtn}
         </div>
       </td>`
-    }
-    html += '</tr>'
-  }
-  html += '</table>'
-  document.getElementById('scheduleGrid').innerHTML = html
+      }
 }
 
 // ========== 选择班次（弹窗确认）==========
@@ -935,19 +949,54 @@ function toggleSlot(day, slotId) {
   const key = `${day}|${slotId}`
   const names = scheduleData[key] || []
   if (names.includes(currentUser)) {
-    showToast('已选择该班次，如需取消请申请', '')
+    // 在排班中——检查是否在3分钟内可以自由取消
+    const entryTime = window._entryTimes ? window._entryTimes[key] : null
+    if (entryTime) {
+      const elapsed = Date.now() - entryTime
+      if (elapsed <= 3 * 60 * 1000) {
+        // 3分钟内，直接取消
+        showConfirm('确认取消', '选择后3分钟内可自由取消，确定取消吗？', () => doQuickCancel(day, slotId))
+        return
+      }
+    }
+    // 超过3分钟
+    const slot = configData.timeSlots.find(s => s.id === slotId)
+    showToast(`已选 ${day} ${slot.label}，如需取消请提交申请（超过3分钟）`, '')
     return
   }
   const slot = configData.timeSlots.find(s => s.id === slotId)
   showConfirm(
     '确认选择班次',
-    `确定选择 ${day} ${slot.label} 吗？选择后不可主动取消。`,
+    `确定选择 ${day} ${slot.label} 吗？选择后3分钟内可免费取消。`,
     () => doSelect(day, slotId)
   )
 }
 
+async function doQuickCancel(day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API + '/cancel-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, day, slotId, reason: '3分钟内自由取消' })
+    }, 15000)
+    const data = await res.json()
+    if (data.ok) {
+      showToast(data.msg || '已取消，空位已自动填补', 'success')
+      await loadSchedule()
+    } else {
+      showToast(data.msg, 'error')
+    }
+  } catch (e) {
+    showToast('操作失败', 'error')
+  }
+}
+
 async function doSelect(day, slotId) {
   console.log('doSelect called:', { day, slotId, currentUser })
+  // 记录选班时间
+  if (!window._entryTimes) window._entryTimes = {}
+  window._entryTimes[`${day}|${slotId}`] = Date.now()
+
   try {
     const res = await fetchWithTimeout(API + '/select', {
       method: 'POST',
