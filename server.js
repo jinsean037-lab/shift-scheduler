@@ -1,6 +1,17 @@
 const express = require('express')
 const path = require('path')
 
+// ========== 默认成员数据（Render 重启后从此恢复）==========
+const DEFAULT_MEMBERS = (process.env.DEFAULT_MEMBERS || '赫敏然,吴卓泓,周子曦,施金,蔡心玥,冯一诺,刘锐曦,罗璐,周田,张新源,马衍茹,邹绪扬,熊卓然,方悠,黄畅锋,孙歌瑶,王梓豪,姚雅洁,陈宇涵,彭德东,王润橦').split(',')
+
+const DEFAULT_PASSWORDS = {
+  '赫敏然':'77893457','吴卓泓':'85630183','周子曦':'65103265','施金':'81621329','蔡心玥':'85481151',
+  '冯一诺':'88137988','刘锐曦':'82034008','罗璐':'76813401','周田':'65989126','张新源':'58175831',
+  '马衍茹':'91998599','邹绪扬':'29822335','熊卓然':'85197554','方悠':'58101585','黄畅锋':'15470436',
+  '孙歌瑶':'81680381','王梓豪':'49907581','姚雅洁':'35122532','陈宇涵':'07342267','彭德东':'62375667',
+  '王润橦':'11176906'
+}
+
 const app = express()
 const PORT = process.env.PORT || 3000
 
@@ -37,7 +48,17 @@ const store = {
   cancelRequests: []   //取消班次申请: [{ name, day, slotId, time, status, reason }]
 }
 
+// ========== 懒初始化：实例休眠重启后自动恢复成员名单 ==========
+function ensureMembers() {
+  if (store.members.length === 0 && DEFAULT_MEMBERS.length > 0) {
+    store.members = [...DEFAULT_MEMBERS]
+    store.passwords = { ...DEFAULT_PASSWORDS }
+    console.log('[init] 已从环境变量恢复成员名单:', store.members.length + '人')
+  }
+}
+
 function readStore() {
+  ensureMembers() // 每次读store时也检查，防止睡醒后第一次请求仍为空
   return store
 }
 
@@ -55,7 +76,8 @@ app.get('/api/config', async (req, res) => {
       timeSlots: store.timeSlots,
       days: store.days,
       maxPerSlot: store.maxPerSlot,
-      startTime: store.startTime
+      startTime: store.startTime,
+      members: store.members
     })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
@@ -565,5 +587,6 @@ app.post('/api/admin/waitlist/approve', async (req, res) => {
 
 // 启动
 app.listen(PORT, '0.0.0.0', () => {
+  ensureMembers() // 启动时检查，自动恢复休眠前的成员名单
   console.log(`排班系统运行中: http://localhost:${PORT}`)
 })
