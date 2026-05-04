@@ -222,6 +222,7 @@ body {
   line-height: 1.5;
   margin-top: 2px;
   min-height: 18px;
+  margin-bottom: 22px; /* 给候补按钮留空间，避免遮挡成员名字 */
 }
 .cell .count {
   position: absolute;
@@ -575,7 +576,7 @@ body {
 
   <!-- 排班表 -->
   <div class="schedule-view" id="scheduleView">
-    <div class="tip">💡 点击格子选择时段（先抢先得），选择后不可主动取消。每时段最多 <span id="maxHint">2</span> 人。满了可申请候补。</div>
+    <div class="tip">💡 点击格子选择时段（先抢先得），选择后不可主动取消。每时段最多 <span id="maxHint">2</span> 人。满了可申请候补。 <button onclick="loadSchedule()" style="margin-left:10px;padding:3px 10px;background:#e8f0fb;color:#4A90D9;border:1px solid #c0d8f0;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔄 刷新</button></div>
     <div id="scheduleGrid"></div>
   </div>
 
@@ -778,6 +779,7 @@ async function doAdminLogin() {
 }
 
 function doLogout() {
+  if (window._scheduleTimer) { clearInterval(window._scheduleTimer); window._scheduleTimer = null }
   currentUser = ''
   isAdmin = false
   localStorage.removeItem('shiftUser')
@@ -812,6 +814,10 @@ async function enterMain() {
 
   await loadConfig()
   await loadSchedule()
+
+  // 每 1 秒自动刷新排班数据，避免选班时看不到他人已选状态
+  if (window._scheduleTimer) clearInterval(window._scheduleTimer)
+  window._scheduleTimer = setInterval(() => { loadSchedule() }, 1000)
 }
 
 // ========== 数据加载 ==========
