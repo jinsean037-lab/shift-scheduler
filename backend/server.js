@@ -3,7 +3,7 @@ const path = require('path')
 const { MongoClient } = require('mongodb')
 
 // ========== MongoDB 连接 ==========
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://1327446407_db_user:<db_password>@cluster0.mdah4fq.mongodb.net/?appName=Cluster0'
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://1327446407_db_user:<db_password>@ac-1pkoj3t-shard-00-00.mdoh4fq.mongodb.net:27017,ac-1pkoj3t-shard-00-01.mdoh4fq.mongodb.net:27017,ac-1pkoj3t-shard-00-02.mdoh4fq.mongodb.net:27017/?ssl=true&replicaSet=atlas-fvozf6-shard-0&authSource=admin&appName=Cluster0'
 const DB_NAME = 'shift-scheduler'
 const COLLECTION_NAME = 'store'
 
