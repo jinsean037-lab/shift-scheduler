@@ -939,7 +939,10 @@ function renderSchedule() {
       </td>`
       }
     }
+    html += '</tr>'
   }
+  html += '</table>'
+  document.getElementById('scheduleGrid').innerHTML = html
 }
 
 // ========== 选择班次（弹窗确认）==========
