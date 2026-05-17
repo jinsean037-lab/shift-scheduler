@@ -36,8 +36,7 @@ body {
   flex-direction: column;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
-  background: #1a1a1a;
+  background: #f5f5f5;
 }
 /* 登录页顶部栏 */
 .login-topbar {
@@ -45,15 +44,15 @@ body {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 14px 40px;
+  gap: 10px;
+  padding: 12px 24px;
   background: white;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   flex-shrink: 0;
 }
 .login-topbar-logo {
   width: auto;
-  height: 48px;
+  height: 42px;
   flex-shrink: 0;
 }
 .login-topbar-logo img {
@@ -651,9 +650,9 @@ body {
 /* 响应式 */
 @media (max-width: 768px) {
   .login-body { flex-direction: column; }
-  .login-bg-left { min-height: 200px; }
-  .login-right { width: 100%; min-width: auto; padding: 32px 24px; }
-  .login-card-wrap { max-width: 340px; }
+  .login-bg-left { min-height: 180px; }
+  .login-right { width: 100%; min-width: auto; padding: 32px 24px; flex: 1; align-items: stretch; }
+  .login-card-wrap { max-width: 340px; margin: 0 auto; }
   .header-inner { padding: 12px 16px; }
   .header-text h1 { font-size: 15px; }
   .college-logo { width: 36px; height: 36px; }
@@ -662,14 +661,17 @@ body {
   .content-wrap { padding: 12px 8px 80px; }
   .schedule-table th, .schedule-table td { padding: 5px 3px; }
   .cell { min-height: 52px; padding: 4px; }
+  .login-page { min-height: 100dvh; background: white; }
+  .login-topbar { padding: 10px 20px; gap: 10px; }
+  .login-topbar-logo { height: 38px; }
+  .login-topbar h1 { font-size: 15px; white-space: nowrap; letter-spacing: 1px; }
 }
 @media (max-width: 480px) {
   .login-bg-left { display: none; }
-  .login-right { width: 100%; min-width: auto; padding: 24px 20px; }
-  .login-topbar { padding: 12px 20px; }
-  .login-topbar h1 { font-size: 15px; }
-}
-  .login-card-wrap { padding: 28px 22px; }
+  .login-right { width: 100%; min-width: auto; padding: 28px 22px; flex: 1; }
+  .login-topbar { padding: 10px 16px; gap: 8px; }
+  .login-topbar-logo { height: 34px; }
+  .login-topbar h1 { font-size: 14px; white-space: nowrap; }
 }
 </style>
 </head>
