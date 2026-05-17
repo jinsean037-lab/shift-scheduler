@@ -3,553 +3,596 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>学工办助理排班</title>
+<title>学工办助理排班系统 v3.0</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* ========== 全局 ========== */
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --primary: #003d79;      /* 中大深蓝 */
+  --primary-light: #1a5fb4;
+  --accent: #c41230;       /* 中大红 */
+  --gold: #c4a35a;
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --text: #2c3e50;
+  --text-light: #7f8c8d;
+  --border: #e2e8f0;
+  --success: #27ae60;
+  --danger: #e74c3c;
+  --warn: #f39c12;
+}
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: #f0f4fa;
-  color: #333;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
   min-height: 100vh;
+  line-height: 1.6;
 }
 
-/* 登录页 */
+/* ========== 学院顶栏 ========== */
+.college-header {
+  background: linear-gradient(135deg, var(--primary) 0%, #1a5fb4 100%);
+  color: white;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+}
+.college-header::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -10%;
+  width: 400px;
+  height: 400px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 50%;
+}
+.college-header::after {
+  content: '';
+  position: absolute;
+  bottom: -60%;
+  left: -5%;
+  width: 300px;
+  height: 300px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 50%;
+}
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+.college-logo {
+  width: 48px;
+  height: 48px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+.header-text h1 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+.header-text p {
+  font-size: 12px;
+  opacity: 0.8;
+  letter-spacing: 0.5px;
+}
+.header-badge {
+  margin-left: auto;
+  background: rgba(255,255,255,0.15);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* ========== 登录页 ========== */
 .login-page {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   padding: 20px;
+  background: linear-gradient(160deg, #f0f4f8 0%, #e8eef5 100%);
 }
 .login-card {
   background: white;
-  border-radius: 20px;
-  padding: 48px 40px;
-  box-shadow: 0 8px 32px rgba(74,144,217,0.12);
+  border-radius: 16px;
+  padding: 48px 44px;
+  box-shadow: 0 12px 48px rgba(0,61,121,0.10);
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
   text-align: center;
+  border: 1px solid rgba(0,61,121,0.06);
+}
+.login-card .logo-circle {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: white;
+  box-shadow: 0 4px 16px rgba(0,61,121,0.25);
 }
 .login-card h1 {
-  font-size: 28px;
-  color: #4A90D9;
-  margin-bottom: 8px;
+  font-size: 24px;
+  color: var(--primary);
+  margin-bottom: 6px;
+  font-weight: 700;
 }
-.login-card p {
-  color: #999;
+.login-card .subtitle {
+  color: var(--text-light);
   font-size: 14px;
   margin-bottom: 32px;
 }
 .login-card input {
   width: 100%;
-  padding: 14px 18px;
-  border: 2px solid #e0e6ef;
-  border-radius: 12px;
-  font-size: 16px;
+  padding: 13px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
   outline: none;
-  transition: border-color 0.2s;
-  background: #f8fafd;
-  margin-bottom: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #fafbfc;
+  margin-bottom: 14px;
 }
 .login-card input:focus {
-  border-color: #4A90D9;
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(26,95,180,0.10);
   background: white;
 }
 .login-card button {
   width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #4A90D9, #3a80c9);
+  padding: 13px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
   color: white;
   border: none;
-  border-radius: 50px;
-  font-size: 17px;
+  border-radius: 10px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 8px;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, transform 0.1s;
+  margin-top: 4px;
 }
-.login-card button:hover { opacity: 0.9; }
+.login-card button:hover { opacity: 0.92; }
+.login-card button:active { transform: scale(0.99); }
 .login-card .error {
-  color: #e74c3c;
-  font-size: 14px;
+  color: var(--danger);
+  font-size: 13px;
   margin-top: 12px;
-  min-height: 20px;
+  min-height: 18px;
 }
 .admin-link {
   margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid #eee;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }
 .admin-link a {
-  color: #4A90D9;
-  font-size: 14px;
+  color: var(--primary-light);
+  font-size: 13px;
   text-decoration: none;
+  transition: color 0.2s;
 }
-.admin-link a:hover { text-decoration: underline; }
+.admin-link a:hover { color: var(--primary); text-decoration: underline; }
 
-/* 主页 */
-.main-page { display: none; padding-bottom: 80px; }
+/* ========== 管理登录弹窗 ========== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: white;
+  border-radius: 16px;
+  padding: 36px 32px;
+  width: 90%;
+  max-width: 380px;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.15);
+}
+.modal-box h2 { font-size: 20px; color: var(--primary); margin-bottom: 6px; }
+.modal-box p { color: var(--text-light); font-size: 13px; margin-bottom: 20px; }
+.modal-box input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  margin-bottom: 14px;
+}
+.modal-box input:focus { border-color: var(--primary-light); }
+.modal-box button {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white; border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.modal-box .error { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 16px; }
+.modal-box .back-link { margin-top: 14px; }
+.modal-box .back-link a { color: var(--text-light); font-size: 13px; text-decoration: none; }
 
-/* 顶栏 */
-.top-bar {
-  background: linear-gradient(135deg, #4A90D9, #6BA3E0);
+/* ========== 确认弹窗 ========== */
+.confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.confirm-overlay.show { display: flex; }
+.confirm-box {
+  background: white;
+  border-radius: 16px;
+  padding: 28px 24px;
+  width: 90%;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.15);
+}
+.confirm-box h3 { font-size: 17px; color: var(--text); margin-bottom: 10px; }
+.confirm-box p { font-size: 14px; color: var(--text-light); margin-bottom: 20px; line-height: 1.5; }
+.confirm-box .btns { display: flex; gap: 10px; }
+.confirm-box .btns button {
+  flex: 1; padding: 11px; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+}
+.confirm-box .btns .cancel { background: #f0f2f5; color: #666; }
+.confirm-box .btns .confirm { background: var(--primary); color: white; }
+
+/* ========== 主内容区 ========== */
+.main-page { display: none; }
+.content-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 16px 100px;
+}
+
+/* 欢迎横幅 */
+.welcome-banner {
+  background: linear-gradient(135deg, var(--primary) 0%, #1a5fb4 60%, #2980b9 100%);
+  border-radius: 14px;
   padding: 20px 24px;
   color: white;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 20px rgba(0,61,121,0.18);
 }
-.top-bar h1 { font-size: 22px; }
-.top-bar .user-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-}
-.top-bar .logout {
+.welcome-banner .info { display: flex; align-items: center; gap: 12px; }
+.welcome-banner .avatar {
+  width: 40px; height: 40px;
   background: rgba(255,255,255,0.2);
-  border: none;
-  color: white;
-  padding: 6px 14px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 13px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; border: 2px solid rgba(255,255,255,0.3);
 }
+.welcome-banner .name { font-size: 16px; font-weight: 600; }
+.welcome-banner .role { font-size: 12px; opacity: 0.8; }
+.welcome-banner .logout-btn {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: white; padding: 7px 16px;
+  border-radius: 20px; cursor: pointer; font-size: 13px;
+  transition: background 0.2s;
+}
+.welcome-banner .logout-btn:hover { background: rgba(255,255,255,0.25); }
 
-/* 标签切换 */
+/* ========== Tab 栏 ========== */
 .tabs {
   display: flex;
   background: white;
-  border-bottom: 2px solid #f0f4fa;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  overflow: hidden;
 }
 .tab {
   flex: 1;
-  padding: 14px;
+  padding: 13px 8px;
   text-align: center;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  color: #999;
+  color: var(--text-light);
   cursor: pointer;
   border-bottom: 3px solid transparent;
   transition: all 0.2s;
+  user-select: none;
 }
-.tab.active {
-  color: #4A90D9;
-  border-bottom-color: #4A90D9;
-}
+.tab:hover { color: var(--primary-light); background: #f8fafd; }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); background: #f8fafd; }
 
-/* 排班表视图 */
-.schedule-view { padding: 16px; }
-.schedule-view .tip {
-  background: #fff8e1;
+/* ========== 提示条 ========== */
+.tip-bar {
+  background: #fffbea;
+  border: 1px solid #ffe58f;
   border-radius: 10px;
-  padding: 12px 16px;
+  padding: 11px 16px;
   font-size: 13px;
   color: #8d6e00;
-  margin-bottom: 16px;
-  line-height: 1.6;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.5;
+}
+.tip-bar .refresh-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  background: white;
+  border: 1px solid #ffe58f;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-/* 表格 */
-.schedule-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+/* ========== 排班表 ========== */
+.table-wrap {
   background: white;
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  overflow-x: auto;
+}
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
 }
 .schedule-table th {
-  background: #f5f8fc;
+  background: #f8fafd;
   padding: 12px 8px;
   font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  border-bottom: 2px solid #e8edf5;
+  font-weight: 700;
+  color: var(--primary);
+  border-bottom: 2px solid var(--border);
 }
-.schedule-table th:first-child { width: 56px; }
+.schedule-table th:first-child { text-align: left; padding-left: 16px; }
 .schedule-table td {
   padding: 8px 6px;
-  text-align: center;
-  border-bottom: 1px solid #f0f4fa;
   vertical-align: top;
+  border-bottom: 1px solid #f0f2f5;
 }
 .schedule-table tr:last-child td { border-bottom: none; }
 
 /* 时段标签 */
-.period-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #999;
-  padding: 2px 6px;
-  border-radius: 8px;
+.period-badge {
   display: inline-block;
-  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-bottom: 3px;
 }
-.period-label.am { background: #fff3e0; color: #e67e22; }
-.period-label.pm { background: #e3f2fd; color: #2980b9; }
+.period-badge.am { background: #e8f4fd; color: #1a5fb4; }
+.period-badge.pm { background: #fff3e0; color: #e65100; }
+.time-label { font-size: 11px; color: #90a4ae; }
 
 /* 格子 */
 .cell {
-  min-height: 60px;
+  min-height: 62px;
   border-radius: 10px;
-  padding: 6px;
+  padding: 6px 7px;
   cursor: pointer;
   transition: all 0.15s;
   background: #f8fafd;
-  border: 2px solid #e8edf5;
+  border: 1.5px solid #e8edf2;
   position: relative;
 }
-.cell:hover { border-color: #4A90D9; }
+.cell:hover { border-color: var(--primary-light); box-shadow: 0 2px 8px rgba(26,95,180,0.10); }
 .cell.mine {
-  background: linear-gradient(135deg, #4A90D9, #5b9fe0);
-  border-color: #3a80c9;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-color: var(--primary);
   color: white;
 }
-.cell.mine .period-label { background: rgba(255,255,255,0.2); color: white; }
-.cell.full {
-  background: #f0f0f0;
-  border-color: #ddd;
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-.cell .names {
-  font-size: 12px;
-  line-height: 1.5;
-  margin-top: 2px;
-  min-height: 18px;
-  margin-bottom: 22px; /* 给候补按钮留空间，避免遮挡成员名字 */
-}
+.cell.mine .period-badge { background: rgba(255,255,255,0.2); color: white; }
+.cell.mine .time-label { color: rgba(255,255,255,0.7); }
+.cell.full { background: #f5f5f5; border-color: #e8e8e8; cursor: not-allowed; opacity: 0.65; }
+.cell .names { font-size: 12px; line-height: 1.5; margin-top: 3px; }
 .cell .count {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 11px;
-  color: #aaa;
-  font-weight: 600;
+  position: absolute; top: 4px; right: 6px;
+  font-size: 11px; font-weight: 700; color: #aab;
 }
 .cell.mine .count { color: rgba(255,255,255,0.7); }
-.cell .time { font-size: 12px; font-weight: 500; }
-.cell .check {
-  position: absolute;
-  top: 4px;
-  left: 6px;
-  font-size: 13px;
-}
+.cell .check { position: absolute; top: 4px; left: 6px; font-size: 13px; }
 .waitlist-btn {
-  position: absolute;
-  bottom: 4px;
-  right: 6px;
-  font-size: 10px;
-  background: #ff9800;
-  color: white;
-  border: none;
-  padding: 2px 6px;
-  border-radius: 4px;
-  cursor: pointer;
+  position: absolute; bottom: 4px; right: 5px;
+  font-size: 10px; background: var(--warn); color: white;
+  border: none; padding: 2px 7px; border-radius: 4px; cursor: pointer;
 }
-.waitlist-btn:hover { background: #f57c00; }
+.waitlist-btn:hover { background: #e67e22; }
 
-/* 统计视图 */
-.stats-view { padding: 16px; display: none; }
-.my-shifts {
+/* ========== 我的班次 ========== */
+.section-card {
   background: white;
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 20px;
+  margin-bottom: 14px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-  margin-bottom: 16px;
 }
-.my-shifts h3 {
-  font-size: 16px;
-  color: #4A90D9;
-  margin-bottom: 16px;
+.section-card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .shift-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f4fa;
+  padding: 11px 0;
+  border-bottom: 1px solid #f0f2f5;
 }
 .shift-item:last-child { border-bottom: none; }
-.shift-item .info { font-size: 14px; }
-.shift-item .info .day { font-weight: 600; }
-.shift-item .info .time { color: #888; font-size: 13px; }
-.shift-item .cancel-btn {
-  background: #fff0f0;
-  color: #e74c3c;
-  border: none;
-  padding: 6px 14px;
+.shift-item .day { font-weight: 700; font-size: 14px; }
+.shift-item .time { color: var(--text-light); font-size: 13px; margin-left: 6px; }
+.cancel-btn {
+  background: none;
+  border: 1.5px solid var(--danger);
+  color: var(--danger);
+  padding: 5px 14px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
 }
-.shift-empty {
-  text-align: center;
-  color: #999;
-  padding: 40px 0;
-  font-size: 14px;
-}
-.my-waitlist {
-  background: #fff8e1;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-  margin-bottom: 16px;
-}
-.my-waitlist h3 {
-  font-size: 16px;
-  color: #f57c00;
-  margin-bottom: 16px;
-}
-.waitlist-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid #ffe0b2;
-  font-size: 14px;
-}
-.waitlist-item:last-child { border-bottom: none; }
+.cancel-btn:hover { background: var(--danger); color: white; }
+.empty-tip { text-align: center; color: var(--text-light); padding: 32px 0; font-size: 14px; }
 
-.my-cancel-requests {
-  background: #fce4ec;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-}
-.my-cancel-requests h3 {
-  font-size: 16px;
-  color: #e91e63;
-  margin-bottom: 16px;
-}
-
-/* 管理视图 */
-.admin-view { padding: 16px; display: none; }
+/* ========== 管理视图 ========== */
 .admin-section {
   background: white;
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 20px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
 }
-.admin-section h3 {
-  font-size: 16px;
-  color: #333;
-  margin-bottom: 16px;
-}
-.admin-section .add-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.admin-section input {
-  flex: 1;
+.admin-section h3 { font-size: 15px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.admin-section input, .admin-section select {
   padding: 10px 14px;
-  border: 2px solid #e0e6ef;
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   font-size: 14px;
   outline: none;
+  background: #fafbfc;
 }
-.admin-section input:focus { border-color: #4A90D9; }
-.admin-section button {
+.admin-section input:focus, .admin-section select:focus { border-color: var(--primary-light); }
+.admin-btn {
   padding: 10px 20px;
-  background: #4A90D9;
-  color: white;
   border: none;
   border-radius: 10px;
-  cursor: pointer;
   font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  color: white;
 }
-.admin-section button:hover { opacity: 0.9; }
-.admin-section button.danger { background: #e74c3c; }
-.member-list {
-  list-style: none;
-  max-height: 300px;
-  overflow-y: auto;
-}
+.admin-btn.primary { background: var(--primary); }
+.admin-btn.danger { background: var(--danger); }
+.admin-btn.success { background: var(--success); }
+.admin-btn:hover { opacity: 0.88; }
+.add-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.member-list { list-style: none; }
 .member-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f4fa;
-  font-size: 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid #f0f2f5; font-size: 14px;
 }
 .member-list li:last-child { border-bottom: none; }
-.member-list .remove-btn {
-  background: none;
-  border: 1px solid #e74c3c;
-  color: #e74c3c;
-  padding: 4px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
+.remove-btn {
+  background: none; border: 1.5px solid var(--danger);
+  color: var(--danger); padding: 4px 12px;
+  border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600;
 }
-.reset-section { text-align: center; }
-.reset-section button {
-  background: #e74c3c;
-  padding: 12px 32px;
-  border-radius: 50px;
-  font-size: 15px;
-}
-.waitlist-section { background: #fff8e1; }
-.waitlist-section h3 { color: #f57c00; }
-.cancel-section { background: #fce4ec; }
-.cancel-section h3 { color: #e91e63; }
-.waitlist-pending, .cancel-pending {
-  max-height: 400px;
-  overflow-y: auto;
-  list-style: none;
-}
-.waitlist-pending li, .cancel-pending li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid #ffe0b2;
-  font-size: 14px;
-}
-.cancel-pending li { border-bottom-color: #f8bbd9; }
-.waitlist-pending li:last-child, .cancel-pending li:last-child { border-bottom: none; }
-.waitlist-pending .approve-btn, .cancel-pending .approve-btn {
-  background: #4A90D9;
-  color: white;
-  border: none;
-  padding: 4px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  margin-left: 8px;
-}
-.waitlist-pending .reject-btn, .cancel-pending .reject-btn {
-  background: none;
-  border: 1px solid #e74c3c;
-  color: #e74c3c;
-  padding: 4px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-}
+.remove-btn:hover { background: var(--danger); color: white; }
 
-/* 确认弹窗 */
-.confirm-modal {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  z-index: 100;
-  align-items: center;
-  justify-content: center;
+.pending-list { list-style: none; }
+.pending-list li {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid #f0f2f5; font-size: 14px;
 }
-.confirm-modal.show { display: flex; }
-.confirm-box {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  width: 90%;
-  max-width: 360px;
-  text-align: center;
-}
-.confirm-box h3 {
-  font-size: 18px;
-  color: #333;
-  margin-bottom: 12px;
-}
-.confirm-box p {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 20px;
-}
-.confirm-box .btns {
-  display: flex;
-  gap: 12px;
-}
-.confirm-box .btns button {
-  flex: 1;
-  padding: 12px;
-  border: none;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.confirm-box .btns .cancel { background: #f0f0f0; color: #666; }
-.confirm-box .btns .confirm { background: #4A90D9; color: white; }
+.pending-list li:last-child { border-bottom: none; }
+.pending-btns { display: flex; gap: 6px; }
+.approve-btn { background: var(--success); color: white; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.reject-btn { background: white; border: 1.5px solid var(--danger); color: var(--danger); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
 
-/* toast */
+/* ========== Toast ========== */
 .toast {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%) translateY(-100px);
-  background: #333;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 12px;
+  position: fixed; top: 20px; left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  background: #333; color: white;
+  padding: 11px 24px;
+  border-radius: 10px;
   font-size: 14px;
   z-index: 999;
   transition: transform 0.3s;
   box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  pointer-events: none;
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
-.toast.error { background: #e74c3c; }
-.toast.success { background: #27ae60; }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
 
-/* 响应式 */
+/* ========== 响应式 ========== */
 @media (max-width: 600px) {
-  .schedule-table th, .schedule-table td { padding: 6px 4px; }
+  .header-inner { padding: 14px 16px; }
+  .header-text h1 { font-size: 16px; }
+  .college-logo { width: 40px; height: 40px; font-size: 18px; }
+  .header-badge { display: none; }
+  .welcome-banner { flex-direction: column; gap: 12px; text-align: center; }
+  .content-wrap { padding: 12px 8px 80px; }
+  .schedule-table th, .schedule-table td { padding: 5px 3px; }
   .cell { min-height: 52px; padding: 4px; }
-  .cell .time { font-size: 11px; }
-  .cell .names { font-size: 11px; }
 }
 </style>
 </head>
 <body>
 
-<!-- 登录页 -->
+<!-- ===== 登录页 ===== -->
 <div class="login-page" id="loginPage">
   <div class="login-card">
-    <h1>📋 学工办助理排班</h1>
-    <p>输入姓名和密码登录</p>
-    <input type="text" id="nameInput" placeholder="请输入你的姓名" maxlength="20">
-    <input type="password" id="passwordInput" placeholder="请输入密码" maxlength="20">
-    <button onclick="doLogin()">进入排班</button>
+    <div class="logo-circle">📋</div>
+    <h1>学工办助理排班</h1>
+    <p class="subtitle">中山大学岭南学院 · 助理排班系统 v3.0</p>
+    <input type="text" id="nameInput" placeholder="请输入姓名" maxlength="20" autocomplete="off">
+    <input type="password" id="passwordInput" placeholder="请输入密码" maxlength="20" autocomplete="off">
+    <button onclick="doLogin()">登&nbsp;&nbsp;录</button>
     <div class="error" id="loginError"></div>
     <div class="admin-link">
-      <a href="#" onclick="showAdminLogin(); return false;">管理员入口</a>
+      <a href="#" onclick="showAdminLogin();return false;">管理员入口</a>
     </div>
   </div>
 </div>
 
-<!-- 管理员登录弹窗 -->
-<div id="adminLoginModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;">
-  <div class="login-card">
-    <h1>🔐 管理员登录</h1>
+<!-- ===== 管理员登录弹窗 ===== -->
+<div class="modal-overlay" id="adminLoginModal">
+  <div class="modal-box">
+    <h2>🔐 管理员登录</h2>
     <p>请输入管理员密码</p>
-    <input type="password" id="adminPassword" placeholder="管理员密码" maxlength="50">
-    <button onclick="doAdminLogin()">进入管理</button>
+    <input type="password" id="adminPassword" placeholder="管理员密码" maxlength="50" autocomplete="off">
+    <button onclick="doAdminLogin()">登&nbsp;&nbsp;录</button>
     <div class="error" id="adminLoginError"></div>
-    <div style="margin-top:16px">
-      <a href="#" onclick="hideAdminLogin(); return false;" style="color:#999;font-size:14px;">返回</a>
-    </div>
+    <div class="back-link"><a href="#" onclick="hideAdminLogin();return false;">← 返回登录页</a></div>
   </div>
 </div>
 
-<!-- 确认弹窗 -->
-<div class="confirm-modal" id="confirmModal">
+<!-- ===== 确认弹窗 ===== -->
+<div class="confirm-overlay" id="confirmModal">
   <div class="confirm-box">
-    <h3 id="confirmTitle">确认选择</h3>
-    <p id="confirmMsg">确定选择该班次吗？</p>
+    <h3 id="confirmTitle">确认操作</h3>
+    <p id="confirmMsg"></p>
     <div id="confirmExtra"></div>
     <div class="btns">
       <button class="cancel" onclick="closeConfirm()">取消</button>
@@ -558,104 +601,139 @@ body {
   </div>
 </div>
 
-<!-- 主页 -->
+<!-- ===== 主页面 ===== -->
 <div class="main-page" id="mainPage">
-  <div class="top-bar">
-    <h1>📋 助理排班</h1>
-    <div class="user-info">
-      <span id="userName"></span>
-      <button class="logout" onclick="doLogout()">退出</button>
-    </div>
-  </div>
-
-  <div class="tabs" id="tabsBar">
-    <div class="tab active" onclick="switchTab('schedule')">排班表</div>
-    <div class="tab" id="myShiftsTab" onclick="switchTab('stats')">我的班次</div>
-    <div class="tab" id="adminTab" style="display:none" onclick="switchTab('admin')">管理</div>
-  </div>
-
-  <!-- 排班表 -->
-  <div class="schedule-view" id="scheduleView">
-    <div class="tip">💡 点击格子选择时段（先抢先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟如需取消请提交申请。每时段最多 <span id="maxHint">2</span> 人。满了可申请候补。 <button onclick="loadSchedule()" style="margin-left:10px;padding:3px 10px;background:#e8f0fb;color:#4A90D9;border:1px solid #c0d8f0;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🔄 刷新</button></div>
-    <div id="scheduleGrid"></div>
-  </div>
-
-  <!-- 我的班次 -->
-  <div class="stats-view" id="statsView">
-    <div class="my-shifts">
-      <h3>📌 我的班次</h3>
-      <div id="myShifts"></div>
-    </div>
-    <div class="my-waitlist" id="myWaitlistSection" style="display:none">
-      <h3>⏳ 我的候补</h3>
-      <div id="myWaitlist"></div>
-    </div>
-    <div class="my-cancel-requests" id="myCancelSection" style="display:none">
-      <h3>❌ 我的取消申请</h3>
-      <div id="myCancelRequests"></div>
-    </div>
-  </div>
-
-  <!-- 管理 -->
-  <div class="admin-view" id="adminView">
-    <div class="admin-section" id="startTimeSection">
-      <h3>⏰ 排班开始时间</h3>
-      <p style="color:#999;font-size:13px;margin-bottom:12px">设置后，成员在指定时间之前无法选班次。留空则不限制。</p>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="datetime-local" id="startTimeInput" style="padding:10px;border:2px solid #e0e6ef;border-radius:10px;font-size:14px;min-width:220px">
-        <button onclick="saveStartTime()" style="padding:10px 20px;background:#27ae60;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600">保存</button>
-        <button onclick="clearStartTime()" style="padding:10px 20px;background:#e0e0e0;color:#666;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600">清除限制</button>
+  <!-- 学院顶栏 -->
+  <div class="college-header">
+    <div class="header-inner">
+      <div class="college-logo">🎓</div>
+      <div class="header-text">
+        <h1>中山大学岭南学院</h1>
+        <p>Sun Yat-sen University · Lingnan College</p>
       </div>
-      <div id="startTimeStatus" style="margin-top:10px;font-size:13px;color:#888"></div>
+      <div class="header-badge">排班系统 v3.0</div>
     </div>
-    <div class="admin-section waitlist-section">
-      <h3>⏳ 候补申请</h3>
-      <ul class="waitlist-pending" id="waitlistPending">
-        <li style="color:#999">暂无候补申请</li>
-      </ul>
-    </div>
-    <div class="admin-section cancel-section">
-      <h3>❌ 取消班次申请</h3>
-      <ul class="cancel-pending" id="cancelPending">
-        <li style="color:#999">暂无取消申请</li>
-      </ul>
-    </div>
-    <div class="admin-section">
-      <h3>👤 成员管理</h3>
-      <div class="add-row">
-        <input type="text" id="newMemberInput" placeholder="输入姓名" maxlength="20">
-        <button onclick="addMember()">添加</button>
+  </div>
+
+  <div class="content-wrap">
+    <!-- 欢迎横幅 -->
+    <div class="welcome-banner" id="welcomeBanner">
+      <div class="info">
+        <div class="avatar" id="avatarIcon">👤</div>
+        <div>
+          <div class="name" id="userName"></div>
+          <div class="role" id="userRole"></div>
+        </div>
       </div>
-      <ul class="member-list" id="memberList"></ul>
+      <button class="logout-btn" onclick="doLogout()">退出登录</button>
     </div>
-    <div class="admin-section">
-      <h3>📌 为成员分配班次</h3>
-      <div class="add-row">
-        <select id="assignMember" style="flex:1;padding:10px;border:2px solid #e0e6ef;border-radius:10px;font-size:14px">
-          <option value="">选择成员</option>
-        </select>
-        <select id="assignDay" style="padding:10px;border:2px solid #e0e6ef;border-radius:10px;font-size:14px">
-          <option value="">选择日期</option>
-          <option value="周一">周一</option>
-          <option value="周二">周二</option>
-          <option value="周三">周三</option>
-          <option value="周四">周四</option>
-          <option value="周五">周五</option>
-        </select>
-        <select id="assignSlot" style="padding:10px;border:2px solid #e0e6ef;border-radius:10px;font-size:14px">
-          <option value="">选择时段</option>
-          <option value="am1">8:00-10:00</option>
-          <option value="am2">10:00-12:00</option>
-          <option value="pm1">14:30-16:00</option>
-          <option value="pm2">16:00-17:30</option>
-        </select>
-        <button onclick="adminAssign()">分配</button>
+
+    <!-- Tab 栏 -->
+    <div class="tabs" id="tabsBar">
+      <div class="tab active" onclick="switchTab('schedule')">📅 排班表</div>
+      <div class="tab" id="myShiftsTab" onclick="switchTab('stats')">📌 我的班次</div>
+      <div class="tab" id="adminTab" style="display:none" onclick="switchTab('admin')">⚙️ 管理</div>
+    </div>
+
+    <!-- 排班表视图 -->
+    <div id="scheduleView">
+      <div class="tip-bar">
+        💡 点击格子选择时段（先到先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟需提交申请。每时段最多 <span id="maxHint">2</span> 人，满了可申请候补。
+        <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>
+      </div>
+      <div class="table-wrap">
+        <div id="scheduleGrid"></div>
       </div>
     </div>
-    <div class="admin-section reset-section">
-      <h3>⚠️ 重置排班</h3>
-      <p style="color:#999;font-size:13px;margin-bottom:16px;">清空所有人的排班选择和候补</p>
-      <button class="danger" onclick="resetSchedule()">重置所有排班</button>
+
+    <!-- 我的班次视图 -->
+    <div id="statsView" style="display:none">
+      <div class="section-card">
+        <h3>📌 我的班次</h3>
+        <div id="myShifts"></div>
+      </div>
+      <div class="section-card" id="myWaitlistSection" style="display:none">
+        <h3>⏳ 我的候补</h3>
+        <div id="myWaitlist"></div>
+      </div>
+      <div class="section-card" id="myCancelSection" style="display:none">
+        <h3>❌ 我的取消申请</h3>
+        <div id="myCancelRequests"></div>
+      </div>
+    </div>
+
+    <!-- 管理视图 -->
+    <div id="adminView" style="display:none">
+      <!-- 开始时间 -->
+      <div class="admin-section">
+        <h3>⏰ 排班开始时间</h3>
+        <p style="color:#999;font-size:13px;margin-bottom:12px">设置后成员在指定时间前无法选班次，留空则不限制。</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="datetime-local" id="startTimeInput" style="min-width:220px">
+          <button class="admin-btn success" onclick="saveStartTime()">保存</button>
+          <button class="admin-btn" style="background:#e0e0e0;color:#666" onclick="clearStartTime()">清除限制</button>
+        </div>
+        <div id="startTimeStatus" style="margin-top:10px;font-size:13px;color:#888"></div>
+      </div>
+
+      <!-- 候补申请 -->
+      <div class="admin-section">
+        <h3>⏳ 候补申请</h3>
+        <ul class="pending-list" id="waitlistPending">
+          <li style="color:#999">暂无候补申请</li>
+        </ul>
+      </div>
+
+      <!-- 取消申请 -->
+      <div class="admin-section">
+        <h3>❌ 取消班次申请</h3>
+        <ul class="pending-list" id="cancelPending">
+          <li style="color:#999">暂无取消申请</li>
+        </ul>
+      </div>
+
+      <!-- 成员管理 -->
+      <div class="admin-section">
+        <h3>👤 成员管理</h3>
+        <div class="add-row">
+          <input type="text" id="newMemberInput" placeholder="输入姓名" maxlength="20" style="flex:1">
+          <button class="admin-btn primary" onclick="addMember()">添加</button>
+        </div>
+        <ul class="member-list" id="memberList"></ul>
+      </div>
+
+      <!-- 手动分配 -->
+      <div class="admin-section">
+        <h3>📌 为成员分配班次</h3>
+        <div class="add-row">
+          <select id="assignMember" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px">
+            <option value="">选择成员</option>
+          </select>
+          <select id="assignDay" style="padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px">
+            <option value="">选择日期</option>
+            <option value="周一">周一</option>
+            <option value="周二">周二</option>
+            <option value="周三">周三</option>
+            <option value="周四">周四</option>
+            <option value="周五">周五</option>
+          </select>
+          <select id="assignSlot" style="padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px">
+            <option value="">选择时段</option>
+            <option value="am1">8:00-10:00</option>
+            <option value="am2">10:00-12:00</option>
+            <option value="pm1">14:30-16:00</option>
+            <option value="pm2">16:00-17:30</option>
+          </select>
+          <button class="admin-btn primary" onclick="adminAssign()">分配</button>
+        </div>
+      </div>
+
+      <!-- 重置 -->
+      <div class="admin-section" style="border:1.5px solid #ffe0e0">
+        <h3 style="color:var(--danger)">⚠️ 重置排班</h3>
+        <p style="color:#999;font-size:13px;margin-bottom:14px">清空所有人的排班选择和候补，此操作不可恢复！</p>
+        <button class="admin-btn danger" onclick="resetSchedule()">重置所有排班</button>
+      </div>
     </div>
   </div>
 </div>
@@ -672,97 +750,83 @@ let configData = {}
 let waitlistData = []
 let cancelRequests = []
 let pendingAction = null
+window._entryTimes = {}
 
-// ========== Toast ==========
-function showToast(msg, type = '') {
+/* ========== Toast ========== */
+function showToast(msg, type='') {
   const t = document.getElementById('toast')
   t.textContent = msg
   t.className = 'toast show ' + type
-  setTimeout(() => t.className = 'toast', 2000)
+  setTimeout(()=>{ t.className = 'toast' }, 2200)
 }
 
-// ========== 确认弹窗 ==========
+/* ========== 确认弹窗 ========== */
 function showConfirm(title, msg, action) {
   document.getElementById('confirmTitle').textContent = title
   document.getElementById('confirmMsg').textContent = msg
   pendingAction = action
   document.getElementById('confirmModal').classList.add('show')
 }
-
 function closeConfirm() {
   document.getElementById('confirmModal').classList.remove('show')
   document.getElementById('confirmExtra').innerHTML = ''
   pendingAction = null
 }
-
 function confirmAction() {
-  console.log('confirmAction called, pendingAction:', pendingAction)
-  if (pendingAction) {
-    pendingAction()
-    closeConfirm()
-  } else {
-    console.log('ERROR: pendingAction is null!')
-  }
+  if (pendingAction) { pendingAction(); closeConfirm() }
 }
 
-// ========== 带超时的 fetch ==========
-async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+/* ========== fetch 超时 ========== */
+async function fetchWithTimeout(url, options={}, timeout=10000) {
   const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeout)
+  const id = setTimeout(()=>controller.abort(), timeout)
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal })
+    const res = await fetch(url, {...options, signal:controller.signal})
     clearTimeout(id)
-    return response
-  } catch (e) {
+    return res
+  } catch(e) {
     clearTimeout(id)
     throw e
   }
 }
 
-// ========== 登录 ==========
+/* ========== 登录 ========== */
 async function doLogin() {
   const name = document.getElementById('nameInput').value.trim()
   const password = document.getElementById('passwordInput').value.trim()
-  if (!name) { showToast('请输入姓名', 'error'); return }
-  if (!password) { showToast('请输入密码', 'error'); return }
+  if (!name) { showToast('请输入姓名','error'); return }
+  if (!password) { showToast('请输入密码','error'); return }
   try {
-    const res = await fetchWithTimeout(API + '/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, password })
+    const res = await fetchWithTimeout(API+'/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, password})
     }, 15000)
     const data = await res.json()
     if (data.ok) {
       currentUser = data.name
       isAdmin = false
-      localStorage.setItem('shiftUser', currentUser)
       enterMain()
     } else {
       document.getElementById('loginError').textContent = data.msg
     }
-  } catch (e) {
-    showToast('网络错误或服务启动中，请稍后重试', 'error')
-  }
+  } catch(e) { showToast('网络错误，请稍后重试','error') }
 }
 
 function showAdminLogin() {
-  document.getElementById('adminLoginModal').style.display = 'flex'
+  document.getElementById('adminLoginModal').classList.add('show')
 }
-
 function hideAdminLogin() {
-  document.getElementById('adminLoginModal').style.display = 'none'
+  document.getElementById('adminLoginModal').classList.remove('show')
   document.getElementById('adminPassword').value = ''
   document.getElementById('adminLoginError').textContent = ''
 }
-
 async function doAdminLogin() {
   const password = document.getElementById('adminPassword').value
-  if (!password) { showToast('请输入密码', 'error'); return }
+  if (!password) { showToast('请输入密码','error'); return }
   try {
-    const res = await fetchWithTimeout(API + '/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password })
+    const res = await fetchWithTimeout(API+'/admin/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password})
     }, 15000)
     const data = await res.json()
     if (data.ok) {
@@ -773,36 +837,26 @@ async function doAdminLogin() {
     } else {
       document.getElementById('adminLoginError').textContent = data.msg
     }
-  } catch (e) {
-    showToast('网络错误', 'error')
-  }
+  } catch(e) { showToast('网络错误','error') }
 }
-
 function doLogout() {
   if (window._scheduleTimer) { clearInterval(window._scheduleTimer); window._scheduleTimer = null }
-  currentUser = ''
-  isAdmin = false
+  currentUser = ''; isAdmin = false
   localStorage.removeItem('shiftUser')
   document.getElementById('loginPage').style.display = 'flex'
   document.getElementById('mainPage').style.display = 'none'
 }
+document.getElementById('nameInput').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('passwordInput').focus() })
+document.getElementById('passwordInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin() })
+document.getElementById('adminPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doAdminLogin() })
 
-// 回车登录
-document.getElementById('nameInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('passwordInput').focus()
-})
-document.getElementById('passwordInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin()
-})
-document.getElementById('adminPassword').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doAdminLogin()
-})
-
-// ========== 进入主页 ==========
+/* ========== 进入主页 ========== */
 async function enterMain() {
   document.getElementById('loginPage').style.display = 'none'
   document.getElementById('mainPage').style.display = 'block'
   document.getElementById('userName').textContent = currentUser
+  document.getElementById('avatarIcon').textContent = isAdmin ? '🔑' : '👤'
+  document.getElementById('userRole').textContent = isAdmin ? '管理员' : '学工办助理'
 
   if (isAdmin) {
     document.getElementById('adminTab').style.display = 'block'
@@ -811,43 +865,30 @@ async function enterMain() {
     document.getElementById('adminTab').style.display = 'none'
     document.getElementById('myShiftsTab').style.display = 'block'
   }
-
   await loadConfig()
   await loadSchedule()
-
-  // 每 1 秒自动刷新排班数据，避免选班时看不到他人已选状态
   if (window._scheduleTimer) clearInterval(window._scheduleTimer)
-  window._scheduleTimer = setInterval(() => { loadSchedule() }, 1000)
+  window._scheduleTimer = setInterval(()=>{ loadSchedule() }, 3000)
 }
 
-// ========== 数据加载 ==========
+/* ========== 数据加载 ========== */
 async function loadConfig() {
   try {
-    const res = await fetchWithTimeout(API + '/config', {}, 15000)
+    const res = await fetchWithTimeout(API+'/config', {}, 15000)
     configData = await res.json()
     document.getElementById('maxHint').textContent = configData.maxPerSlot
-    if (configData.startTime) {
-      const startDate = new Date(configData.startTime)
-      const nowBeijingMs = Date.now() + 8 * 60 * 60 * 1000
-      if (nowBeijingMs < startDate.getTime()) {
-        showToast('排班尚未开始，请等待管理员开放', 'error')
-      }
-    }
-  } catch (e) {
-    showToast('加载配置失败，服务可能正在启动', 'error')
-  }
+  } catch(e) {}
 }
-
 async function loadSchedule() {
   try {
-    const res = await fetchWithTimeout(API + '/schedule', {}, 15000)
+    const res = await fetchWithTimeout(API+'/schedule', {}, 15000)
     const data = await res.json()
     configData.timeSlots = data.timeSlots
     configData.days = data.days
     configData.maxPerSlot = data.maxPerSlot
     configData.members = data.members
     configData.startTime = data.startTime || null
-    scheduleData = data.schedule
+    scheduleData = data.schedule || {}
     waitlistData = data.waitlist || []
     cancelRequests = data.cancelRequests || []
     renderSchedule()
@@ -859,84 +900,67 @@ async function loadSchedule() {
       updateAssignMemberList()
       loadAdminStartTime()
     }
-  } catch (e) {
-    showToast('加载排班失败，服务可能正在启动', 'error')
-  }
+  } catch(e) {}
 }
 
-// ========== 渲染排班表 ==========
+/* ========== 渲染排班表 ========== */
 function renderSchedule() {
-  const { timeSlots, days, maxPerSlot } = configData
-  let html = '<table class="schedule-table">'
-
-  html += '<tr><th></th>'
-  for (const day of days) {
-    html += `<th>${day}</th>`
-  }
+  const {timeSlots, days, maxPerSlot} = configData
+  if (!timeSlots || !days) return
+  let html = '<table class="schedule-table"><tr><th style="min-width:56px"></th>'
+  for (const day of days) html += `<th>${day}</th>`
   html += '</tr>'
 
   for (const slot of timeSlots) {
     const periodClass = slot.period === '上午' ? 'am' : 'pm'
     html += '<tr>'
-    html += `<td><span class="period-label ${periodClass}">${slot.period}</span><br><span style="font-size:11px;color:#888">${slot.label}</span></td>`
-
+    html += `<td style="padding-left:16px"><span class="period-badge ${periodClass}">${slot.period}</span><br><span class="time-label">${slot.label}</span></td>`
     for (const day of days) {
       const key = `${day}|${slot.id}`
       const names = scheduleData[key] || []
       const isMine = names.includes(currentUser)
       const isFull = names.length >= maxPerSlot
-
       let cellClass = 'cell'
       if (isMine) cellClass += ' mine'
       else if (isFull) cellClass += ' full'
-
-      const namesHtml = names.map(n =>
-        n === currentUser ? `<strong>${n}</strong>` : n
-      ).join('<br>')
-
-      const myWaitlistItem = waitlistData.find(w => w.name === currentUser && w.day === day && w.slotId === slot.id)
-      const waitlistStatus = myWaitlistItem ? (myWaitlistItem.status || 'pending') : null
-
+      const namesHtml = names.map(n => n===currentUser ? `<strong>${n}</strong>` : n).join('<br>')
+      const myWaitlistItem = waitlistData.find(w=>w.name===currentUser && w.day===day && w.slotId===slot.id)
+      const waitlistStatus = myWaitlistItem ? (myWaitlistItem.status||'pending') : null
       let waitlistBtn = ''
       if (!isMine && isFull && !isAdmin) {
         if (!waitlistStatus) {
           waitlistBtn = `<button class="waitlist-btn" onclick="event.stopPropagation();applyWaitlist('${day}','${slot.id}')">候补</button>`
-        } else if (waitlistStatus === 'pending') {
-          waitlistBtn = `<button class="waitlist-btn" style="background:#999" onclick="event.stopPropagation();">待处理</button>`
-        } else if (waitlistStatus === 'approved') {
-          waitlistBtn = `<button class="waitlist-btn" style="background:#27ae60" onclick="event.stopPropagation();">已批准</button>`
-        } else if (waitlistStatus === 'rejected') {
-          waitlistBtn = `<button class="waitlist-btn" style="background:#e74c3c" onclick="event.stopPropagation();">已拒绝</button>`
+        } else if (waitlistStatus==='pending') {
+          waitlistBtn = `<button class="waitlist-btn" style="background:#999" disabled>待处理</button>`
+        } else if (waitlistStatus==='approved') {
+          waitlistBtn = `<button class="waitlist-btn" style="background:var(--success)">已批准</button>`
+        } else if (waitlistStatus==='rejected') {
+          waitlistBtn = `<button class="waitlist-btn" style="background:var(--danger)">已拒绝</button>`
         }
       }
-
       if (isMine) {
-        const entryTime = window._entryTimes ? window._entryTimes[`${day}|${slot.id}`] : null
+        const entryTime = window._entryTimes ? window._entryTimes[key] : null
         let cancelInfo = ''
         if (entryTime) {
           const elapsed = Date.now() - entryTime
-          if (elapsed <= 3 * 60 * 1000) {
-            const left = Math.ceil((3 * 60 * 1000 - elapsed) / 1000)
-            cancelInfo = `<span style="font-size:10px;color:#f59e0b">(${left}s内可取消)</span>`
+          if (elapsed <= 3*60*1000) {
+            const left = Math.ceil((3*60*1000 - elapsed)/1000)
+            cancelInfo = `<span style="font-size:10px;color:#f59e0b">（${left}s内可取消）</span>`
           }
         }
-        html += `<td>
-        <div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
+        html += `<td><div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
           <span class="check">✓</span>
           <span class="count">${names.length}/${maxPerSlot}</span>
-          <span class="time">${slot.label}${cancelInfo}</span>
+          <div class="time-label">${slot.label} ${cancelInfo}</div>
           <div class="names">${namesHtml}</div>
-        </div>
-      </td>`
+        </div></td>`
       } else {
-        html += `<td>
-        <div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
+        html += `<td><div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
           <span class="count">${names.length}/${maxPerSlot}</span>
-          <span class="time">${slot.label}</span>
-          <div class="names">${namesHtml || '<span style="color:#ccc">空</span>'}</div>
+          <div class="time-label">${slot.label}</div>
+          <div class="names">${namesHtml||'<span style="color:#ccc">空</span>'}</div>
           ${waitlistBtn}
-        </div>
-      </td>`
+        </div></td>`
       }
     }
     html += '</tr>'
@@ -945,608 +969,374 @@ function renderSchedule() {
   document.getElementById('scheduleGrid').innerHTML = html
 }
 
-// ========== 选择班次（弹窗确认）==========
+/* ========== 选班/取消 ========== */
 function toggleSlot(day, slotId) {
-  if (isAdmin) {
-    showToast('管理员不能选班次', 'error')
-    return
-  }
+  if (isAdmin) { showToast('管理员不能选班次','error'); return }
   const key = `${day}|${slotId}`
   const names = scheduleData[key] || []
   if (names.includes(currentUser)) {
-    // 在排班中——检查是否在3分钟内可以自由取消
     const entryTime = window._entryTimes ? window._entryTimes[key] : null
-    if (entryTime) {
-      const elapsed = Date.now() - entryTime
-      if (elapsed <= 3 * 60 * 1000) {
-        // 3分钟内，直接取消
-        showConfirm('确认取消', '选择后3分钟内可自由取消，确定取消吗？', () => doQuickCancel(day, slotId))
-        return
-      }
-    }
-    // 超过3分钟
-    const slot = configData.timeSlots.find(s => s.id === slotId)
-    showToast(`已选 ${day} ${slot.label}，如需取消请提交申请（超过3分钟）`, '')
-    return
-  }
-  const slot = configData.timeSlots.find(s => s.id === slotId)
-  showConfirm(
-    '确认选择班次',
-    `确定选择 ${day} ${slot.label} 吗？选择后3分钟内可自由取消。`,
-    () => doSelect(day, slotId)
-  )
-}
-
-async function doQuickCancel(day, slotId) {
-  try {
-    const res = await fetchWithTimeout(API + '/cancel-request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, day, slotId, reason: '3分钟内自由取消' })
-    }, 15000)
-    const data = await res.json()
-    if (data.ok) {
-      showToast(data.msg || '已取消，空位已自动填补', 'success')
-      await loadSchedule()
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
-}
-
-async function doSelect(day, slotId) {
-  console.log('doSelect called:', { day, slotId, currentUser })
-  // 记录选班时间
-  if (!window._entryTimes) window._entryTimes = {}
-  window._entryTimes[`${day}|${slotId}`] = Date.now()
-
-  try {
-    const res = await fetchWithTimeout(API + '/select', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, day, slotId })
-    }, 15000)
-    const data = await res.json()
-    console.log('select response:', data)
-    if (data.ok) {
-      scheduleData = data.schedule
-      renderSchedule()
-      renderMyShifts()
-      if (data.action === 'added') showToast('已选择该时段', 'success')
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    console.error('select error:', e)
-    showToast('操作失败', 'error')
-  }
-}
-
-// ========== 候补 ==========
-async function applyWaitlist(day, slotId) {
-  try {
-    const res = await fetchWithTimeout(API + '/waitlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, day, slotId })
-    }, 15000)
-    const data = await res.json()
-    if (data.ok) {
-      showToast('候补申请已提交', 'success')
-      await loadSchedule()
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    showToast('申请失败', 'error')
-  }
-}
-
-async function cancelWaitlist(day, slotId) {
-  try {
-    const res = await fetchWithTimeout(API + '/waitlist/cancel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, day, slotId })
-    }, 15000)
-    await loadSchedule()
-    showToast('已取消候补', '')
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
-}
-
-// ========== 取消班次申请（弹窗输入理由）==========
-function requestCancel(day, slotId) {
-  const slot = configData.timeSlots.find(s => s.id === slotId)
-  document.getElementById('confirmTitle').textContent = '申请取消班次'
-  document.getElementById('confirmMsg').textContent = `${day} ${slot.label}`
-  document.getElementById('confirmExtra').innerHTML = `<input type="text" id="cancelReason" placeholder="请输入取消理由（必填）" style="width:100%;padding:10px;border:2px solid #e0e6ef;border-radius:8px;margin-top:12px" maxlength="100">`
-  pendingAction = () => {
-    const reason = document.getElementById('cancelReason').value.trim()
-    if (!reason) {
-      showToast('请输入取消理由', 'error')
+    if (entryTime && Date.now()-entryTime <= 3*60*1000) {
+      showConfirm('确认取消', `确定取消 ${day} ${configData.timeSlots.find(s=>s.id===slotId).label} 吗？`, ()=>doQuickCancel(day,slotId))
       return
     }
+    showToast(`已选该时段，超过3分钟请提交取消申请`, '')
+    return
+  }
+  const slot = configData.timeSlots.find(s=>s.id===slotId)
+  showConfirm('确认选择', `确定选择 ${day} ${slot.label} 吗？选择后3分钟内可自由取消。`, ()=>doSelect(day,slotId))
+}
+async function doQuickCancel(day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API+'/cancel-request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser, day, slotId, reason:'3分钟内自由取消'})
+    },15000)
+    const data = await res.json()
+    if (data.ok) { showToast(data.msg||'已取消','success'); await loadSchedule() }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('操作失败','error') }
+}
+async function doSelect(day, slotId) {
+  window._entryTimes[`${day}|${slotId}`] = Date.now()
+  try {
+    const res = await fetchWithTimeout(API+'/select', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser, day, slotId})
+    },15000)
+    const data = await res.json()
+    if (data.ok) { scheduleData = data.schedule; renderSchedule(); renderMyShifts(); showToast('已选择该时段','success') }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('操作失败','error') }
+}
+
+/* ========== 候补 ========== */
+async function applyWaitlist(day, slotId) {
+  try {
+    const res = await fetchWithTimeout(API+'/waitlist', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser, day, slotId})
+    },15000)
+    const data = await res.json()
+    if (data.ok) { showToast('候补申请已提交','success'); await loadSchedule() }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('申请失败','error') }
+}
+async function cancelWaitlist(day, slotId) {
+  try {
+    await fetchWithTimeout(API+'/waitlist/cancel', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser, day, slotId})
+    },15000)
+    await loadSchedule()
+    showToast('已取消候补','')
+  } catch(e) { showToast('操作失败','error') }
+}
+
+/* ========== 取消申请 ========== */
+function requestCancel(day, slotId) {
+  const slot = configData.timeSlots.find(s=>s.id===slotId)
+  document.getElementById('confirmTitle').textContent = '申请取消班次'
+  document.getElementById('confirmMsg').textContent = `${day} ${slot.label}`
+  document.getElementById('confirmExtra').innerHTML = `<input type="text" id="cancelReason" placeholder="请输入取消理由（必填）" style="width:100%;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;margin-top:10px" maxlength="100">`
+  pendingAction = ()=>{
+    const reason = document.getElementById('cancelReason').value.trim()
+    if (!reason) { showToast('请输入取消理由','error'); return }
     doRequestCancel(day, slotId, reason)
   }
   document.getElementById('confirmModal').classList.add('show')
 }
-
 async function doRequestCancel(day, slotId, reason) {
-  console.log('doRequestCancel:', { day, slotId, reason, currentUser })
   try {
-    const res = await fetchWithTimeout(API + '/cancel-request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, day, slotId, reason })
-    }, 15000)
+    const res = await fetchWithTimeout(API+'/cancel-request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser, day, slotId, reason})
+    },15000)
     const data = await res.json()
-    console.log('cancel-request response:', data)
-    if (data.ok) {
-      closeConfirm()
-      showToast('取消申请已提交', 'success')
-      await loadSchedule()
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    console.error('cancel-request error:', e)
-    showToast('申请失败', 'error')
-  }
+    if (data.ok) { closeConfirm(); showToast('取消申请已提交','success'); await loadSchedule() }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('申请失败','error') }
 }
-
 async function revokeCancelRequest(day, slotId) {
   try {
-    const res = await fetchWithTimeout(API + '/cancel-request/revoke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, day, slotId })
-    }, 15000)
+    await fetchWithTimeout(API+'/cancel-request/revoke', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser, day, slotId})
+    },15000)
     await loadSchedule()
-    showToast('已撤销申请', '')
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
+    showToast('已撤销申请','')
+  } catch(e) { showToast('操作失败','error') }
 }
 
-// ========== 我的班次 ==========
+/* ========== 渲染我的班次 ========== */
 function renderMyShifts() {
-  const { timeSlots, days } = configData
+  const {timeSlots, days} = configData
   const mySlots = []
-
-  for (const day of days) {
-    for (const slot of timeSlots) {
+  for (const day of days||[]) {
+    for (const slot of timeSlots||[]) {
       const key = `${day}|${slot.id}`
-      const names = scheduleData[key] || []
-      if (names.includes(currentUser)) {
-        mySlots.push({ day, slot, key })
-      }
+      if ((scheduleData[key]||[]).includes(currentUser)) mySlots.push({day, slot})
     }
   }
-
-  if (mySlots.length === 0) {
-    document.getElementById('myShifts').innerHTML = '<div class="shift-empty">暂未选择任何时段</div>'
+  if (mySlots.length===0) {
+    document.getElementById('myShifts').innerHTML = '<div class="empty-tip">暂未选择任何时段</div>'
   } else {
     let html = ''
     for (const s of mySlots) {
-      // 检查是否已申请取消
-      const cancelReq = cancelRequests.find(r => r.name === currentUser && r.day === s.day && r.slotId === s.slot.id)
+      const cancelReq = (cancelRequests||[]).find(r=>r.name===currentUser&&r.day===s.day&&r.slotId===s.slot.id)
       let cancelBtn = ''
       if (!cancelReq) {
         cancelBtn = `<button class="cancel-btn" onclick="requestCancel('${s.day}','${s.slot.id}')">申请取消</button>`
       } else {
-        const status = cancelReq.status || 'pending'
-        if (status === 'pending') {
-          cancelBtn = `<span style="color:#f57c00;font-size:12px">取消申请中</span>`
-        } else if (status === 'approved') {
-          cancelBtn = `<span style="color:#27ae60;font-size:12px">已批准取消</span>`
-        } else if (status === 'rejected') {
-          cancelBtn = `<span style="color:#e74c3c;font-size:12px">取消被拒绝</span>`
-        }
+        const st = cancelReq.status||'pending'
+        if (st==='pending') cancelBtn = `<span style="color:var(--warn);font-size:12px">取消申请中</span>`
+        else if (st==='approved') cancelBtn = `<span style="color:var(--success);font-size:12px">已批准取消</span>`
+        else if (st==='rejected') cancelBtn = `<span style="color:var(--danger);font-size:12px">取消被拒绝</span>`
       }
       html += `<div class="shift-item">
-        <div class="info">
-          <span class="day">${s.day}</span>
-          <span class="time">${s.slot.period} ${s.slot.label}</span>
-        </div>
+        <div><span class="day">${s.day}</span><span class="time">${s.slot.period} ${s.slot.label}</span></div>
         ${cancelBtn}
       </div>`
     }
     document.getElementById('myShifts').innerHTML = html
   }
-
-  // 我的候补
-  const myWaitlist = waitlistData.filter(w => w.name === currentUser)
-  if (myWaitlist.length > 0) {
-    document.getElementById('myWaitlistSection').style.display = 'block'
-    let html = ''
-    for (const w of myWaitlist) {
-      const slot = timeSlots.find(s => s.id === w.slotId)
-      const status = w.status || 'pending'
-      let statusText = ''
-      let statusClass = ''
-      let actionBtn = ''
-
-      if (status === 'pending') {
-        statusText = '⏳ 待处理'
-        statusClass = 'color:#f57c00'
-        actionBtn = `<button class="cancel-btn" onclick="cancelWaitlist('${w.day}','${w.slotId}')">取消</button>`
-      } else if (status === 'approved') {
-        statusText = '✅ 已批准'
-        statusClass = 'color:#27ae60'
-      } else if (status === 'rejected') {
-        statusText = '❌ 已拒绝'
-        statusClass = 'color:#e74c3c'
-        actionBtn = `<button class="cancel-btn" onclick="cancelWaitlist('${w.day}','${w.slotId}')">删除</button>`
-      }
-
-      html += `<div class="waitlist-item">
-        <span>${w.day} ${slot ? slot.label : w.slotId} <span style="${statusClass};font-size:12px">${statusText}</span></span>
+  // 候补
+  const myWL = (waitlistData||[]).filter(w=>w.name===currentUser)
+  if (myWL.length>0) {
+    document.getElementById('myWaitlistSection').style.display='block'
+    let html=''
+    for (const w of myWL) {
+      const slot = (timeSlots||[]).find(s=>s.id===w.slotId)
+      const st = w.status||'pending'
+      let actionBtn=''
+      if (st==='pending') actionBtn = `<button class="cancel-btn" onclick="cancelWaitlist('${w.day}','${w.slotId}')">取消</button>`
+      else if (st==='rejected') actionBtn = `<button class="cancel-btn" onclick="cancelWaitlist('${w.day}','${w.slotId}')">删除</button>`
+      html += `<div class="shift-item">
+        <div><span class="day">${w.day} ${slot?slot.label:w.slotId}</span>
+        <span style="font-size:12px;${st==='approved'?'color:var(--success)':st==='rejected'?'color:var(--danger)':'color:var(--warn)'}"> ${st==='pending'?'⏳ 待处理':st==='approved'?'✅ 已批准':'❌ 已拒绝'}</span></div>
         ${actionBtn}
       </div>`
     }
     document.getElementById('myWaitlist').innerHTML = html
   } else {
-    document.getElementById('myWaitlistSection').style.display = 'none'
+    document.getElementById('myWaitlistSection').style.display='none'
   }
-
-  // 我的取消申请
-  const myCancelReqs = cancelRequests.filter(r => r.name === currentUser)
-  if (myCancelReqs.length > 0) {
-    document.getElementById('myCancelSection').style.display = 'block'
-    let html = ''
-    for (const r of myCancelReqs) {
-      const slot = timeSlots.find(s => s.id === r.slotId)
-      const status = r.status || 'pending'
-      let statusText = ''
-      let statusClass = ''
-      let actionBtn = ''
-
-      if (status === 'pending') {
-        statusText = '⏳ 待处理'
-        statusClass = 'color:#f57c00'
-        actionBtn = `<button class="cancel-btn" onclick="revokeCancelRequest('${r.day}','${r.slotId}')">撤销</button>`
-      } else if (status === 'approved') {
-        statusText = '✅ 已批准'
-        statusClass = 'color:#27ae60'
-      } else if (status === 'rejected') {
-        statusText = '❌ 已拒绝'
-        statusClass = 'color:#e74c3c'
-        actionBtn = `<button class="cancel-btn" onclick="revokeCancelRequest('${r.day}','${r.slotId}')">删除</button>`
-      }
-
-      html += `<div class="waitlist-item">
-        <span>${r.day} ${slot ? slot.label : r.slotId} <span style="${statusClass};font-size:12px">${statusText}</span></span>
+  // 取消申请
+  const myCR = (cancelRequests||[]).filter(r=>r.name===currentUser)
+  if (myCR.length>0) {
+    document.getElementById('myCancelSection').style.display='block'
+    let html=''
+    for (const r of myCR) {
+      const slot = (timeSlots||[]).find(s=>s.id===r.slotId)
+      const st = r.status||'pending'
+      let actionBtn=''
+      if (st==='pending') actionBtn = `<button class="cancel-btn" onclick="revokeCancelRequest('${r.day}','${r.slotId}')">撤销</button>`
+      else if (st==='rejected') actionBtn = `<button class="cancel-btn" onclick="revokeCancelRequest('${r.day}','${r.slotId}')">删除</button>`
+      html += `<div class="shift-item">
+        <div><span class="day">${r.day} ${slot?slot.label:r.slotId}</span>
+        <span style="font-size:12px;${st==='approved'?'color:var(--success)':'color:var(--warn)'}"> ${st==='pending'?'⏳ 待处理':st==='approved'?'✅ 已批准':'❌ 已拒绝'}</span></div>
         ${actionBtn}
       </div>`
     }
     document.getElementById('myCancelRequests').innerHTML = html
   } else {
-    document.getElementById('myCancelSection').style.display = 'none'
+    document.getElementById('myCancelSection').style.display='none'
   }
 }
 
-// ========== Tab 切换 ==========
+/* ========== Tab 切换 ========== */
 function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
-  document.querySelectorAll('.schedule-view, .stats-view, .admin-view').forEach(v => v.style.display = 'none')
-
-  if (tab === 'schedule') {
-    document.querySelectorAll('.tab')[0].classList.add('active')
-    document.getElementById('scheduleView').style.display = 'block'
-  } else if (tab === 'stats') {
-    document.querySelectorAll('.tab')[1].classList.add('active')
-    document.getElementById('statsView').style.display = 'block'
-  } else if (tab === 'admin') {
-    document.getElementById('adminTab').classList.add('active')
-    document.getElementById('adminView').style.display = 'block'
-  }
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'))
+  document.getElementById('scheduleView').style.display='none'
+  document.getElementById('statsView').style.display='none'
+  document.getElementById('adminView').style.display='none'
+  if (tab==='schedule') { document.querySelectorAll('.tab')[0].classList.add('active'); document.getElementById('scheduleView').style.display='block' }
+  else if (tab==='stats') { document.querySelectorAll('.tab')[1].classList.add('active'); document.getElementById('statsView').style.display='block' }
+  else if (tab==='admin') { document.getElementById('adminTab').classList.add('active'); document.getElementById('adminView').style.display='block' }
 }
 
-// ========== 管理功能 ==========
+/* ========== 管理功能 ========== */
 async function loadMembers() {
   try {
-    const res = await fetchWithTimeout(API + '/admin/members', {}, 15000)
+    const res = await fetchWithTimeout(API+'/admin/members', {}, 15000)
     const data = await res.json()
-    let html = ''
-    for (const name of data.members) {
-      html += `<li>
-        <span>${name}</span>
-        <button class="remove-btn" onclick="removeMember('${name}')">移除</button>
-      </li>`
-    }
+    let html = (data.members||[]).map(name=>`<li><span>${name}</span><button class="remove-btn" onclick="removeMember('${name}')">移除</button></li>`).join('')
     document.getElementById('memberList').innerHTML = html || '<li style="color:#999">暂无成员</li>'
-  } catch (e) {
-    showToast('加载成员失败', 'error')
-  }
+  } catch(e) {}
 }
-
 function renderWaitlistPending() {
-  const pending = waitlistData.filter(w => !w.status || w.status === 'pending')
-  if (pending.length === 0) {
-    document.getElementById('waitlistPending').innerHTML = '<li style="color:#999">暂无候补申请</li>'
-    return
-  }
-  let html = ''
+  const pending = (waitlistData||[]).filter(w=>!w.status||w.status==='pending')
+  if (pending.length===0) { document.getElementById('waitlistPending').innerHTML='<li style="color:#999">暂无候补申请</li>'; return }
+  let html=''
   for (const w of pending) {
-    const slot = configData.timeSlots.find(s => s.id === w.slotId)
-    html += `<li>
-      <span><strong>${w.name}</strong> 申请 ${w.day} ${slot ? slot.label : w.slotId}</span>
-      <div>
-        <button class="approve-btn" onclick="approveWaitlist('${w.name}','${w.day}','${w.slotId}')">批准</button>
-        <button class="reject-btn" onclick="rejectWaitlist('${w.name}','${w.day}','${w.slotId}')">拒绝</button>
-      </div>
-    </li>`
+    const slot = (configData.timeSlots||[]).find(s=>s.id===w.slotId)
+    html += `<li><span><strong>${w.name}</strong> 申请 ${w.day} ${slot?slot.label:w.slotId}</span><div class="pending-btns">
+      <button class="approve-btn" onclick="approveWaitlist('${w.name}','${w.day}','${w.slotId}')">批准</button>
+      <button class="reject-btn" onclick="rejectWaitlist('${w.name}','${w.day}','${w.slotId}')">拒绝</button>
+    </div></li>`
   }
   document.getElementById('waitlistPending').innerHTML = html
 }
-
 function renderCancelPending() {
-  const pending = cancelRequests.filter(r => !r.status || r.status === 'pending')
-  if (pending.length === 0) {
-    document.getElementById('cancelPending').innerHTML = '<li style="color:#999">暂无取消申请</li>'
-    return
-  }
-  let html = ''
+  const pending = (cancelRequests||[]).filter(r=>!r.status||r.status==='pending')
+  if (pending.length===0) { document.getElementById('cancelPending').innerHTML='<li style="color:#999">暂无取消申请</li>'; return }
+  let html=''
   for (const r of pending) {
-    const slot = configData.timeSlots.find(s => s.id === r.slotId)
-    const reasonText = r.reason ? `<br><span style="color:#888;font-size:12px">理由：${r.reason}</span>` : ''
-    html += `<li>
-      <span><strong>${r.name}</strong> 申请取消 ${r.day} ${slot ? slot.label : r.slotId}${reasonText}</span>
-      <div>
-        <button class="approve-btn" onclick="approveCancel('${r.name}','${r.day}','${r.slotId}')">批准</button>
-        <button class="reject-btn" onclick="rejectCancel('${r.name}','${r.day}','${r.slotId}')">拒绝</button>
-      </div>
-    </li>`
+    const slot = (configData.timeSlots||[]).find(s=>s.id===r.slotId)
+    const reasonText = r.reason?`<br><span style="color:#888;font-size:12px">理由：${r.reason}</span>`:''
+    html += `<li><span><strong>${r.name}</strong> 申请取消 ${r.day} ${slot?slot.label:r.slotId}${reasonText}</span><div class="pending-btns">
+      <button class="approve-btn" onclick="approveCancel('${r.name}','${r.day}','${r.slotId}')">批准</button>
+      <button class="reject-btn" onclick="rejectCancel('${r.name}','${r.day}','${r.slotId}')">拒绝</button>
+    </div></li>`
   }
   document.getElementById('cancelPending').innerHTML = html
 }
-
-async function approveWaitlist(name, day, slotId) {
+async function approveWaitlist(name,day,slotId) {
   try {
-    const res = await fetchWithTimeout(API + '/admin/waitlist/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, day, slotId })
-    }, 15000)
+    const res = await fetchWithTimeout(API+'/admin/waitlist/approve', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name,day,slotId})
+    },15000)
     const data = await res.json()
-    if (data.ok) {
-      showToast('已批准', 'success')
-      await loadSchedule()
-      renderWaitlistPending()
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
+    if (data.ok) { showToast('已批准','success'); await loadSchedule(); renderWaitlistPending() }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('操作失败','error') }
 }
-
-async function rejectWaitlist(name, day, slotId) {
+async function rejectWaitlist(name,day,slotId) {
   try {
-    const res = await fetchWithTimeout(API + '/admin/waitlist/reject', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, day, slotId })
-    }, 15000)
-    showToast('已拒绝', '')
-    await loadSchedule()
-    renderWaitlistPending()
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
+    await fetchWithTimeout(API+'/admin/waitlist/reject', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name,day,slotId})
+    },15000)
+    showToast('已拒绝','')
+    await loadSchedule(); renderWaitlistPending()
+  } catch(e) { showToast('操作失败','error') }
 }
-
-async function approveCancel(name, day, slotId) {
+async function approveCancel(name,day,slotId) {
   try {
-    const res = await fetchWithTimeout(API + '/admin/cancel/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, day, slotId })
-    }, 15000)
+    const res = await fetchWithTimeout(API+'/admin/cancel/approve', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name,day,slotId})
+    },15000)
     const data = await res.json()
-    if (data.ok) {
-      showToast('已批准取消', 'success')
-      await loadSchedule()
-      renderCancelPending()
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
+    if (data.ok) { showToast('已批准取消','success'); await loadSchedule(); renderCancelPending() }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('操作失败','error') }
 }
-
-async function rejectCancel(name, day, slotId) {
+async function rejectCancel(name,day,slotId) {
   try {
-    const res = await fetchWithTimeout(API + '/admin/cancel/reject', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, day, slotId })
-    }, 15000)
-    showToast('已拒绝', '')
-    await loadSchedule()
-    renderCancelPending()
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
+    await fetchWithTimeout(API+'/admin/cancel/reject', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name,day,slotId})
+    },15000)
+    showToast('已拒绝','')
+    await loadSchedule(); renderCancelPending()
+  } catch(e) { showToast('操作失败','error') }
 }
-
 async function addMember() {
   const input = document.getElementById('newMemberInput')
   const name = input.value.trim()
   if (!name) return
   try {
-    const res = await fetchWithTimeout(API + '/admin/member', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    }, 15000)
+    const res = await fetchWithTimeout(API+'/admin/member', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name})
+    },15000)
     const data = await res.json()
-    if (data.ok) {
-      input.value = ''
-      loadMembers()
-      loadConfig()
-      showToast('添加成功', 'success')
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    showToast('添加失败', 'error')
-  }
+    if (data.ok) { input.value=''; loadMembers(); loadConfig(); showToast('添加成功','success') }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('添加失败','error') }
 }
-
 async function removeMember(name) {
   if (!confirm(`确定移除 ${name}？将同时清除其排班和候补。`)) return
   try {
-    const res = await fetchWithTimeout(API + '/admin/member/remove', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    }, 15000)
+    const res = await fetchWithTimeout(API+'/admin/member/remove', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name})
+    },15000)
     const data = await res.json()
-    if (data.ok) {
-      loadMembers()
-      loadSchedule()
-      showToast('已移除', '')
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
+    if (data.ok) { loadMembers(); loadSchedule(); showToast('已移除','') }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('操作失败','error') }
 }
-
-// 管理员分配班次
 async function adminAssign() {
   const name = document.getElementById('assignMember').value
   const day = document.getElementById('assignDay').value
   const slotId = document.getElementById('assignSlot').value
-  if (!name || !day || !slotId) {
-    showToast('请选择成员、日期和时段', 'error')
-    return
-  }
+  if (!name||!day||!slotId) { showToast('请选择成员、日期和时段','error'); return }
   try {
-    const res = await fetchWithTimeout(API + '/admin/assign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, day, slotId })
-    }, 15000)
+    const res = await fetchWithTimeout(API+'/admin/assign', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name,day,slotId})
+    },15000)
     const data = await res.json()
-    if (data.ok) {
-      showToast(`已为 ${name} 分配班次`, 'success')
-      await loadSchedule()
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    showToast('分配失败', 'error')
-  }
+    if (data.ok) { showToast(`已为 ${name} 分配班次`,'success'); await loadSchedule() }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('分配失败','error') }
 }
-
 function updateAssignMemberList() {
   const select = document.getElementById('assignMember')
   if (!select) return
-  select.innerHTML = '<option value="">选择成员</option>'
-  for (const name of configData.members || []) {
-    select.innerHTML += `<option value="${name}">${name}</option>`
+  select.innerHTML='<option value="">选择成员</option>'
+  for (const name of configData.members||[]) {
+    select.innerHTML+=`<option value="${name}">${name}</option>`
   }
 }
-
-// ========== 开始时间设置 ==========
 async function loadAdminStartTime() {
   try {
-    const res = await fetchWithTimeout(API + '/admin/start-time', {}, 15000)
+    const res = await fetchWithTimeout(API+'/admin/start-time',{},15000)
     const data = await res.json()
     const statusEl = document.getElementById('startTimeStatus')
     if (data.startTime) {
       const d = new Date(data.startTime)
-      const beijing = new Date(d.getTime() - 8 * 60 * 60 * 1000)
-      const str = beijing.getFullYear() + '年' + (beijing.getMonth() + 1) + '月' + beijing.getDate() + '日 '
-        + String(beijing.getHours()).padStart(2, '0') + ':' + String(beijing.getMinutes()).padStart(2, '0')
-      statusEl.textContent = '当前设置：北京时间 ' + str
+      const beijing = new Date(d.getTime()-8*60*60*1000)
+      const str = beijing.getFullYear()+'年'+(beijing.getMonth()+1)+'月'+beijing.getDate()+'日 '
+        +String(beijing.getHours()).padStart(2,'0')+':'+String(beijing.getMinutes()).padStart(2,'0')
+      statusEl.textContent = '当前设置：北京时间 '+str
     } else {
       statusEl.textContent = '当前：无限制'
     }
-  } catch (e) { }
+  } catch(e) {}
 }
-
 async function saveStartTime() {
   const val = document.getElementById('startTimeInput').value
   let startTime = null
   if (val) {
     const localMs = new Date(val).getTime()
-    const beijingOffset = 8 * 60 * 60 * 1000
-    startTime = new Date(localMs + beijingOffset).toISOString()
+    startTime = new Date(localMs+8*60*60*1000).toISOString()
   }
   try {
-    const res = await fetchWithTimeout(API + '/admin/start-time', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startTime })
-    }, 15000)
+    const res = await fetchWithTimeout(API+'/admin/start-time', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({startTime})
+    },15000)
     const data = await res.json()
-    if (data.ok) {
-      showToast('保存成功', 'success')
-      loadAdminStartTime()
-    } else {
-      showToast(data.msg, 'error')
-    }
-  } catch (e) {
-    showToast('保存失败', 'error')
-  }
+    if (data.ok) { showToast('保存成功','success'); loadAdminStartTime() }
+    else showToast(data.msg,'error')
+  } catch(e) { showToast('保存失败','error') }
 }
-
 async function clearStartTime() {
   if (!confirm('确定清除限制？成员将可以立即开始选班次。')) return
   try {
-    const res = await fetchWithTimeout(API + '/admin/start-time', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startTime: null })
-    }, 15000)
-    const data = await res.json()
-    if (data.ok) {
-      document.getElementById('startTimeInput').value = ''
-      showToast('已清除限制', 'success')
-      loadAdminStartTime()
-    }
-  } catch (e) {
-    showToast('操作失败', 'error')
-  }
+    await fetchWithTimeout(API+'/admin/start-time', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({startTime:null})
+    },15000)
+    document.getElementById('startTimeInput').value=''
+    showToast('已清除限制','success')
+    loadAdminStartTime()
+  } catch(e) { showToast('操作失败','error') }
 }
-
-// ========== 重置排班 ==========
 async function resetSchedule() {
   if (!confirm('确定重置所有排班和候补？此操作不可恢复！')) return
   try {
-    const res = await fetchWithTimeout(API + '/admin/reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    }, 15000)
+    const res = await fetchWithTimeout(API+'/admin/reset', {
+      method:'POST', headers:{'Content-Type':'application/json'}
+    },15000)
     const data = await res.json()
-    if (data.ok) {
-      await loadSchedule()
-      renderWaitlistPending()
-      renderCancelPending()
-      showToast('排班已重置', 'success')
-    }
-  } catch (e) {
-    showToast('重置失败', 'error')
-  }
+    if (data.ok) { await loadSchedule(); renderWaitlistPending(); renderCancelPending(); showToast('排班已重置','success') }
+  } catch(e) { showToast('重置失败','error') }
 }
-
-// ========== 自动登录 ==========
-(async function init() {
-  const saved = localStorage.getItem('shiftUser')
-  if (saved && saved !== '管理员') {
-    // 不自动登录，需要输入密码
-  }
-  document.getElementById('loginPage').style.display = 'flex'
-})()
 </script>
 </body>
 </html>
