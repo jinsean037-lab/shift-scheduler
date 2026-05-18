@@ -103,7 +103,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(139,26,26,0.60);
+  background: rgba(139,26,26,0.50);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   z-index: 1;
@@ -805,6 +805,7 @@ body {
         </div>
       </div>
       <button class="logout-btn" onclick="doLogout()">退出登录</button>
+        <button class="logout-btn" style="background:rgba(255,255,255,0.15);margin-left:8px" onclick="showChangePassword()">修改密码</button>
     </div>
 
     <!-- Tab 栏 -->
@@ -871,6 +872,13 @@ body {
         </ul>
       </div>
 
+      <!-- 密码管理 -->
+      <div class="admin-section">
+        <h3>🔑 密码管理</h3>
+        <p style="color:#999;font-size:13px;margin-bottom:12px">查看或重置成员密码。点击"显示"查看原密码，或设置新密码后点击"重置"。</p>
+        <ul class="member-list" id="passwordList"></ul>
+      </div>
+
       <!-- 成员管理 -->
       <div class="admin-section">
         <h3>👤 成员管理</h3>
@@ -914,6 +922,20 @@ body {
         <button class="admin-btn danger" onclick="resetSchedule()">重置所有排班</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div class="modal-overlay" id="changePwdModal">
+  <div class="modal-box">
+    <h2>🔒 修改密码</h2>
+    <p>请输入原密码和新密码</p>
+    <input type="password" id="oldPwdInput" placeholder="原密码" maxlength="50" autocomplete="off">
+    <input type="password" id="newPwdInput" placeholder="新密码（至少6位）" maxlength="50" autocomplete="off">
+    <input type="password" id="confirmPwdInput" placeholder="确认新密码" maxlength="50" autocomplete="off">
+    <button onclick="doChangePassword()">确认修改</button>
+    <div class="error" id="changePwdError"></div>
+    <div class="back-link"><a href="#" onclick="hideChangePassword();return false;">取消</a></div>
   </div>
 </div>
 
@@ -1331,7 +1353,7 @@ function switchTab(tab) {
   document.getElementById('adminView').style.display='none'
   if (tab==='schedule') { document.querySelectorAll('.tab')[0].classList.add('active'); document.getElementById('scheduleView').style.display='block' }
   else if (tab==='stats') { document.querySelectorAll('.tab')[1].classList.add('active'); document.getElementById('statsView').style.display='block' }
-  else if (tab==='admin') { document.getElementById('adminTab').classList.add('active'); document.getElementById('adminView').style.display='block' }
+  else if (tab==='admin') { document.getElementById('adminTab').classList.add('active'); document.getElementById('adminView').style.display='block'; loadPasswords(); }
 }
 
 /* ========== 管理功能 ========== */
@@ -1516,6 +1538,106 @@ async function resetSchedule() {
     if (data.ok) { await loadSchedule(); renderWaitlistPending(); renderCancelPending(); showToast('排班已重置','success') }
   } catch(e) { showToast('重置失败','error') }
 }
+
+
+// ========== 密码管理 ==========
+function showChangePassword() {
+  document.getElementById('oldPwdInput').value = '';
+  document.getElementById('newPwdInput').value = '';
+  document.getElementById('confirmPwdInput').value = '';
+  document.getElementById('changePwdError').textContent = '';
+  document.getElementById('changePwdModal').classList.add('show');
+}
+function hideChangePassword() {
+  document.getElementById('changePwdModal').classList.remove('show');
+}
+async function doChangePassword() {
+  const oldP = document.getElementById('oldPwdInput').value.trim();
+  const newP = document.getElementById('newPwdInput').value.trim();
+  const confirmP = document.getElementById('confirmPwdInput').value.trim();
+  const err = document.getElementById('changePwdError');
+  if (!oldP) { err.textContent = '请输入原密码'; return; }
+  if (!newP || newP.length < 6) { err.textContent = '新密码至少6位'; return; }
+  if (newP !== confirmP) { err.textContent = '两次输入的新密码不一致'; return; }
+  try {
+    const res = await fetch(API + '/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, oldPassword: oldP, newPassword: newP })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      hideChangePassword();
+      showToast('密码修改成功，请重新登录');
+      setTimeout(() => doLogout(), 1500);
+    } else {
+      err.textContent = data.msg || '修改失败';
+    }
+  } catch (e) {
+    err.textContent = '网络错误';
+  }
+}
+// 管理员：加载密码列表
+async function loadPasswords() {
+  try {
+    const res = await fetch(API + '/admin/passwords');
+    const data = await res.json();
+    if (!data.passwords) return;
+    const ul = document.getElementById('passwordList');
+    ul.innerHTML = '';
+    Object.entries(data.passwords).forEach(([name, pwd]) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span class="name">${name}</span>
+        <span class="pwd-mask" id="pwd-${name}">••••••</span>
+        <span class="real-pwd" id="real-${name}" style="display:none;color:#c41230;font-weight:600">${pwd}</span>
+        <button class="admin-btn primary" style="padding:4px 10px;font-size:12px" onclick="togglePwd('${name}')">显示</button>
+        <input type="password" id="reset-pwd-${name}" placeholder="新密码" style="width:100px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+        <button class="admin-btn success" style="padding:4px 10px;font-size:12px" onclick="resetPassword('${name}')">重置</button>
+      `;
+      ul.appendChild(li);
+    });
+  } catch (e) {
+    console.error('加载密码失败', e);
+  }
+}
+function togglePwd(name) {
+  const mask = document.getElementById('pwd-' + name);
+  const real = document.getElementById('real-' + name);
+  const btn = mask.nextElementSibling;
+  if (real.style.display === 'none') {
+    real.style.display = 'inline';
+    mask.style.display = 'none';
+    btn.textContent = '隐藏';
+  } else {
+    real.style.display = 'none';
+    mask.style.display = 'inline';
+    btn.textContent = '显示';
+  }
+}
+async function resetPassword(name) {
+  const input = document.getElementById('reset-pwd-' + name);
+  const newP = input.value.trim();
+  if (!newP || newP.length < 6) { showToast('新密码至少6位'); return; }
+  try {
+    const res = await fetch(API + '/admin/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, newPassword: newP })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`已重置 ${name} 的密码`);
+      input.value = '';
+      loadPasswords();
+    } else {
+      showToast(data.msg || '重置失败');
+    }
+  } catch (e) {
+    showToast('网络错误');
+  }
+}
+
 </script>
 </body>
 </html>
