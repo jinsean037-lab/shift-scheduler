@@ -563,12 +563,28 @@ body {
   border: none; padding: 2px 7px; border-radius: 4px; cursor: pointer;
 }
 .waitlist-btn:hover { background: #e67e22; }
-.cancel-btn {
+/* 排班表格子内的取消按钮（绝对定位） */
+.cell .cancel-btn {
   position: absolute; bottom: 4px; right: 5px;
   font-size: 11px; background: var(--danger); color: white;
   border: none; padding: 3px 10px; border-radius: 4px; cursor: pointer;
 }
-.cancel-btn:hover { background: #c0392b; }
+.cell .cancel-btn:hover { background: #c0392b; }
+
+/* 我的班次卡片内的取消按钮（行内） */
+.shift-card .cancel-btn {
+  position: relative;
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 13px;
+  background: var(--danger);
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.shift-card .cancel-btn:hover { background: #c0392b; }
 
 /* 图例 */
 .legend {
@@ -662,11 +678,6 @@ body {
   font-size: 13px;
   color: var(--text-light);
 }
-.shift-card .cancel-btn {
-  margin-left: 12px;
-  flex-shrink: 0;
-}
-
 /* 管理视图 */
 .admin-section {
   background: white;
@@ -1724,7 +1735,7 @@ async function pickSlot(day, slot) {
     const data = await res.json();
     console.log('[pick] response:', data);
     if (data.ok) { showToast('✅ 选择成功！' + day + ' ' + slot); loadSchedule(); loadMyShifts(); }
-    else if (data.waitlist) { showToast('已加入候补'); }
+    else if (data.waitlist) { showToast('已加入候补'); loadSchedule(); }
     else { alert(data.msg || '操作失败'); }
   } catch(e) { console.error('[pick] error:', e); alert('网络错误：' + e.message); }
 }
