@@ -533,6 +533,52 @@ app.post('/api/admin/waitlist/approve', async (req, res) => {
   }
 })
 
+
+// ========== 密码管理 ==========
+
+// 成员修改自己的密码
+app.post('/api/change-password', async (req, res) => {
+  try {
+    const { name, oldPassword, newPassword } = req.body
+    if (!name || !oldPassword || !newPassword) return res.json({ ok: false, msg: '参数缺失' })
+    if (newPassword.length < 6) return res.json({ ok: false, msg: '新密码至少6位' })
+    const store = await readStore()
+    if (store.passwords[name] !== oldPassword) return res.json({ ok: false, msg: '原密码错误' })
+    store.passwords[name] = newPassword
+    await writeStore({ passwords: store.passwords })
+    res.json({ ok: true, msg: '密码修改成功' })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：查看所有成员密码
+app.get('/api/admin/passwords', async (req, res) => {
+  try {
+    const store = await readStore()
+    res.json({ passwords: store.passwords || {} })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：重置成员密码
+app.post('/api/admin/reset-password', async (req, res) => {
+  try {
+    const { name, newPassword } = req.body
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    if (!newPassword || newPassword.length < 6) return res.json({ ok: false, msg: '新密码至少6位' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    store.passwords[name] = newPassword
+    await writeStore({ passwords: store.passwords })
+    res.json({ ok: true, passwords: store.passwords, msg: `已重置 ${name} 的密码` })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+
 // ========== 启动 ==========
 async function start() {
   const connected = await connectMongo()
