@@ -629,6 +629,44 @@ body {
 .cancel-btn:hover { background: var(--danger); color: white; }
 .empty-tip { text-align: center; color: var(--text-light); padding: 32px 0; font-size: 14px; }
 
+/* 我的班次 - 卡片样式 */
+.shift-list { display: flex; flex-direction: column; gap: 10px; }
+.shift-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #fdf2f2, #fff);
+  border: 1.5px solid #f0e0e0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  transition: all 0.2s;
+}
+.shift-card:hover { border-color: var(--primary-light); box-shadow: 0 3px 12px rgba(139,26,26,0.1); }
+.shift-day {
+  min-width: 56px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(139,26,26,0.08);
+  border-radius: 8px;
+  padding: 8px 14px;
+  text-align: center;
+}
+.shift-slot {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.shift-time {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-light);
+}
+.shift-card .cancel-btn {
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
 /* 管理视图 */
 .admin-section {
   background: white;
@@ -1622,6 +1660,7 @@ async function loadSchedule() {
 function renderSchedule(data) {
   const grid = document.getElementById('scheduleGrid');
   if (!data.schedule) { grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">暂无数据</p>'; return; }
+  console.log('[renderSchedule] currentUser="' + currentUser + '", schedule=', JSON.stringify(data.schedule));
   const days = ['周一','周二','周三','周四','周五'];
   const slots = [
     {key:'am1',label:'8:00-10:00'},
@@ -1727,10 +1766,14 @@ async function loadMyShifts() {
 }
 function renderMyShifts(shifts) {
   const el = document.getElementById('myShifts');
-  if (!shifts.length) { el.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0">暂无排班</p>'; return; }
+  if (!shifts.length) { el.innerHTML = '<p class="empty-tip">暂无排班记录</p>'; return; }
   let html = '<div class="shift-list">';
   shifts.forEach(s => {
-    html += '<div class="shift-card"><div class="shift-day">' + s.day + '</div><div class="shift-slot">' + s.slotLabel + '</div><div class="shift-time">' + s.time + '</div></div>';
+    html += '<div class="shift-card">';
+    html += '<div class="shift-day">' + s.day + '</div>';
+    html += '<div class="shift-slot">' + (s.slotLabel || s.slot) + '</div>';
+    html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>';
+    html += '</div>';
   });
   html += '</div>';
   el.innerHTML = html;
