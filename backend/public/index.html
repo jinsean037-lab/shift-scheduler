@@ -64,11 +64,12 @@ body {
   object-fit: contain;
 }
 .topbar-title {
-  font-size: 20px;
+  font-size: 22px;
   color: var(--primary);
   font-weight: 700;
-  letter-spacing: 4px;
+  letter-spacing: 6px;
   font-family: "Noto Serif SC", "Source Han Serif SC", "SimSun", "STSong", serif;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 /* 登录页主体区 */
 .login-body {
@@ -79,15 +80,16 @@ body {
 /* 左侧背景图 - 纯背景无叠加 */
 .login-bg-left {
   flex: 1;
-  background: url('/login-bg.jpg') center/cover no-repeat;
+  background: url('/login-bg.jpg') 50% 50% / 150% auto no-repeat;
+  animation: bgPan 30s ease-in-out infinite;
 }
 
 /* 右侧登录区 - 半透明岭院红 + 背景图透出 */
 .login-right {
   width: 440px;
   min-width: 380px;
-  background: url('/login-bg.jpg') center/cover no-repeat,
-              linear-gradient(135deg, rgba(139,26,26,0.95) 0%, rgba(164,30,34,0.93) 50%, rgba(107,15,15,0.94) 100%);
+  background: linear-gradient(135deg, rgba(139,26,26,0.97) 0%, rgba(164,30,34,0.96) 50%, rgba(107,15,15,0.97) 100%);
+  overflow: hidden;
   background-blend-mode: overlay;
   display: flex;
   flex-direction: column;
@@ -97,12 +99,21 @@ body {
   flex-shrink: 0;
   position: relative;
 }
+/* 登录区背景图（动画） */
+.login-right::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: url('/login-bg.jpg') 50% 50% / 150% auto no-repeat;
+  animation: bgPan 30s ease-in-out infinite;
+  z-index: 0;
+}
 /* 登录区毛玻璃遮罩 */
 .login-right::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(139,26,26,0.90);
+  background: rgba(139,26,26,0.95);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 0;
@@ -215,7 +226,7 @@ body {
   color: #fff;
   margin-bottom: 16px;
 }
-.login-card input::placeholder { color: rgba(255,255,255,0.55); }
+.login-card input::placeholder { color: rgba(255,255,255,0.65); }
 .login-card input:focus {
   border-color: rgba(255,255,255,0.7);
   box-shadow: 0 0 0 3px rgba(255,255,255,0.15);
@@ -675,10 +686,10 @@ body {
 /* 响应式 */
 @media (max-width: 768px) {
   .login-body { flex-direction: column; }
-  .login-bg-left { min-height: 200px; }
+  .login-bg-left { min-height: 200px; background-size: 150% auto; animation: bgPan 30s ease-in-out infinite; }
   .login-right { width: 100%; min-width: auto; padding: 0; flex: 1; display: flex; align-items: stretch; }
   .login-card-wrap { max-width: 100%; margin: 0; padding: 48px 28px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
-  .login-card-header h2 { font-size: 20px; }
+  .login-card-header h2 { font-size: 22px; letter-spacing: 1px; }
   .login-card-header p { font-size: 12px; }
   .login-card input { padding: 13px 14px; font-size: 14px; }
   .login-card button { padding: 13px; font-size: 15px; }
@@ -697,16 +708,23 @@ body {
   .topbar-title { font-size: 16px; white-space: nowrap; letter-spacing: 2px; }
 }
 @media (max-width: 480px) {
-  .login-bg-left { display: none; }
+  .login-bg-left { min-height: 120px; background-size: 150% auto; animation: bgPan 30s ease-in-out infinite; }
   .login-right { width: 100%; min-width: auto; padding: 0; flex: 1; display: flex; align-items: stretch; }
   .login-card-wrap { padding: 36px 20px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
-  .login-card-header h2 { font-size: 18px; }
+  .login-card-header h2 { font-size: 20px; letter-spacing: 1px; }
   .login-card-header p { font-size: 12px; }
   .login-card input { padding: 12px 13px; font-size: 14px; }
   .login-card button { padding: 12px; font-size: 14px; letter-spacing: 3px; }
   .login-topbar { padding: 10px 16px; gap: 8px; }
   .login-topbar-logo { height: 34px; }
   .topbar-title { font-size: 14px; white-space: nowrap; letter-spacing: 1px; }
+}
+
+/* 背景图左右循环慢速平移 */
+@keyframes bgPan {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 </style>
 </head>
