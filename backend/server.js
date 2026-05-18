@@ -344,9 +344,20 @@ app.post('/api/cancel-request', async (req, res) => {
     const { name, day, slotId, reason } = req.body
     if (!name || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
-    const key = `${day}|${slotId}`
-    const list = store.schedule[key] || []
-    if (!list.includes(name)) return res.json({ ok: false, msg: '你不在该班次中' })
+    // 兼容嵌套格式和扁平格式
+    let list = null
+    let key = ''
+    // 嵌套格式: schedule[day][slotId]
+    if (store.schedule[day] && Array.isArray(store.schedule[day][slotId])) {
+      list = store.schedule[day][slotId]
+      key = `${day}|${slotId}`
+    }
+    // 扁平格式: schedule[day|slotId]
+    if (!list && Array.isArray(store.schedule[`${day}|${slotId}`])) {
+      list = store.schedule[`${day}|${slotId}`]
+      key = `${day}|${slotId}`
+    }
+    if (!list || !list.includes(name)) return res.json({ ok: false, msg: '你不在该班次中' })
 
     const exists = store.cancelRequests.find(r => r.name === name && r.day === day && r.slotId === slotId && r.status === 'pending')
     if (exists) return res.json({ ok: false, msg: '已提交取消申请' })
@@ -358,7 +369,14 @@ app.post('/api/cancel-request', async (req, res) => {
         // 3分钟内：直接取消 + 自动候补填补
         const idx = list.indexOf(name)
         if (idx >= 0) list.splice(idx, 1)
-        if (list.length === 0) delete store.schedule[key]
+        if (list.length === 0) {
+          // 兼容嵌套和扁平格式删除
+          if (store.schedule[day] && store.schedule[day][slotId] !== undefined) {
+            delete store.schedule[day][slotId]
+          } else {
+            delete store.schedule[key]
+          }
+        }
         delete store.scheduleTime[`${key}|${name}`]
         const filledBy = autoFillFromWaitlist(store, day, slotId)
         await writeStore({
