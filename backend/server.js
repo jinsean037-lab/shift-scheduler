@@ -260,13 +260,31 @@ app.post('/api/login', async (req, res) => {
 app.get('/api/schedule', async (req, res) => {
   try {
     const store = await readStore()
+    // 统一转换为嵌套格式 { '周一':{am1:[...],am2:[...]}, ... }
+    const raw = store.schedule || {}
+    const days = ['周一','周二','周三','周四','周五']
+    const slotIds = ['am1','am2','pm1','pm2']
+    const schedule = {}
+    for (const d of days) {
+      schedule[d] = {}
+      for (const s of slotIds) {
+        // 优先读嵌套格式
+        if (raw[d] && Array.isArray(raw[d][s])) {
+          schedule[d][s] = raw[d][s]
+        } else {
+          // 兼容扁平格式
+          const flatKey = `${d}|${s}`
+          schedule[d][s] = Array.isArray(raw[flatKey]) ? raw[flatKey] : []
+        }
+      }
+    }
     res.json({
-      timeSlots: store.timeSlots,
-      days: store.days,
-      maxPerSlot: store.maxPerSlot,
-      schedule: store.schedule,
+      timeSlots: store.timeSlots || defaultStore().timeSlots,
+      days: store.days || defaultStore().days,
+      maxPerSlot: store.maxPerSlot || 2,
+      schedule,
       members: store.members,
-      waitlist: store.waitlist,
+      waitlist: store.waitlist || [],
       cancelRequests: store.cancelRequests || [],
       startTime: store.startTime
     })
@@ -286,15 +304,16 @@ app.post('/api/select', async (req, res) => {
       return res.json({ ok: false, msg: '排班尚未开始，请等待管理员设置开始时间' })
     }
     if (!store.members.includes(name)) return res.json({ ok: false, msg: '用户不存在' })
-    const key = `${day}|${slot}`
-    if (!store.schedule[key]) store.schedule[key] = []
-    const list = store.schedule[key]
+    // 统一使用嵌套格式
+    if (!store.schedule[day]) store.schedule[day] = {}
+    if (!store.schedule[day][slot]) store.schedule[day][slot] = []
+    const list = store.schedule[day][slot]
     if (list.includes(name)) return res.json({ ok: true, action: 'none', schedule: store.schedule, msg: '已选择该时段' })
     if (list.length >= store.maxPerSlot) {
       return res.json({ ok: false, msg: `该时段已满（${store.maxPerSlot}/${store.maxPerSlot}），可申请候补` })
     }
     list.push(name)
-    store.scheduleTime[`${key}|${name}`] = Date.now()
+    store.scheduleTime[`${day}|${slot}|${name}`] = Date.now()
     await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime })
     res.json({ ok: true, action: 'added', schedule: store.schedule })
   } catch (e) {
@@ -667,30 +686,27 @@ app.get('/api/my-shifts', async (req, res) => {
     if (!name) return res.json({ shifts: [], waitlist: [] })
     const store = await readStore()
     const shifts = []
-    // schedule 格式: { '周一':{am1:[...],am2:[...]}, ... }
+    // 优先嵌套格式: { '周一':{am1:[...],am2:[...]}, ... }
     const sched = store.schedule || {}
-    for (const day of Object.keys(sched)) {
-      const slots = sched[day]
-      if (typeof slots === 'object') {
-        for (const slotId of Object.keys(slots)) {
-          const names = slots[slotId]
-          if (Array.isArray(names) && names.includes(name)) {
-            const slotInfo = (store.timeSlots || []).find(t => t.id === slotId)
+    for (const day of ['周一','周二','周三','周四','周五']) {
+      const dayData = sched[day]
+      if (dayData && typeof dayData === 'object') {
+        for (const slotId of ['am1','am2','pm1','pm2']) {
+          if (Array.isArray(dayData[slotId]) && dayData[slotId].includes(name)) {
+            const slotInfo = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
             shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
           }
         }
       }
     }
-    // 也检查扁平格式: { '周一|am1':[...] }
+    // 兼容扁平格式: { '周一|am1':[...] }
     for (const key of Object.keys(sched)) {
       if (key.includes('|')) {
         const [day, slotId] = key.split('|')
         const names = sched[key]
-        if (Array.isArray(names) && names.includes(name)) {
-          if (!shifts.find(s => s.day === day && s.slot === slotId)) {
-            const slotInfo = (store.timeSlots || []).find(t => t.id === slotId)
-            shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
-          }
+        if (Array.isArray(names) && names.includes(name) && !shifts.find(s => s.day === day && s.slot === slotId)) {
+          const slotInfo = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
+          shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
         }
       }
     }
@@ -701,33 +717,19 @@ app.get('/api/my-shifts', async (req, res) => {
   }
 })
 
-// 兼容: POST /api/cancel（直接取消，3分钟内自动通过）
+// 兼容: POST /api/cancel（直接取消）
 app.post('/api/cancel', async (req, res) => {
   try {
     const { name, day, slot } = req.body
-    // 转发到 cancel-request 逻辑
-    req.body.slotId = req.body.slot || slot
-    req.body.day = day
-    req.body.name = name
+    if (!name || !day || !slot) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
-    const key = `${day}|${slot}`
-    const list = store.schedule[key] || []
+    // 嵌套格式
+    const list = (store.schedule[day] && store.schedule[day][slot]) || []
     if (!list.includes(name)) return res.json({ ok: false, msg: '你不在该班次中' })
-    // 检查3分钟规则
-    const entryTime = store.scheduleTime ? store.scheduleTime[`${key}|${name}`] : null
-    if (entryTime && Date.now() - entryTime <= 3 * 60 * 1000) {
-      const idx = list.indexOf(name)
-      if (idx >= 0) list.splice(idx, 1)
-      delete store.scheduleTime[`${key}|${name}`]
-      autoFillFromWaitlist(store, day, slot)
-      await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, waitlist: store.waitlist })
-      return res.json({ ok: true, msg: '已取消' })
-    }
-    // 超过3分钟，走 cancel-request 流程但直接返回成功（简化体验）
     const idx = list.indexOf(name)
     if (idx >= 0) list.splice(idx, 1)
     autoFillFromWaitlist(store, day, slot)
-  await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, waitlist: store.waitlist })
+    await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, waitlist: store.waitlist })
     res.json({ ok: true, msg: '已取消' })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
