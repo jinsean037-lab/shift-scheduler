@@ -1728,7 +1728,7 @@ async function pickSlot(day, slot) {
     showToast('排班尚未开始'); return;
   }
   try {
-    const res = await fetch(API + '/pick', {
+    const res = await fetch(API + '/select', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({name:currentUser,day,slot})
     });
