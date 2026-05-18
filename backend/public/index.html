@@ -304,6 +304,25 @@ body {
 .modal-box .back-link a { color: var(--text-light); font-size: 13px; text-decoration: none; }
 
 /* ========== 确认弹窗 ========== */
+/* Toast 提示 */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #8B1A1A;
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(139,26,26,0.3);
+}
+.toast.show { opacity: 1; }
+
 .confirm-overlay {
   display: none;
   position: fixed;
@@ -1220,6 +1239,8 @@ body {
 
 <!-- ===== 主页面 ===== -->
 <div class="main-page" id="mainPage">
+  <!-- Toast 提示 -->
+  <div id="toast" class="toast"></div>
   <!-- 顶栏 -->
   <div class="app-header">
     <div class="app-header-inner">
