@@ -79,14 +79,21 @@ async function connectMongo() {
 }
 
 async function readStore() {
+  // 文件存储模式
+  if (useFileFallback) {
+    if (!localStore) {
+      console.log('[readStore] localStore is null, calling loadFromFile()...');
+      loadFromFile()
+    }
+    // 合并默认值，确保所有字段存在（scheduleTime, waitlist, cancelRequests 等）
+    return Object.assign(defaultStore(), localStore || {})
+  }
   if (!storeCollection) return defaultStore()
   try {
     const doc = await storeCollection.findOne({ _id: 'singleton' })
     if (!doc) return defaultStore()
-    // 合并默认值 + 数据库数据
     const result = defaultStore()
     Object.assign(result, doc)
-    // 确保密码表完整
     result.passwords = { ...DEFAULT_PASSWORDS, ...(result.passwords || {}) }
     delete result._id
     return result
@@ -97,7 +104,13 @@ async function readStore() {
 }
 
 async function writeStore(data) {
-  if (!storeCollection) return
+  // 文件存储模式
+  if (useFileFallback && localStore) {
+    Object.assign(localStore, data);
+    saveToFile();
+    return;
+  }
+  if (!storeCollection) return;
   try {
     await storeCollection.updateOne(
       { _id: 'singleton' },
