@@ -1237,6 +1237,20 @@ body {
   </div>
 </div>
 
+<!-- 取消申请弹窗 -->
+<div class="modal-overlay" id="cancelReasonModal">
+  <div class="modal-box">
+    <h2>取消值班申请</h2>
+    <p>请填写取消理由（管理员将审核）</p>
+    <input type="text" id="cancelDayInput" readonly style="display:none">
+    <input type="text" id="cancelSlotInput" readonly style="display:none">
+    <textarea id="cancelReasonInput" placeholder="请输入取消理由..." rows="3" maxlength="200"></textarea>
+    <div class="error" id="cancelReasonError"></div>
+    <button onclick="doCancelRequest()">提交申请</button>
+    <div class="back-link"><a href="javascript:hideCancelReasonModal()">取消</a></div>
+  </div>
+</div>
+
 <!-- ===== 主页面 ===== -->
 <div class="main-page" id="mainPage">
   <!-- Toast 提示 -->
@@ -1760,20 +1774,45 @@ async function pickSlot(day, slot) {
     else { alert(data.msg || '操作失败'); }
   } catch(e) { console.error('[pick] error:', e); alert('网络错误：' + e.message); }
 }
-async function cancelSlot(day, slot) {
-  // 弹出理由输入框
-  const reason = prompt('请填写取消申请理由：', '');
-  if (!reason || !reason.trim()) { showToast('已取消操作'); return; }
+function showCancelReasonModal(day, slot) {
+  const d = document.getElementById('cancelDayInput');
+  const s = document.getElementById('cancelSlotInput');
+  const r = document.getElementById('cancelReasonInput');
+  const e = document.getElementById('cancelReasonError');
+  const m = document.getElementById('cancelReasonModal');
+  if (d) d.value = day;
+  if (s) s.value = slot;
+  if (r) r.value = '';
+  if (e) e.textContent = '';
+  if (m) m.classList.add('show');
+}
+function hideCancelReasonModal() {
+  const m = document.getElementById('cancelReasonModal');
+  if (m) m.classList.remove('show');
+}
+async function doCancelRequest() {
+  const day = document.getElementById('cancelDayInput').value;
+  const slot = document.getElementById('cancelSlotInput').value;
+  const reason = document.getElementById('cancelReasonInput').value.trim();
+  const err = document.getElementById('cancelReasonError');
+  if (!reason) { err.textContent = '请填写取消理由'; return; }
   try {
-    // 提交取消申请（管理员审核）
     const res = await fetch(API + '/cancel-request', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser, day, slot, reason:reason.trim()})
+      body: JSON.stringify({name:currentUser, day, slotId:slot, reason})
     });
     const data = await res.json();
-    if (data.ok) { showToast('取消申请已提交，等待管理员审核'); loadMyShifts(); }
-    else { showToast(data.msg||'提交失败'); }
-  } catch(e) { showToast('网络错误'); }
+    if (data.ok) {
+      hideCancelReasonModal();
+      showToast(data.msg || '取消申请已提交，等待管理员审核');
+      loadMyShifts(); loadSchedule();
+    } else {
+      err.textContent = data.msg || '提交失败';
+    }
+  } catch(e) { err.textContent = '网络错误，请重试'; }
+}
+async function cancelSlot(day, slot) {
+  showCancelReasonModal(day, slot);
 }
 async function joinWaitlist(day, slot) {
   try {
