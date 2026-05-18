@@ -1799,14 +1799,20 @@ function renderCalendar(shifts, year, month) {
 
 // ========== 修改密码 ==========
 function showChangePassword() {
-  document.getElementById('oldPwdInput').value = '';
-  document.getElementById('newPwdInput').value = '';
-  document.getElementById('confirmPwdInput').value = '';
-  document.getElementById('changePwdError').textContent = '';
-  document.getElementById('changePwdModal').classList.add('show');
+  const o = document.getElementById('oldPwdInput');
+  const n = document.getElementById('newPwdInput');
+  const c = document.getElementById('confirmPwdInput');
+  const e = document.getElementById('changePwdError');
+  const m = document.getElementById('changePwdModal');
+  if (o) o.value = '';
+  if (n) n.value = '';
+  if (c) c.value = '';
+  if (e) e.textContent = '';
+  if (m) m.classList.add('show');
 }
 function hideChangePassword() {
-  document.getElementById('changePwdModal').classList.remove('show');
+  const m = document.getElementById('changePwdModal');
+  if (m) m.classList.remove('show');
 }
 async function doChangePassword() {
   const oldP = document.getElementById('oldPwdInput').value.trim();
