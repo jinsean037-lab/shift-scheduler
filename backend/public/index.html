@@ -1463,7 +1463,7 @@ async function doLogin() {
     const data = await res.json();
     if (data.ok) {
       currentUser = data.name;
-      currentRole = data.role;
+      currentRole = data.isAdmin ? 'admin' : 'member';
       localStorage.setItem('userName', currentUser);
       localStorage.setItem('userRole', currentRole);
       // 填充 UI
