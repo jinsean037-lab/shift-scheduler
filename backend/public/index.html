@@ -465,7 +465,7 @@ body {
 .schedule-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px;
+  min-width: unset;
 }
 .schedule-table th {
   background: var(--primary);
@@ -659,8 +659,9 @@ body {
   .header-badge { display: none; }
   .welcome-banner { flex-direction: column; gap: 12px; text-align: center; }
   .content-wrap { padding: 12px 8px 80px; }
-  .schedule-table th, .schedule-table td { padding: 5px 3px; }
-  .cell { min-height: 52px; padding: 4px; }
+  .schedule-table th, .schedule-table td { padding: 4px 2px; font-size: 12px; }
+  .cell { min-height: 44px; padding: 3px 2px; }
+  .table-wrap { overflow-x: visible; }
   .login-page { min-height: 100dvh; background: white; }
   .login-topbar { padding: 10px 20px; gap: 10px; }
   .login-topbar-logo { height: 38px; }
