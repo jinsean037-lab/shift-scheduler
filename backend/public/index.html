@@ -2040,8 +2040,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sidebarAvatar').textContent = currentUser.charAt(0);
     document.getElementById('sidebarName').textContent = currentUser;
     document.getElementById('sidebarRole').textContent = currentRole==='admin'?'管理员':'助理';
-    document.getElementById('userName').textContent = currentUser;
-    document.getElementById('userRole').textContent = currentRole==='admin'?'管理员':'助理';
     if (currentRole==='admin') {
       document.getElementById('adminNavGroupTitle').style.display = '';
       document.getElementById('adminNavItem').style.display = '';
