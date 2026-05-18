@@ -1389,7 +1389,9 @@ function showToast(msg, duration=2200) {
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), duration);
+  } catch(e) { console.error("switchTab error:", e); }
 }
+
 function showConfirm(title, msg, action) {
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmMsg').textContent = msg;
@@ -1409,6 +1411,7 @@ function confirmAction() {
 
 // ========== Tab 切换（新：page-view + sidebar nav）==========
 function switchTab(tab) {
+    try {
   // 隐藏所有 page-view
   document.querySelectorAll('.page-view').forEach(v => v.classList.remove('active'));
   // 移除所有 nav 激活态
