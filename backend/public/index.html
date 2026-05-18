@@ -88,7 +88,9 @@ body {
 .login-right {
   width: 440px;
   min-width: 380px;
-  background: linear-gradient(135deg, rgba(139,26,26,0.97) 0%, rgba(164,30,34,0.96) 50%, rgba(107,15,15,0.97) 100%);
+  background: url('/login-bg.jpg') center/cover no-repeat,
+              linear-gradient(135deg, rgba(139,26,26,0.97) 0%, rgba(164,30,34,0.96) 50%, rgba(107,15,15,0.97) 100%);
+  background-blend-mode: overlay;
   overflow: hidden;
   background-blend-mode: overlay;
   display: flex;
@@ -98,15 +100,6 @@ body {
   padding: 48px 40px;
   flex-shrink: 0;
   position: relative;
-}
-/* 登录区背景图（动画） */
-.login-right::after {
-  content: '';
-  position: absolute;
-  inset: -20%;
-  background: url('/login-bg.jpg') 50% 50% / 150% auto no-repeat;
-  animation: bgPan 30s ease-in-out infinite;
-  z-index: 0;
 }
 /* 登录区毛玻璃遮罩 */
 .login-right::before {
