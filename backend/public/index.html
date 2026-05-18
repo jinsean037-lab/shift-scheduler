@@ -1596,23 +1596,19 @@ function renderSchedule(data) {
       const count = assigned.length;
       const isMe = assigned.includes(currentUser);
       const max = (configData.maxPerSlot || 2);
-      let cls = 'slot-cell';
-      if (isMe) cls += ' selected';
+      let cls = 'cell';
+      if (isMe) cls += ' mine';
       else if (count >= max) cls += ' full';
       let inner = '';
       if (assigned.length > 0) {
-        inner = '<div class="avatars">';
-        assigned.forEach(n => {
-          inner += '<span class="avatar-circle small' + (n===currentUser?' me':'') + '">' + n.charAt(0) + '</span>';
-        });
-        inner += '</div><div class="slot-names">' + assigned.join('、') + '</div>';
+        inner = '<div class="names">' + assigned.join('、') + '</div>';
       }
       if (count < max && !isMe && currentRole !== 'admin') {
         inner += '<button class="pick-btn" onclick="pickSlot(\'' + d + '\',\'' + s.key + '\')">选择</button>';
       } else if (isMe) {
         inner += '<button class="cancel-btn" onclick="cancelSlot(\'' + d + '\',\'' + s.key + '\')">取消</button>';
       } else if (count >= max && !isMe && currentRole !== 'admin') {
-        inner += '<button class="wait-btn" onclick="joinWaitlist(\'' + d + '\',\'' + s.key + '\')">候补</button>';
+        inner += '<button class="waitlist-btn" onclick="joinWaitlist(\'' + d + '\',\'' + s.key + '\')">候补</button>';
       }
       html += '<td class="' + cls + '" data-day="' + d + '" data-slot="' + s.key + '">' + inner + '</td>';
     });
