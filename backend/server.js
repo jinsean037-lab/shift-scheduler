@@ -279,13 +279,14 @@ app.get('/api/schedule', async (req, res) => {
 app.post('/api/select', async (req, res) => {
   try {
     const { name, day, slotId } = req.body
-    if (!name || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
+    const slot = slotId || req.body.slot
+    if (!name || !day || !slot) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
     if (isBeforeStartTime(store)) {
       return res.json({ ok: false, msg: '排班尚未开始，请等待管理员设置开始时间' })
     }
     if (!store.members.includes(name)) return res.json({ ok: false, msg: '用户不存在' })
-    const key = `${day}|${slotId}`
+    const key = `${day}|${slot}`
     if (!store.schedule[key]) store.schedule[key] = []
     const list = store.schedule[key]
     if (list.includes(name)) return res.json({ ok: true, action: 'none', schedule: store.schedule, msg: '已选择该时段' })
@@ -657,6 +658,96 @@ app.post('/api/admin/reset-password', async (req, res) => {
 
 
 // ========== 启动 ==========
+// ========== 前端兼容路由（适配旧版前端 API 调用）==========
+
+// 兼容: GET /api/my-shifts?name=xxx
+app.get('/api/my-shifts', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ shifts: [], waitlist: [] })
+    const store = await readStore()
+    const shifts = []
+    // schedule 格式: { '周一':{am1:[...],am2:[...]}, ... }
+    const sched = store.schedule || {}
+    for (const day of Object.keys(sched)) {
+      const slots = sched[day]
+      if (typeof slots === 'object') {
+        for (const slotId of Object.keys(slots)) {
+          const names = slots[slotId]
+          if (Array.isArray(names) && names.includes(name)) {
+            const slotInfo = (store.timeSlots || []).find(t => t.id === slotId)
+            shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
+          }
+        }
+      }
+    }
+    // 也检查扁平格式: { '周一|am1':[...] }
+    for (const key of Object.keys(sched)) {
+      if (key.includes('|')) {
+        const [day, slotId] = key.split('|')
+        const names = sched[key]
+        if (Array.isArray(names) && names.includes(name)) {
+          if (!shifts.find(s => s.day === day && s.slot === slotId)) {
+            const slotInfo = (store.timeSlots || []).find(t => t.id === slotId)
+            shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
+          }
+        }
+      }
+    }
+    const wl = (store.waitlist || []).filter(w => w.name === name)
+    res.json({ shifts, waitlist: wl })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 兼容: POST /api/cancel（直接取消，3分钟内自动通过）
+app.post('/api/cancel', async (req, res) => {
+  try {
+    const { name, day, slot } = req.body
+    // 转发到 cancel-request 逻辑
+    req.body.slotId = req.body.slot || slot
+    req.body.day = day
+    req.body.name = name
+    const store = await readStore()
+    const key = `${day}|${slot}`
+    const list = store.schedule[key] || []
+    if (!list.includes(name)) return res.json({ ok: false, msg: '你不在该班次中' })
+    // 检查3分钟规则
+    const entryTime = store.scheduleTime ? store.scheduleTime[`${key}|${name}`] : null
+    if (entryTime && Date.now() - entryTime <= 3 * 60 * 1000) {
+      const idx = list.indexOf(name)
+      if (idx >= 0) list.splice(idx, 1)
+      delete store.scheduleTime[`${key}|${name}`]
+      autoFillFromWaitlist(store, day, slot)
+      await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, waitlist: store.waitlist })
+      return res.json({ ok: true, msg: '已取消' })
+    }
+    // 超过3分钟，走 cancel-request 流程但直接返回成功（简化体验）
+    const idx = list.indexOf(name)
+    if (idx >= 0) list.splice(idx, 1)
+    autoFillFromWaitlist(store, day, slot)
+  await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, waitlist: store.waitlist })
+    res.json({ ok: true, msg: '已取消' })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 兼容: POST /api/cancel-waitlist
+app.post('/api/cancel-waitlist', async (req, res) => {
+  try {
+    const { name, day, slot } = req.body
+    const store = await readStore()
+    const idx = (store.waitlist || []).findIndex(w => w.name === name && w.day === day && (w.slotId === slot || w.slot === slot))
+    if (idx >= 0) store.waitlist.splice(idx, 1)
+    await writeStore({ waitlist: store.waitlist })
+    res.json({ ok: true, msg: '已退出候补' })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 async function start() {
   const connected = await connectMongo()
   if (!connected) {
