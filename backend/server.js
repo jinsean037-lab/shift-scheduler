@@ -103,6 +103,78 @@ async function writeStore(data) {
   }
 }
 
+
+// ========== 文件持久化（MongoDB 不可用时的 fallback）==========
+const fs = require('fs');
+const STORE_FILE = require('path').join(__dirname, 'data', 'store.json');
+let useFileFallback = false;
+let localStore = null;
+
+function loadFromFile() {
+  try {
+    if (fs.existsSync(STORE_FILE)) {
+      const raw = fs.readFileSync(STORE_FILE, 'utf8');
+      localStore = JSON.parse(raw);
+      // 合并 DEFAULT_MEMBERS
+      if (localStore.members && Array.isArray(localStore.members)) {
+        DEFAULT_MEMBERS.forEach(m => {
+          if (!localStore.members.includes(m)) localStore.members.push(m);
+        });
+      }
+      console.log('[file] 已从', STORE_FILE, '加载数据');
+    } else {
+      localStore = getDefaultStore();
+      saveToFile();
+    }
+  } catch (e) {
+    console.error('[file] loadFromFile 失败:', e.message);
+    localStore = getDefaultStore();
+  }
+}
+
+function saveToFile() {
+  try {
+    const dir = require('path').dirname(STORE_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(STORE_FILE, JSON.stringify(localStore, null, 2), 'utf8');
+  } catch (e) {
+    console.error('[file] saveToFile 失败:', e.message);
+  }
+}
+
+function getDefaultStore() {
+  return {
+    startTime: null,
+    maxPerSlot: 2,
+    schedule: {
+      '周一': { am1:[], am2:[], pm1:[], pm2:[] },
+      '周二': { am1:[], am2:[], pm1:[], pm2:[] },
+      '周三': { am1:[], am2:[], pm1:[], pm2:[] },
+      '周四': { am1:[], am2:[], pm1:[], pm2:[] },
+      '周五': { am1:[], am2:[], pm1:[], pm2:[] }
+    },
+    passwords: {},
+    members: [...DEFAULT_MEMBERS]
+  };
+}
+
+function ensureMembers() {
+  if (!localStore) localStore = getDefaultStore();
+  if (!localStore.members) localStore.members = [...DEFAULT_MEMBERS];
+  DEFAULT_MEMBERS.forEach(m => {
+    if (!localStore.members.includes(m)) localStore.members.push(m);
+  });
+  // 自动生成默认密码
+  if (!localStore.passwords) localStore.passwords = {};
+  localStore.members.forEach(m => {
+    if (!localStore.passwords[m]) localStore.passwords[m] = String(Math.floor(10000000 + Math.random()*90000000));
+  });
+  saveToFile();
+}
+
+
 // ========== Express 应用 ==========
 const app = express()
 const PORT = process.env.PORT || 3000
