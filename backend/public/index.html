@@ -87,7 +87,7 @@ body {
   width: 440px;
   min-width: 380px;
   background: url('/login-bg.jpg') center/cover no-repeat,
-              linear-gradient(135deg, rgba(139,26,26,0.88) 0%, rgba(164,30,34,0.82) 50%, rgba(107,15,15,0.86) 100%);
+              linear-gradient(135deg, rgba(139,26,26,0.95) 0%, rgba(164,30,34,0.93) 50%, rgba(107,15,15,0.94) 100%);
   background-blend-mode: overlay;
   display: flex;
   flex-direction: column;
@@ -102,7 +102,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(139,26,26,0.75);
+  background: rgba(139,26,26,0.90);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 0;
@@ -675,9 +675,13 @@ body {
 /* 响应式 */
 @media (max-width: 768px) {
   .login-body { flex-direction: column; }
-  .login-bg-left { min-height: 180px; }
-  .login-right { width: 100%; min-width: auto; padding: 32px 24px; flex: 1; align-items: stretch; }
-  .login-card-wrap { max-width: 340px; margin: 0 auto; }
+  .login-bg-left { min-height: 200px; }
+  .login-right { width: 100%; min-width: auto; padding: 0; flex: 1; display: flex; align-items: stretch; }
+  .login-card-wrap { max-width: 100%; margin: 0; padding: 48px 28px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .login-card-header h2 { font-size: 20px; }
+  .login-card-header p { font-size: 12px; }
+  .login-card input { padding: 13px 14px; font-size: 14px; }
+  .login-card button { padding: 13px; font-size: 15px; }
   .header-inner { padding: 12px 16px; }
   .header-text h1 { font-size: 15px; }
   .college-logo { width: 36px; height: 36px; }
@@ -694,10 +698,15 @@ body {
 }
 @media (max-width: 480px) {
   .login-bg-left { display: none; }
-  .login-right { width: 100%; min-width: auto; padding: 28px 22px; flex: 1; }
+  .login-right { width: 100%; min-width: auto; padding: 0; flex: 1; display: flex; align-items: stretch; }
+  .login-card-wrap { padding: 36px 20px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .login-card-header h2 { font-size: 18px; }
+  .login-card-header p { font-size: 12px; }
+  .login-card input { padding: 12px 13px; font-size: 14px; }
+  .login-card button { padding: 12px; font-size: 14px; letter-spacing: 3px; }
   .login-topbar { padding: 10px 16px; gap: 8px; }
   .login-topbar-logo { height: 34px; }
-  .topbar-title { font-size: 14px; white-space: nowrap; }
+  .topbar-title { font-size: 14px; white-space: nowrap; letter-spacing: 1px; }
 }
 </style>
 </head>
@@ -1501,3 +1510,4 @@ async function resetSchedule() {
 </script>
 </body>
 </html>
+
