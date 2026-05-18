@@ -46,6 +46,11 @@ function defaultStore() {
 // ========== MongoDB 操作 ==========
 
 async function connectMongo() {
+  // 如果 URI 是占位符，跳过 MongoDB
+  if (MONGO_URI.includes('<db_password>')) {
+    console.log('[mongo] URI 为占位符，跳过 MongoDB');
+    return false;
+  }
   if (dbClient) return true
   try {
     console.log('[mongo] 正在连接...')
