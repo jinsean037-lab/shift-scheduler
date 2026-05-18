@@ -1746,7 +1746,7 @@ async function loadHomeStats() {
 
     // 早班/午班次数
     const morning = shifts.filter(s => s.slot && (s.slot.startsWith('am') || (s.time&&s.time.includes('8:00')))).length;
-    const afternoon = shifts.filter(s => s.slot && (s.slot.startsWith('pm') || (s.time&&(s.time.includes('14:30')||s.time.includes('16:00')))).length;
+    const afternoon = shifts.filter(s => s.slot && (s.slot.startsWith('pm') || (s.time && (s.time.includes('14:30')||s.time.includes('16:00')))).length);
     document.getElementById('statMorningShifts').textContent = morning || thisMonth.filter(s=>s.slot&&s.slot.startsWith('am')).length;
     document.getElementById('statAfternoonShifts').textContent = afternoon || thisMonth.filter(s=>s.slot&&s.slot.startsWith('pm')).length;
 
