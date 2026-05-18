@@ -107,26 +107,32 @@ app.get('/api/my-shifts', (req, res) => {
   const { name } = req.query
   if (!name) return res.json({ ok: false, msg: '缺少参数' })
   const shifts = []
+  const slotLabels = { am1:'8:00-10:00', am2:'10:00-12:00', pm1:'14:30-16:00', pm2:'16:00-17:30' }
   Object.entries(store.schedule).forEach(([day, slots]) => {
     Object.entries(slots).forEach(([slot, names]) => {
-      if (names.includes(name)) shifts.push({ day, slot })
+      if (names.includes(name)) shifts.push({ day, slot, slotLabel: slotLabels[slot] || slot, time: slotLabels[slot] || slot })
     })
   })
-  res.json({ ok: true, shifts })
+  const myWaitlist = (store.waitlist || []).filter(w => w.name === name)
+  const myCancelReqs = (store.cancelRequests || []).filter(r => r.name === name)
+  res.json({ ok: true, shifts, waitlist: myWaitlist, cancelRequests: myCancelReqs })
 })
 
 // 选时段
 app.post('/api/pick', (req, res) => {
-  const { name, day, slotId } = req.body
-  if (!store.startTime) return res.json({ ok: false, msg: '尚未开始' })
-  const now = Date.now() + 8 * 3600 * 1000
-  if (now < new Date(store.startTime).getTime()) return res.json({ ok: false, msg: '未到开始时间' })
+  const { name, day, slotId, slot } = req.body
+  const realSlot = slotId || slot  // 兼容前端两种参数名
+  // 未设置开始时间时允许选班（仅做人数限制）
+  if (store.startTime) {
+    const now = Date.now()
+    if (now < new Date(store.startTime).getTime()) return res.json({ ok: false, msg: '未到开始时间' })
+  }
 
-  const key = `${day}|${slotId}`
+  const key = `${day}|${realSlot}`
   if (!store.schedule[day]) store.schedule[day] = {}
-  if (!store.schedule[day][slotId]) store.schedule[day][slotId] = []
+  if (!store.schedule[day][realSlot]) store.schedule[day][realSlot] = []
 
-  const list = store.schedule[day][slotId]
+  const list = store.schedule[day][realSlot]
   if (list.includes(name)) return res.json({ ok: false, msg: '不能重复选择' })
 
   // 检查是否已选2个
@@ -140,12 +146,40 @@ app.post('/api/pick', (req, res) => {
 
   // 是否已满
   if (list.length >= (store.maxPerSlot || 2)) {
-    return res.json({ ok: false, msg: '该时段已满，可候补' })
+    return res.json({ ok: false, msg: '该时段已满', waitlist: true })
   }
 
   list.push(name)
   store.scheduleTime = store.scheduleTime || {}
   store.scheduleTime[`${key}|${name}`] = Date.now()
+  saveStore(store)
+  res.json({ ok: true, schedule: store.schedule })
+})
+
+// 直接取消（3分钟内自由取消）
+app.post('/api/cancel', (req, res) => {
+  const { name, day, slotId, slot } = req.body
+  const realSlot = slotId || slot
+  const key = `${day}|${realSlot}`
+  if (!store.schedule[day] || !store.schedule[day][realSlot]) {
+    return res.json({ ok: false, msg: '未找到排班记录' })
+  }
+  const list = store.schedule[day][realSlot]
+  const idx = list.indexOf(name)
+  if (idx < 0) return res.json({ ok: false, msg: '你未选择此时段' })
+  // 检查是否在3分钟内（自由取消窗口）
+  const pickTime = (store.scheduleTime && store.scheduleTime[`${key}|${name}`]) || 0
+  const elapsed = Date.now() - pickTime
+  if (elapsed > 3 * 60 * 1000 && pickTime > 0) {
+    // 超过3分钟，转为取消申请
+    const existing = store.cancelRequests.find(r => r.name === name && r.day === day && r.slotId === realSlot)
+    if (existing) return res.json({ ok: false, msg: '已提交过取消申请' })
+    store.cancelRequests.push({ name, day, slotId: realSlot, time: Date.now() })
+    saveStore(store)
+    return res.json({ ok: false, msg: '已超过3分钟，已提交取消申请等待审批', requested: true })
+  }
+  list.splice(idx, 1)
+  delete store.scheduleTime[`${key}|${name}`]
   saveStore(store)
   res.json({ ok: true, schedule: store.schedule })
 })
@@ -163,13 +197,14 @@ app.post('/api/cancel-request', (req, res) => {
 
 // 候补
 app.post('/api/waitlist', (req, res) => {
-  const { name, day, slotId } = req.body
-  const key = `${day}|${slotId}`
-  const list = (store.schedule[day] && store.schedule[day][slotId]) || []
+  const { name, day, slotId, slot } = req.body
+  const realSlot = slotId || slot
+  const key = `${day}|${realSlot}`
+  const list = (store.schedule[day] && store.schedule[day][realSlot]) || []
   if (list.includes(name)) return res.json({ ok: false, msg: '你已在此时段' })
-  const existing = store.waitlist.find(w => w.name === name && w.day === day && w.slotId === slotId)
+  const existing = store.waitlist.find(w => w.name === name && w.day === day && (w.slotId === realSlot || w.slot === realSlot))
   if (existing) return res.json({ ok: false, msg: '已在候补列表' })
-  store.waitlist.push({ name, day, slotId, time: Date.now() })
+  store.waitlist.push({ name, day, slotId: realSlot, time: Date.now() })
   saveStore(store)
   res.json({ ok: true })
 })
