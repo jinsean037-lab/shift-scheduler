@@ -583,13 +583,16 @@ app.post('/api/admin/reset-password', async (req, res) => {
 async function start() {
   const connected = await connectMongo()
   if (!connected) {
-    console.error('[fatal] MongoDB 连接失败，服务无法启动')
-    process.exit(1)
+    console.log('[warn] MongoDB 连接失败，回退到文件存储模式')
+    useFileFallback = true
+    loadFromFile()
+    ensureMembers()
+    console.log(`[db] 文件持久化已启用 (data/store.json)`)
   }
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`排班系统运行中: http://localhost:${PORT}`)
-    console.log(`[db] MongoDB 持久化已启用`)
+    if (!useFileFallback) console.log(`[db] MongoDB 持久化已启用`)
   })
 }
 
