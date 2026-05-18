@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
 <title>学工办助理排班系统 v3.0</title>
 <style>
 /* ========== 全局 ========== */
@@ -45,20 +48,27 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 24px;
+  padding: 14px 32px;
   background: white;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08);
   flex-shrink: 0;
 }
 .login-topbar-logo {
   width: auto;
-  height: 42px;
+  height: 46px;
   flex-shrink: 0;
 }
 .login-topbar-logo img {
   height: 100%;
   width: auto;
   object-fit: contain;
+}
+.topbar-title {
+  font-size: 20px;
+  color: var(--primary);
+  font-weight: 700;
+  letter-spacing: 4px;
+  font-family: "Noto Serif SC", "Source Han Serif SC", "SimSun", "STSong", serif;
 }
 /* 登录页主体区 */
 .login-body {
@@ -72,17 +82,30 @@ body {
   background: url('/login-bg.jpg') center/cover no-repeat;
 }
 
-/* 右侧登录区 */
+/* 右侧登录区 - 半透明岭院红 + 背景图透出 */
 .login-right {
   width: 440px;
   min-width: 380px;
-  background: white;
+  background: url('/login-bg.jpg') center/cover no-repeat,
+              linear-gradient(135deg, rgba(139,26,26,0.88) 0%, rgba(164,30,34,0.82) 50%, rgba(107,15,15,0.86) 100%);
+  background-blend-mode: overlay;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 48px 40px;
   flex-shrink: 0;
+  position: relative;
+}
+/* 登录区毛玻璃遮罩 */
+.login-right::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(139,26,26,0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 0;
 }
 
 .login-container {
@@ -147,19 +170,21 @@ body {
 /* 右侧登录卡片 */
 .login-card-wrap {
   flex: 1;
-  background: white;
+  background: transparent;
   padding: 48px 40px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-width: 340px;
+  position: relative;
+  z-index: 1;
 }
 .login-card-header {
   margin-bottom: 32px;
 }
 .login-card-header h2 {
   font-size: 22px;
-  color: var(--primary);
+  color: #fff;
   font-weight: 700;
   margin-bottom: 6px;
   position: relative;
@@ -174,25 +199,27 @@ body {
   border-radius: 2px;
 }
 .login-card-header p {
-  color: var(--text-light);
+  color: rgba(255,255,255,0.75);
   font-size: 13px;
   margin-top: 10px;
 }
 .login-card input {
   width: 100%;
   padding: 14px 16px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid rgba(255,255,255,0.3);
   border-radius: 8px;
   font-size: 15px;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
-  background: #fafbfc;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
   margin-bottom: 16px;
 }
+.login-card input::placeholder { color: rgba(255,255,255,0.55); }
 .login-card input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(139,26,26,0.12);
-  background: white;
+  border-color: rgba(255,255,255,0.7);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.18);
 }
 .login-card button {
   width: 100%;
@@ -220,7 +247,7 @@ body {
 .admin-link {
   margin-top: 28px;
   padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid rgba(255,255,255,0.25);
   text-align: center;
 }
 .admin-link a {
@@ -229,7 +256,7 @@ body {
   text-decoration: none;
   transition: color 0.2s;
 }
-.admin-link a:hover { color: var(--primary-light); text-decoration: underline; }
+.admin-link a:hover { color: #fff; text-decoration: underline; }
 
 /* ========== 管理员登录弹窗 ========== */
 .modal-overlay {
@@ -663,14 +690,14 @@ body {
   .login-page { min-height: 100dvh; background: white; }
   .login-topbar { padding: 10px 20px; gap: 10px; }
   .login-topbar-logo { height: 38px; }
-  .login-topbar h1 { font-size: 15px; white-space: nowrap; letter-spacing: 1px; }
+  .topbar-title { font-size: 16px; white-space: nowrap; letter-spacing: 2px; }
 }
 @media (max-width: 480px) {
   .login-bg-left { display: none; }
   .login-right { width: 100%; min-width: auto; padding: 28px 22px; flex: 1; }
   .login-topbar { padding: 10px 16px; gap: 8px; }
   .login-topbar-logo { height: 34px; }
-  .login-topbar h1 { font-size: 14px; white-space: nowrap; }
+  .topbar-title { font-size: 14px; white-space: nowrap; }
 }
 </style>
 </head>
@@ -683,7 +710,7 @@ body {
     <div class="login-topbar-logo">
       <img src="/lingnan-logo.png" alt="岭南学院">
     </div>
-    <h1 style="font-size:18px;color:var(--primary);font-weight:700;letter-spacing:2px;">学工办助理排班系统</h1>
+    <h1 class="topbar-title">学工办助理排班系统</h1>
   </div>
   <!-- 主体区 -->
   <div class="login-body">
