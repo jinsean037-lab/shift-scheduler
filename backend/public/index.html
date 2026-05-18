@@ -717,6 +717,352 @@ body {
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+
+/* ========== 新版布局：左侧导航 + 右侧内容 ========== */
+
+/* 顶栏 */
+.app-header {
+  background: white;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+}
+.app-header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.app-brand img {
+  height: 32px;
+  width: auto;
+}
+.app-brand span {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 1px;
+}
+.app-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.app-user-name {
+  font-size: 13px;
+  color: #555;
+  font-weight: 600;
+}
+.app-btn-outline {
+  background: white;
+  border: 1.5px solid #ddd;
+  color: #555;
+  padding: 5px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+.app-btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.app-btn-danger {
+  background: var(--danger);
+  border: none;
+  color: white;
+  padding: 5px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: opacity 0.2s;
+}
+.app-btn-danger:hover { opacity: 0.85; }
+
+/* 主体 */
+.app-body {
+  display: flex;
+  min-height: calc(100vh - 56px);
+}
+
+/* 左侧导航栏 */
+.sidebar {
+  width: 220px;
+  background: #fff;
+  border-right: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: sticky;
+  top: 56px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+}
+.sidebar-user-card {
+  padding: 20px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: linear-gradient(135deg, var(--primary) 0%, #9B1B1B 100%);
+  color: white;
+}
+.sidebar-avatar {
+  width: 42px; height: 42px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+.sidebar-user-info { overflow: hidden; }
+.sidebar-name {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-role {
+  font-size: 11px;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+/* 导航项 */
+.sidebar-nav { flex: 1; padding: 12px 0; }
+.nav-group-title {
+  padding: 8px 16px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  color: #444;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.nav-item:hover {
+  background: #fdf2f2;
+  color: var(--primary);
+}
+.nav-item.active {
+  background: #fef3f3;
+  color: var(--primary);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+.nav-icon { font-size: 16px; width: 22px; text-align: center; }
+.nav-admin { color: var(--danger); }
+.nav-admin:hover { background: #fff5f5; color: var(--danger); }
+.nav-admin.active { background: #fef5f5; border-left-color: var(--danger); }
+
+/* 侧边栏底部 */
+.sidebar-footer {
+  padding: 14px 16px;
+  border-top: 1px solid #f0f0f0;
+  text-align: center;
+}
+.sidebar-version {
+  font-size: 11px;
+  color: #aaa;
+  font-weight: 600;
+}
+.sidebar-school {
+  font-size: 10px;
+  color: #ccc;
+  margin-top: 2px;
+}
+
+/* 右侧内容区 */
+.main-content {
+  flex: 1;
+  padding: 24px 28px;
+  overflow-y: auto;
+  background: #f7f8fa;
+  min-width: 0;
+}
+
+/* 页面视图 */
+.page-view { display: none; }
+.page-view.active { display: block; animation: fadeIn 0.25s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+/* 页面标题 */
+.page-title-row {
+  margin-bottom: 20px;
+}
+.page-title-row h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 4px;
+}
+.page-subtitle {
+  font-size: 13px;
+  color: #888;
+}
+
+/* 统计卡片 */
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.stat-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.stat-info { flex: 1; }
+.stat-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #222;
+  line-height: 1.2;
+}
+.stat-label {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* 首页区块 */
+.home-section { margin-bottom: 20px; }
+
+/* 日历网格 */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  transition: transform 0.15s;
+  cursor: default;
+  position: relative;
+}
+.cal-cell:hover { transform: scale(1.1); z-index: 1; }
+.cal-cell .cal-day { font-size: 12px; }
+.cal-cell .cal-count { font-size: 9px; margin-top: 1px; opacity: 0.8; }
+.cal-empty { background: #f0f0f0; border-radius: 6px; }
+.cal-none { background: #f5f5f5; color: #bbb; }
+.cal-1 { background: #fee2e2; color: #991b1b; }
+.cal-2 { background: #fecaca; color: #991b1b; }
+.cal-3plus { background: #c41230; color: white; }
+.cal-today { box-shadow: 0 0 0 2px var(--primary); }
+
+/* 快捷操作 */
+.quick-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.quick-btn {
+  padding: 10px 20px;
+  border: 1.5px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #555;
+}
+.quick-btn:hover { border-color: var(--primary); color: var(--primary); background: #fdf2f2; }
+.quick-btn-primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.quick-btn-primary:hover { background: #9B1B1B; border-color: #9B1B1B; color: white; }
+
+/* 隐藏旧布局元素 */
+.main-page .college-header,
+.main-page .welcome-banner,
+.main-page .tabs { display: none !important; }
+.main-page .content-wrap { max-width: none; padding: 0; }
+
+/* 移动端适配 */
+@media(max-width:768px){
+  .sidebar {
+    width: 100%;
+    position: relative;
+    top: 0;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid #eee;
+  }
+  .sidebar-user-card { padding: 14px 12px; }
+  .sidebar-nav { padding: 8px 0; }
+  .nav-item { padding: 8px 12px; font-size: 13px; }
+  .sidebar-footer { display: none; }
+  .app-body { flex-direction: column; }
+  .main-content { padding: 16px; }
+  .stat-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-card { padding: 12px 14px; }
+  .stat-icon { width: 38px; height: 38px; font-size: 18px; }
+  .stat-value { font-size: 20px; }
+  .app-header-inner { padding: 0 12px; }
+  .app-brand span { font-size: 14px; }
+  .app-user-name { display: none; }
+  .app-btn-outline { padding: 4px 10px; font-size: 11px; }
+  .app-btn-danger { padding: 4px 10px; font-size: 11px; }
+  .calendar-grid { gap: 2px; }
+  .cal-cell { font-size: 9px; border-radius: 4px; }
+  .cal-cell .cal-day { font-size: 10px; }
+}
+@media(max-width:480px){
+  .stat-cards { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { padding: 10px 12px; }
+  .stat-value { font-size: 18px; }
+  .quick-actions { flex-direction: column; }
+  .quick-btn { width: 100%; text-align: center; }
+}
+
 </style>
 </head>
 <body>
@@ -780,767 +1126,676 @@ body {
 
 <!-- ===== 主页面 ===== -->
 <div class="main-page" id="mainPage">
-  <!-- 学院顶栏 -->
-  <div class="college-header">
-    <div class="header-inner">
-      <div class="college-logo">
-        <img src="/lingnan-logo.png" alt="岭南学院">
+  <!-- 顶栏 -->
+  <div class="app-header">
+    <div class="app-header-inner">
+      <div class="app-brand">
+        <img src="/lingnan-logo.png" alt="">
+        <span>学工办助理排班系统</span>
       </div>
-      <div class="header-text">
-        <h1>学工办助理排班系统</h1>
-        <p>中山大学岭南学院</p>
+      <div class="app-user">
+        <span class="app-user-name" id="headerUserName"></span>
+        <button class="app-btn-outline" onclick="showChangePassword()">修改密码</button>
+        <button class="app-btn-danger" onclick="doLogout()">退出</button>
       </div>
-      <div class="header-badge">v3.0</div>
     </div>
   </div>
 
-  <div class="content-wrap">
-    <!-- 欢迎横幅 -->
-    <div class="welcome-banner" id="welcomeBanner">
-      <div class="info">
-        <div class="avatar" id="avatarIcon">👤</div>
-        <div>
-          <div class="name" id="userName"></div>
-          <div class="role" id="userRole"></div>
-        </div>
-      </div>
-      <button class="logout-btn" onclick="doLogout()">退出登录</button>
-        <button class="logout-btn" style="background:rgba(255,255,255,0.15);margin-left:8px" onclick="showChangePassword()">修改密码</button>
-    </div>
-
-    <!-- Tab 栏 -->
-    <div class="tabs" id="tabsBar">
-      <div class="tab active" onclick="switchTab('schedule')">📅 排班表</div>
-      <div class="tab" id="myShiftsTab" onclick="switchTab('stats')">📌 我的班次</div>
-      <div class="tab" id="adminTab" style="display:none" onclick="switchTab('admin')">⚙️ 管理</div>
-    </div>
-
-    <!-- 排班表视图 -->
-    <div id="scheduleView">
-      <div class="tip-bar">
-        💡 点击格子选择时段（先到先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟需提交申请。每时段最多 <span id="maxHint">2</span> 人，满了可申请候补。
-        <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>
-      </div>
-      <div class="table-wrap">
-        <div id="scheduleGrid"></div>
-      </div>
-    </div>
-
-    <!-- 我的班次视图 -->
-    <div id="statsView" style="display:none">
-      <div class="section-card">
-        <h3>📌 我的班次</h3>
-        <div id="myShifts"></div>
-      </div>
-      <div class="section-card" id="myWaitlistSection" style="display:none">
-        <h3>⏳ 我的候补</h3>
-        <div id="myWaitlist"></div>
-      </div>
-      <div class="section-card" id="myCancelSection" style="display:none">
-        <h3>❌ 我的取消申请</h3>
-        <div id="myCancelRequests"></div>
-      </div>
-    </div>
-
-    <!-- 管理视图 -->
-    <div id="adminView" style="display:none">
-      <!-- 开始时间 -->
-      <div class="admin-section">
-        <h3>⏰ 排班开始时间</h3>
-        <p style="color:#999;font-size:13px;margin-bottom:12px">设置后成员在指定时间前无法选班次，留空则不限制。</p>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="datetime-local" id="startTimeInput" style="min-width:220px">
-          <button class="admin-btn success" onclick="saveStartTime()">保存</button>
-          <button class="admin-btn" style="background:#e0e0e0;color:#666" onclick="clearStartTime()">清除限制</button>
-        </div>
-        <div id="startTimeStatus" style="margin-top:10px;font-size:13px;color:#888"></div>
-      </div>
-
-      <!-- 候补申请 -->
-      <div class="admin-section">
-        <h3>⏳ 候补申请</h3>
-        <ul class="pending-list" id="waitlistPending">
-          <li style="color:#999">暂无候补申请</li>
-        </ul>
-      </div>
-
-      <!-- 取消申请 -->
-      <div class="admin-section">
-        <h3>❌ 取消班次申请</h3>
-        <ul class="pending-list" id="cancelPending">
-          <li style="color:#999">暂无取消申请</li>
-        </ul>
-      </div>
-
-      <!-- 密码管理 -->
-      <div class="admin-section">
-        <h3>🔑 密码管理</h3>
-        <p style="color:#999;font-size:13px;margin-bottom:12px">查看或重置成员密码。点击"显示"查看原密码，或设置新密码后点击"重置"。</p>
-        <ul class="member-list" id="passwordList"></ul>
-      </div>
-
-      <!-- 成员管理 -->
-      <div class="admin-section">
-        <h3>👤 成员管理</h3>
-        <div class="add-row">
-          <input type="text" id="newMemberInput" placeholder="输入姓名" maxlength="20" style="flex:1">
-          <button class="admin-btn primary" onclick="addMember()">添加</button>
-        </div>
-        <ul class="member-list" id="memberList"></ul>
-      </div>
-
-      <!-- 手动分配 -->
-      <div class="admin-section">
-        <h3>📌 为成员分配班次</h3>
-        <div class="add-row">
-          <select id="assignMember" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
-            <option value="">选择成员</option>
-          </select>
-          <select id="assignDay" style="padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
-            <option value="">选择日期</option>
-            <option value="周一">周一</option>
-            <option value="周二">周二</option>
-            <option value="周三">周三</option>
-            <option value="周四">周四</option>
-            <option value="周五">周五</option>
-          </select>
-          <select id="assignSlot" style="padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
-            <option value="">选择时段</option>
-            <option value="am1">8:00-10:00</option>
-            <option value="am2">10:00-12:00</option>
-            <option value="pm1">14:30-16:00</option>
-            <option value="pm2">16:00-17:30</option>
-          </select>
-          <button class="admin-btn primary" onclick="adminAssign()">分配</button>
+  <!-- 主体：左侧导航 + 右侧内容 -->
+  <div class="app-body">
+    <!-- 左侧导航栏 -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-user-card">
+        <div class="sidebar-avatar" id="sidebarAvatar">👤</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-name" id="sidebarName"></div>
+          <div class="sidebar-role" id="sidebarRole"></div>
         </div>
       </div>
 
-      <!-- 重置 -->
-      <div class="admin-section" style="border:1.5px solid #ffe0e0">
-        <h3 style="color:var(--danger)">⚠️ 重置排班</h3>
-        <p style="color:#999;font-size:13px;margin-bottom:14px">清空所有人的排班选择和候补，此操作不可恢复！</p>
-        <button class="admin-btn danger" onclick="resetSchedule()">重置所有排班</button>
+      <div class="sidebar-nav">
+        <div class="nav-group-title">功能导航</div>
+        <a class="nav-item active" data-page="home" onclick="switchTab('home')">
+          <span class="nav-icon">🏠</span><span>首页概览</span>
+        </a>
+        <a class="nav-item" data-page="schedule" onclick="switchTab('schedule')">
+          <span class="nav-icon">📅</span><span>排班表</span>
+        </a>
+        <a class="nav-item" data-page="stats" onclick="switchTab('stats')">
+          <span class="nav-icon">📌</span><span>我的班次</span>
+        </a>
+
+        <div class="nav-group-title" id="adminNavGroupTitle" style="display:none">管理功能</div>
+        <a class="nav-item nav-admin" data-page="admin" id="adminNavItem" style="display:none" onclick="switchTab('admin')">
+          <span class="nav-icon">⚙️</span><span>管理中心</span>
+        </a>
       </div>
-    </div>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-version">v3.0</div>
+        <div class="sidebar-school">中山大学岭南学院</div>
+      </div>
+    </nav>
+
+    <!-- 右侧内容区 -->
+    <main class="main-content" id="mainContent">
+
+      <!-- ===== 首页视图 ===== -->
+      <div class="page-view active" id="homeView">
+        <div class="page-title-row">
+          <h2>首页概览</h2>
+          <p class="page-subtitle">个人值班数据统计</p>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stat-cards">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#8B1A1A,#c41230)">📋</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statTotalShifts">0</div>
+              <div class="stat-label">本月值班次数</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#1a6bc4,#4da6ff)">⏱️</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statTotalHours">0h</div>
+              <div class="stat-label">累计值班时长</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#2e7d32,#66bb6a)">🌅</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statMorningShifts">0</div>
+              <div class="stat-label">早班次数</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:linear-gradient(135deg,#e65100,#ff9800)">🌇</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statAfternoonShifts">0</div>
+              <div class="stat-label">午班次数</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 本周排班 -->
+        <div class="section-card home-section">
+          <h3>📅 本周我的排班</h3>
+          <div id="homeMyShifts"><p style="color:#999;text-align:center;padding:20px 0">暂无排班记录</p></div>
+        </div>
+
+        <!-- 值班日历热力图 -->
+        <div class="section-card home-section">
+          <h3>📊 本月值班分布</h3>
+          <div id="homeCalendar" style="padding:10px 0">
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </div>
+        </div>
+
+        <!-- 快捷操作 -->
+        <div class="section-card home-section">
+          <h3>⚡ 快捷操作</h3>
+          <div class="quick-actions">
+            <button class="quick-btn" onclick="switchTab('schedule')">📅 查看排班表</button>
+            <button class="quick-btn" onclick="switchTab('stats')">📌 我的班次详情</button>
+            <button class="quick-btn quick-btn-primary" onclick="showChangePassword()">🔑 修改密码</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 排班表视图 ===== -->
+      <div class="page-view" id="scheduleView" style="display:none">
+        <div class="page-title-row">
+          <h2>排班表</h2>
+          <p class="page-subtitle">点击格子选择值班时段</p>
+        </div>
+        <div class="tip-bar">
+          💡 点击格子选择时段（先到先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟需提交申请。每时段最多 <span id="maxHint">2</span> 人，满了可申请候补。
+          <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>
+        </div>
+        <div class="table-wrap">
+          <div id="scheduleGrid"></div>
+        </div>
+      </div>
+
+      <!-- ===== 我的班次视图 ===== -->
+      <div class="page-view" id="statsView" style="display:none">
+        <div class="page-title-row">
+          <h2>我的班次</h2>
+          <p class="page-subtitle">查看和管理你的值班记录</p>
+        </div>
+        <div class="section-card">
+          <h3>📌 我的班次</h3>
+          <div id="myShifts"></div>
+        </div>
+        <div class="section-card" id="myWaitlistSection" style="display:none">
+          <h3>⏳ 我的候补</h3>
+          <div id="myWaitlist"></div>
+        </div>
+        <div class="section-card" id="myCancelSection" style="display:none">
+          <h3>❌ 我的取消申请</h3>
+          <div id="myCancelRequests"></div>
+        </div>
+      </div>
+
+      <!-- ===== 管理视图 ===== -->
+      <div class="page-view" id="adminView" style="display:none">
+        <div class="page-title-row">
+          <h2>管理中心</h2>
+          <p class="page-subtitle">管理员专属功能</p>
+        </div>
+        <!-- 开始时间 -->
+        <div class="admin-section">
+          <h3>⏰ 排班开始时间</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">设置后成员在指定时间前无法选班次，留空则不限制。</p>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="datetime-local" id="startTimeInput" style="min-width:220px">
+            <button class="admin-btn success" onclick="saveStartTime()">保存</button>
+            <button class="admin-btn" style="background:#e0e0e0;color:#666" onclick="clearStartTime()">清除限制</button>
+          </div>
+          <div id="startTimeStatus" style="margin-top:10px;font-size:13px;color:#888"></div>
+        </div>
+
+        <!-- 候补申请 -->
+        <div class="admin-section">
+          <h3>⏳ 候补申请</h3>
+          <ul class="pending-list" id="waitlistPending">
+            <li style="color:#999">暂无候补申请</li>
+          </ul>
+        </div>
+
+        <!-- 取消申请 -->
+        <div class="admin-section">
+          <h3>❌ 取消班次申请</h3>
+          <ul class="pending-list" id="cancelPending">
+            <li style="color:#999">暂无取消申请</li>
+          </ul>
+        </div>
+
+        <!-- 密码管理 -->
+        <div class="admin-section">
+          <h3>🔑 密码管理</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">重置成员密码为随机生成的8位数字组合。</p>
+          <ul class="member-list" id="passwordList"></ul>
+        </div>
+
+        <!-- 成员管理 -->
+        <div class="admin-section">
+          <h3>👤 成员管理</h3>
+          <div class="add-row">
+            <input type="text" id="newMemberInput" placeholder="输入姓名" maxlength="20" style="flex:1">
+            <button class="admin-btn primary" onclick="addMember()">添加</button>
+          </div>
+          <ul class="member-list" id="memberList"></ul>
+        </div>
+
+        <!-- 手动分配 -->
+        <div class="admin-section">
+          <h3>📌 为成员分配班次</h3>
+          <div class="add-row">
+            <select id="assignMember" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
+              <option value="">选择成员</option>
+            </select>
+            <select id="assignDay" style="padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
+              <option value="">选择日期</option>
+              <option value="周一">周一</option>
+              <option value="周二">周二</option>
+              <option value="周三">周三</option>
+              <option value="周四">周四</option>
+              <option value="周五">周五</option>
+            </select>
+            <select id="assignSlot" style="padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
+              <option value="">选择时段</option>
+              <option value="am1">8:00-10:00</option>
+              <option value="am2">10:00-12:00</option>
+              <option value="pm1">14:30-16:00</option>
+              <option value="pm2">16:00-17:30</option>
+            </select>
+            <button class="admin-btn primary" onclick="adminAssign()">分配</button>
+          </div>
+        </div>
+
+        <!-- 重置 -->
+        <div class="admin-section" style="border:1.5px solid #ffe0e0">
+          <h3 style="color:var(--danger)">⚠️ 重置排班</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:14px">清空所有人的排班选择和候补，此操作不可恢复！</p>
+          <button class="admin-btn danger" onclick="resetSchedule()">重置所有排班</button>
+        </div>
+      </div>
+    </main>
   </div>
 </div>
 
-<!-- 修改密码弹窗 -->
-<div class="modal-overlay" id="changePwdModal">
-  <div class="modal-box">
-    <h2>🔒 修改密码</h2>
-    <p>请输入原密码和新密码</p>
-    <input type="password" id="oldPwdInput" placeholder="原密码" maxlength="50" autocomplete="off">
-    <input type="password" id="newPwdInput" placeholder="新密码（至少6位）" maxlength="50" autocomplete="off">
-    <input type="password" id="confirmPwdInput" placeholder="确认新密码" maxlength="50" autocomplete="off">
-    <button onclick="doChangePassword()">确认修改</button>
-    <div class="error" id="changePwdError"></div>
-    <div class="back-link"><a href="#" onclick="hideChangePassword();return false;">取消</a></div>
-  </div>
-</div>
 
-<!-- Toast -->
-<div class="toast" id="toast"></div>
+
+</html>
+
+
 
 <script>
-const API = '/api'
-let currentUser = ''
-let isAdmin = false
-let scheduleData = {}
-let configData = {}
-let waitlistData = []
-let cancelRequests = []
-let pendingAction = null
-window._entryTimes = {}
+const API = '/api';
+let currentUser = localStorage.getItem('userName') || '';
+let currentRole = localStorage.getItem('userRole') || 'member';
+let configData = {};
+let userShifts = [];
 
-/* ========== Toast ========== */
-function showToast(msg, type='') {
-  const t = document.getElementById('toast')
-  t.textContent = msg
-  t.className = 'toast show ' + type
-  setTimeout(()=>{ t.className = 'toast' }, 2200)
+// ========== 工具 ==========
+function showToast(msg, duration=2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), duration);
 }
-
-/* ========== 确认弹窗 ========== */
 function showConfirm(title, msg, action) {
-  document.getElementById('confirmTitle').textContent = title
-  document.getElementById('confirmMsg').textContent = msg
-  pendingAction = action
-  document.getElementById('confirmModal').classList.add('show')
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  document.getElementById('confirmExtra').innerHTML = '';
+  window._confirmAction = action;
+  document.getElementById('confirmModal').classList.add('show');
 }
+window.confirmAction = null;
 function closeConfirm() {
-  document.getElementById('confirmModal').classList.remove('show')
-  document.getElementById('confirmExtra').innerHTML = ''
-  pendingAction = null
+  document.getElementById('confirmModal').classList.remove('show');
+  window._confirmAction = null;
 }
 function confirmAction() {
-  if (pendingAction) { pendingAction(); closeConfirm() }
+  if (window._confirmAction) { window._confirmAction(); }
+  closeConfirm();
 }
 
-/* ========== fetch 超时 ========== */
-async function fetchWithTimeout(url, options={}, timeout=10000) {
-  const controller = new AbortController()
-  const id = setTimeout(()=>controller.abort(), timeout)
-  try {
-    const res = await fetch(url, {...options, signal:controller.signal})
-    clearTimeout(id)
-    return res
-  } catch(e) {
-    clearTimeout(id)
-    throw e
+// ========== Tab 切换（新：page-view + sidebar nav）==========
+function switchTab(tab) {
+  // 隐藏所有 page-view
+  document.querySelectorAll('.page-view').forEach(v => v.classList.remove('active'));
+  // 移除所有 nav 激活态
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+  if (tab === 'home') {
+    document.getElementById('homeView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="home"]');
+    if (nav) nav.classList.add('active');
+    loadHomeStats();
+  } else if (tab === 'schedule') {
+    document.getElementById('scheduleView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="schedule"]');
+    if (nav) nav.classList.add('active');
+    // 兼容旧 tab 样式
+    const tabEl = document.getElementById('tabsBar');
+    if (tabEl) { 
+      Array.from(tabEl.children).forEach(t => t.classList.remove('active'));
+      const st = document.getElementById('myShiftsTab');
+      if (st) st.classList.remove('active');
+      const schTab = tabEl.querySelector('.tab');
+      if (schTab) schTab.classList.add('active');
+    }
+    loadSchedule();
+  } else if (tab === 'stats') {
+    document.getElementById('statsView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="stats"]');
+    if (nav) nav.classList.add('active');
+    loadMyShifts();
+  } else if (tab === 'admin') {
+    document.getElementById('adminView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="admin"]');
+    if (nav) nav.classList.add('active');
+    loadPasswords();
+    loadMembers();
+    loadStartTime();
+    loadWaitlist();
+    loadCancelRequests();
   }
 }
 
-/* ========== 登录 ========== */
+// ========== 登录 ==========
 async function doLogin() {
-  const name = document.getElementById('nameInput').value.trim()
-  const password = document.getElementById('passwordInput').value.trim()
-  if (!name) { showToast('请输入姓名','error'); return }
-  if (!password) { showToast('请输入密码','error'); return }
+  const name = document.getElementById('nameInput').value.trim();
+  const pwd = document.getElementById('passwordInput').value.trim();
+  const err = document.getElementById('loginError');
+  if (!name || !pwd) { err.textContent = '请输入姓名和密码'; return; }
   try {
-    const res = await fetchWithTimeout(API+'/login', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name, password})
-    }, 15000)
-    const data = await res.json()
+    const res = await fetch(API + '/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, password: pwd})
+    });
+    const data = await res.json();
     if (data.ok) {
-      currentUser = data.name
-      isAdmin = false
-      enterMain()
+      currentUser = data.name;
+      currentRole = data.role;
+      localStorage.setItem('userName', currentUser);
+      localStorage.setItem('userRole', currentRole);
+      // 填充 UI
+      document.getElementById('headerUserName').textContent = currentUser;
+      document.getElementById('sidebarAvatar').textContent = currentUser.charAt(0);
+      document.getElementById('sidebarName').textContent = currentUser;
+      document.getElementById('sidebarRole').textContent = currentRole === 'admin' ? '管理员' : '助理';
+      document.getElementById('userName').textContent = currentUser;
+      document.getElementById('userRole').textContent = currentRole === 'admin' ? '管理员' : '助理';
+      // 显示/隐藏管理导航
+      if (currentRole === 'admin') {
+        document.getElementById('adminNavGroupTitle').style.display = '';
+        document.getElementById('adminNavItem').style.display = '';
+      } else {
+        document.getElementById('adminNavGroupTitle').style.display = 'none';
+        document.getElementById('adminNavItem').style.display = 'none';
+      }
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('mainPage').style.display = 'flex';
+      // 默认显示首页
+      switchTab('home');
+      loadConfig();
     } else {
-      document.getElementById('loginError').textContent = data.msg
+      err.textContent = data.msg || '登录失败';
     }
-  } catch(e) { showToast('网络错误，请稍后重试','error') }
+  } catch(e) { err.textContent = '网络错误'; }
 }
 
-function showAdminLogin() {
-  document.getElementById('adminLoginModal').classList.add('show')
-}
-function hideAdminLogin() {
-  document.getElementById('adminLoginModal').classList.remove('show')
-  document.getElementById('adminPassword').value = ''
-  document.getElementById('adminLoginError').textContent = ''
-}
+// ========== 管理员登录 ==========
 async function doAdminLogin() {
-  const password = document.getElementById('adminPassword').value
-  if (!password) { showToast('请输入密码','error'); return }
+  const pwd = document.getElementById('adminPassword').value.trim();
+  const err = document.getElementById('adminLoginError');
+  if (!pwd) { err.textContent = '请输入管理员密码'; return; }
   try {
-    const res = await fetchWithTimeout(API+'/admin/login', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({password})
-    }, 15000)
-    const data = await res.json()
+    const res = await fetch(API + '/admin/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({password: pwd})
+    });
+    const data = await res.json();
     if (data.ok) {
-      currentUser = '管理员'
-      isAdmin = true
-      hideAdminLogin()
-      enterMain()
+      currentUser = data.name || '管理员';
+      currentRole = 'admin';
+      localStorage.setItem('userName', currentUser);
+      localStorage.setItem('userRole', currentRole);
+      document.getElementById('headerUserName').textContent = currentUser;
+      document.getElementById('sidebarAvatar').textContent = '⚙';
+      document.getElementById('sidebarName').textContent = currentUser;
+      document.getElementById('sidebarRole').textContent = '管理员';
+      document.getElementById('adminNavGroupTitle').style.display = '';
+      document.getElementById('adminNavItem').style.display = '';
+      document.getElementById('adminLoginModal').classList.remove('show');
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('mainPage').style.display = 'flex';
+      switchTab('home');
+      loadConfig();
     } else {
-      document.getElementById('adminLoginError').textContent = data.msg
+      err.textContent = data.msg || '密码错误';
     }
-  } catch(e) { showToast('网络错误','error') }
+  } catch(e) { err.textContent = '网络错误'; }
 }
+function showAdminLogin() { document.getElementById('adminLoginModal').classList.add('show'); }
+function hideAdminLogin() { document.getElementById('adminLoginModal').classList.remove('show'); }
+
+// ========== 登出 ==========
 function doLogout() {
-  if (window._scheduleTimer) { clearInterval(window._scheduleTimer); window._scheduleTimer = null }
-  currentUser = ''; isAdmin = false
-  localStorage.removeItem('shiftUser')
-  document.getElementById('loginPage').style.display = 'flex'
-  document.getElementById('mainPage').style.display = 'none'
-}
-document.getElementById('nameInput').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('passwordInput').focus() })
-document.getElementById('passwordInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin() })
-document.getElementById('adminPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doAdminLogin() })
-
-/* ========== 进入主页 ========== */
-async function enterMain() {
-  document.getElementById('loginPage').style.display = 'none'
-  document.getElementById('mainPage').style.display = 'block'
-  document.getElementById('userName').textContent = currentUser
-  document.getElementById('avatarIcon').textContent = isAdmin ? '🔑' : '👤'
-  document.getElementById('userRole').textContent = isAdmin ? '管理员' : '学工办助理'
-
-  if (isAdmin) {
-    document.getElementById('adminTab').style.display = 'block'
-    document.getElementById('myShiftsTab').style.display = 'none'
-  } else {
-    document.getElementById('adminTab').style.display = 'none'
-    document.getElementById('myShiftsTab').style.display = 'block'
-  }
-  await loadConfig()
-  await loadSchedule()
-  if (window._scheduleTimer) clearInterval(window._scheduleTimer)
-  window._scheduleTimer = setInterval(()=>{ loadSchedule() }, 3000)
+  currentUser = '';
+  currentRole = 'member';
+  localStorage.clear();
+  document.getElementById('mainPage').style.display = 'none';
+  document.getElementById('loginPage').style.display = '';
+  document.getElementById('nameInput').value = '';
+  document.getElementById('passwordInput').value = '';
 }
 
-/* ========== 数据加载 ========== */
+// ========== 加载配置 ==========
 async function loadConfig() {
   try {
-    const res = await fetchWithTimeout(API+'/config', {}, 15000)
-    configData = await res.json()
-    document.getElementById('maxHint').textContent = configData.maxPerSlot
+    const res = await fetch(API + '/config');
+    configData = await res.json();
+    const mh = document.getElementById('maxHint');
+    if (mh) mh.textContent = configData.maxPerSlot || 2;
+    if (configData.startTime) {
+      const d = new Date(configData.startTime);
+      const now = new Date();
+      if (now < d) {
+        const tip = document.querySelector('.tip-bar');
+        if (tip) tip.innerHTML = '⏳ 排班尚未开始，开始时间：' + d.toLocaleString() + ' <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>';
+      }
+    }
   } catch(e) {}
 }
+
+// ========== 排班表 ==========
 async function loadSchedule() {
   try {
-    const res = await fetchWithTimeout(API+'/schedule', {}, 15000)
-    const data = await res.json()
-    configData.timeSlots = data.timeSlots
-    configData.days = data.days
-    configData.maxPerSlot = data.maxPerSlot
-    configData.members = data.members
-    configData.startTime = data.startTime || null
-    scheduleData = data.schedule || {}
-    waitlistData = data.waitlist || []
-    cancelRequests = data.cancelRequests || []
-    renderSchedule()
-    renderMyShifts()
-    if (isAdmin) {
-      renderWaitlistPending()
-      renderCancelPending()
-      loadMembers()
-      updateAssignMemberList()
-      loadAdminStartTime()
-    }
-  } catch(e) {}
+    const res = await fetch(API + '/schedule');
+    const data = await res.json();
+    renderSchedule(data);
+  } catch(e) { console.error('加载排班表失败', e); }
 }
-
-/* ========== 渲染排班表 ========== */
-function renderSchedule() {
-  const {timeSlots, days, maxPerSlot} = configData
-  if (!timeSlots || !days) return
-  let html = '<table class="schedule-table"><tr><th style="min-width:56px"></th>'
-  for (const day of days) html += `<th>${day}</th>`
-  html += '</tr>'
-
-  for (const slot of timeSlots) {
-    const periodClass = slot.period === '上午' ? 'am' : 'pm'
-    html += '<tr>'
-    html += `<td style="padding-left:16px"><span class="period-badge ${periodClass}">${slot.period}</span><br><span class="time-label">${slot.label}</span></td>`
-    for (const day of days) {
-      const key = `${day}|${slot.id}`
-      const names = scheduleData[key] || []
-      const isMine = names.includes(currentUser)
-      const isFull = names.length >= maxPerSlot
-      let cellClass = 'cell'
-      if (isMine) cellClass += ' mine'
-      else if (isFull) cellClass += ' full'
-      const namesHtml = names.map(n => n===currentUser ? `<strong>${n}</strong>` : n).join('<br>')
-      const myWaitlistItem = waitlistData.find(w=>w.name===currentUser && w.day===day && w.slotId===slot.id)
-      const waitlistStatus = myWaitlistItem ? (myWaitlistItem.status||'pending') : null
-      let waitlistBtn = ''
-      if (!isMine && isFull && !isAdmin) {
-        if (!waitlistStatus) {
-          waitlistBtn = `<button class="waitlist-btn" onclick="event.stopPropagation();applyWaitlist('${day}','${slot.id}')">候补</button>`
-        } else if (waitlistStatus==='pending') {
-          waitlistBtn = `<button class="waitlist-btn" style="background:#999" disabled>待处理</button>`
-        } else if (waitlistStatus==='approved') {
-          waitlistBtn = `<button class="waitlist-btn" style="background:var(--success)">已批准</button>`
-        } else if (waitlistStatus==='rejected') {
-          waitlistBtn = `<button class="waitlist-btn" style="background:var(--danger)">已拒绝</button>`
-        }
+function renderSchedule(data) {
+  const grid = document.getElementById('scheduleGrid');
+  if (!data.schedule) { grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">暂无数据</p>'; return; }
+  const days = ['周一','周二','周三','周四','周五'];
+  const slots = [
+    {key:'am1',label:'8:00-10:00'},
+    {key:'am2',label:'10:00-12:00'},
+    {key:'pm1',label:'14:30-16:00'},
+    {key:'pm2',label:'16:00-17:30'}
+  ];
+  let html = '<table class="schedule-table"><thead><tr><th></th>';
+  days.forEach(d => html += '<th>' + d + '</th>');
+  html += '</tr></thead><tbody>';
+  slots.forEach(s => {
+    html += '<tr><td class="time-label">' + s.label + '</td>';
+    days.forEach(d => {
+      const assigned = data.schedule[d] && data.schedule[d][s.key] ? data.schedule[d][s.key] : [];
+      const count = assigned.length;
+      const isMe = assigned.includes(currentUser);
+      const max = (configData.maxPerSlot || 2);
+      let cls = 'slot-cell';
+      if (isMe) cls += ' selected';
+      else if (count >= max) cls += ' full';
+      let inner = '';
+      if (assigned.length > 0) {
+        inner = '<div class="avatars">';
+        assigned.forEach(n => {
+          inner += '<span class="avatar-circle small' + (n===currentUser?' me':'') + '">' + n.charAt(0) + '</span>';
+        });
+        inner += '</div><div class="slot-names">' + assigned.join('、') + '</div>';
       }
-      if (isMine) {
-        const entryTime = window._entryTimes ? window._entryTimes[key] : null
-        let cancelInfo = ''
-        if (entryTime) {
-          const elapsed = Date.now() - entryTime
-          if (elapsed <= 3*60*1000) {
-            const left = Math.ceil((3*60*1000 - elapsed)/1000)
-            cancelInfo = `<span style="font-size:10px;color:#f59e0b">（${left}s内可取消）</span>`
-          }
-        }
-        html += `<td><div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
-          <span class="check">✓</span>
-          <span class="count">${names.length}/${maxPerSlot}</span>
-          <div class="time-label">${slot.label} ${cancelInfo}</div>
-          <div class="names">${namesHtml}</div>
-        </div></td>`
-      } else {
-        html += `<td><div class="${cellClass}" onclick="toggleSlot('${day}','${slot.id}')">
-          <span class="count">${names.length}/${maxPerSlot}</span>
-          <div class="time-label">${slot.label}</div>
-          <div class="names">${namesHtml||'<span style="color:#ccc">空</span>'}</div>
-          ${waitlistBtn}
-        </div></td>`
+      if (count < max && !isMe && currentRole !== 'admin') {
+        inner += '<button class="pick-btn" onclick="pickSlot(\'' + d + '\',\'' + s.key + '\')">选择</button>';
+      } else if (isMe) {
+        inner += '<button class="cancel-btn" onclick="cancelSlot(\'' + d + '\',\'' + s.key + '\')">取消</button>';
+      } else if (count >= max && !isMe && currentRole !== 'admin') {
+        inner += '<button class="wait-btn" onclick="joinWaitlist(\'' + d + '\',\'' + s.key + '\')">候补</button>';
       }
-    }
-    html += '</tr>'
-  }
-  html += '</table>'
-  document.getElementById('scheduleGrid').innerHTML = html
+      html += '<td class="' + cls + '" data-day="' + d + '" data-slot="' + s.key + '">' + inner + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  // 图例
+  html += '<div class="legend">';
+  html += '<span class="legend-item"><span class="legend-color selected"></span> 已选</span>';
+  html += '<span class="legend-item"><span class="legend-color full"></span> 已满</span>';
+  html += '<span class="legend-item"><span class="legend-color available"></span> 可选</span>';
+  html += '</div>';
+
+  grid.innerHTML = html;
 }
 
-/* ========== 选班/取消 ========== */
-function toggleSlot(day, slotId) {
-  if (isAdmin) { showToast('管理员不能选班次','error'); return }
-  const key = `${day}|${slotId}`
-  const names = scheduleData[key] || []
-  if (names.includes(currentUser)) {
-    const entryTime = window._entryTimes ? window._entryTimes[key] : null
-    if (entryTime && Date.now()-entryTime <= 3*60*1000) {
-      showConfirm('确认取消', `确定取消 ${day} ${configData.timeSlots.find(s=>s.id===slotId).label} 吗？`, ()=>doQuickCancel(day,slotId))
-      return
-    }
-    showToast(`已选该时段，超过3分钟请提交取消申请`, '')
-    return
+// ========== 选/取消班次 ==========
+async function pickSlot(day, slot) {
+  const max = configData.maxPerSlot || 2;
+  const now = new Date();
+  if (configData.startTime && now < new Date(configData.startTime)) {
+    showToast('排班尚未开始'); return;
   }
-  const slot = configData.timeSlots.find(s=>s.id===slotId)
-  showConfirm('确认选择', `确定选择 ${day} ${slot.label} 吗？选择后3分钟内可自由取消。`, ()=>doSelect(day,slotId))
-}
-async function doQuickCancel(day, slotId) {
   try {
-    const res = await fetchWithTimeout(API+'/cancel-request', {
+    const res = await fetch(API + '/pick', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser, day, slotId, reason:'3分钟内自由取消'})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { showToast(data.msg||'已取消','success'); await loadSchedule() }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('操作失败','error') }
+      body: JSON.stringify({name:currentUser,day,slot})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('选择成功'); loadSchedule(); loadMyShifts(); }
+    else if (data.waitlist) { showToast('已加入候补'); }
+    else { showToast(data.msg||'操作失败'); }
+  } catch(e) { showToast('网络错误'); }
 }
-async function doSelect(day, slotId) {
-  window._entryTimes[`${day}|${slotId}`] = Date.now()
+async function cancelSlot(day, slot) {
+  showConfirm('取消班次', '确定取消 ' + day + ' ' + slot + ' 的班次吗？', async () => {
+    try {
+      const res = await fetch(API + '/cancel', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name:currentUser,day,slot})
+      });
+      const data = await res.json();
+      if (data.ok) { showToast('取消成功'); loadSchedule(); loadMyShifts(); }
+      else { showToast(data.msg||'操作失败'); }
+    } catch(e) { showToast('网络错误'); }
+  });
+}
+async function joinWaitlist(day, slot) {
   try {
-    const res = await fetchWithTimeout(API+'/select', {
+    const res = await fetch(API + '/waitlist', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser, day, slotId})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { scheduleData = data.schedule; renderSchedule(); renderMyShifts(); showToast('已选择该时段','success') }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('操作失败','error') }
+      body: JSON.stringify({name:currentUser,day,slot})
+    });
+    const data = await res.json();
+    if (data.ok) showToast('已加入候补');
+    else showToast(data.msg||'操作失败');
+  } catch(e) { showToast('网络错误'); }
 }
 
-/* ========== 候补 ========== */
-async function applyWaitlist(day, slotId) {
+// ========== 我的班次 ==========
+async function loadMyShifts() {
+  if (!currentUser) return;
   try {
-    const res = await fetchWithTimeout(API+'/waitlist', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser, day, slotId})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { showToast('候补申请已提交','success'); await loadSchedule() }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('申请失败','error') }
+    const res = await fetch(API + '/my-shifts?name=' + encodeURIComponent(currentUser));
+    const data = await res.json();
+    renderMyShifts(data.shifts||[]);
+    renderWaitlist(data.waitlist||[]);
+    renderCancelRequests(data.cancelRequests||[]);
+  } catch(e) { console.error('加载我的班次失败',e); }
 }
-async function cancelWaitlist(day, slotId) {
+function renderMyShifts(shifts) {
+  const el = document.getElementById('myShifts');
+  if (!shifts.length) { el.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0">暂无排班</p>'; return; }
+  let html = '<div class="shift-list">';
+  shifts.forEach(s => {
+    html += '<div class="shift-card"><div class="shift-day">' + s.day + '</div><div class="shift-slot">' + s.slotLabel + '</div><div class="shift-time">' + s.time + '</div></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+  // 同时更新首页
+  const homeEl = document.getElementById('homeMyShifts');
+  if (homeEl) homeEl.innerHTML = html;
+}
+function renderWaitlist(wl) {
+  const el = document.getElementById('myWaitlist');
+  const sec = document.getElementById('myWaitlistSection');
+  if (!wl || !wl.length) { if(el) el.innerHTML = ''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display = '';
+  let html = '<ul>';
+  wl.forEach(w => { html += '<li>' + w.day + ' ' + w.slot + ' <button onclick="cancelWaitlist(\'' + w.day + '\',\'' + w.slot + '\')">取消候补</button></li>'; });
+  html += '</ul>';
+  if(el) el.innerHTML = html;
+}
+function renderCancelRequests(reqs) {
+  const el = document.getElementById('myCancelRequests');
+  const sec = document.getElementById('myCancelSection');
+  if (!reqs || !reqs.length) { if(el) el.innerHTML = ''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display = '';
+  let html = '<ul>';
+  reqs.forEach(r => { html += '<li>' + r.day + ' ' + r.slot + ' — 审核中</li>'; });
+  html += '</ul>';
+  if(el) el.innerHTML = html;
+}
+async function cancelWaitlist(day, slot) {
   try {
-    await fetchWithTimeout(API+'/waitlist/cancel', {
+    const res = await fetch(API + '/cancel-waitlist', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser, day, slotId})
-    },15000)
-    await loadSchedule()
-    showToast('已取消候补','')
-  } catch(e) { showToast('操作失败','error') }
+      body: JSON.stringify({name:currentUser,day,slot})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('已取消候补'); loadMyShifts(); }
+  } catch(e) { showToast('网络错误'); }
 }
 
-/* ========== 取消申请 ========== */
-function requestCancel(day, slotId) {
-  const slot = configData.timeSlots.find(s=>s.id===slotId)
-  document.getElementById('confirmTitle').textContent = '申请取消班次'
-  document.getElementById('confirmMsg').textContent = `${day} ${slot.label}`
-  document.getElementById('confirmExtra').innerHTML = `<input type="text" id="cancelReason" placeholder="请输入取消理由（必填）" style="width:100%;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;margin-top:10px" maxlength="100">`
-  pendingAction = ()=>{
-    const reason = document.getElementById('cancelReason').value.trim()
-    if (!reason) { showToast('请输入取消理由','error'); return }
-    doRequestCancel(day, slotId, reason)
-  }
-  document.getElementById('confirmModal').classList.add('show')
-}
-async function doRequestCancel(day, slotId, reason) {
+// ========== 首页统计 ==========
+async function loadHomeStats() {
+  if (!currentUser) return;
   try {
-    const res = await fetchWithTimeout(API+'/cancel-request', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser, day, slotId, reason})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { closeConfirm(); showToast('取消申请已提交','success'); await loadSchedule() }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('申请失败','error') }
-}
-async function revokeCancelRequest(day, slotId) {
-  try {
-    await fetchWithTimeout(API+'/cancel-request/revoke', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser, day, slotId})
-    },15000)
-    await loadSchedule()
-    showToast('已撤销申请','')
-  } catch(e) { showToast('操作失败','error') }
-}
+    const res = await fetch(API + '/my-shifts?name=' + encodeURIComponent(currentUser));
+    const data = await res.json();
+    const shifts = data.shifts || [];
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
 
-/* ========== 渲染我的班次 ========== */
-function renderMyShifts() {
-  const {timeSlots, days} = configData
-  const mySlots = []
-  for (const day of days||[]) {
-    for (const slot of timeSlots||[]) {
-      const key = `${day}|${slot.id}`
-      if ((scheduleData[key]||[]).includes(currentUser)) mySlots.push({day, slot})
-    }
-  }
-  if (mySlots.length===0) {
-    document.getElementById('myShifts').innerHTML = '<div class="empty-tip">暂未选择任何时段</div>'
-  } else {
-    let html = ''
-    for (const s of mySlots) {
-      const cancelReq = (cancelRequests||[]).find(r=>r.name===currentUser&&r.day===s.day&&r.slotId===s.slot.id)
-      let cancelBtn = ''
-      if (!cancelReq) {
-        cancelBtn = `<button class="cancel-btn" onclick="requestCancel('${s.day}','${s.slot.id}')">申请取消</button>`
-      } else {
-        const st = cancelReq.status||'pending'
-        if (st==='pending') cancelBtn = `<span style="color:var(--warn);font-size:12px">取消申请中</span>`
-        else if (st==='approved') cancelBtn = `<span style="color:var(--success);font-size:12px">已批准取消</span>`
-        else if (st==='rejected') cancelBtn = `<span style="color:var(--danger);font-size:12px">取消被拒绝</span>`
+    // 本月值班次数
+    const thisMonth = shifts.filter(s => {
+      const d = s.dateObj ? new Date(s.dateObj) : null;
+      return d && d.getFullYear()===y && d.getMonth()===m;
+    });
+    document.getElementById('statTotalShifts').textContent = thisMonth.length;
+
+    // 累计时长
+    let totalMin = 0;
+    shifts.forEach(s => {
+      if (s.start && s.end) {
+        const [sh,sm] = s.start.split(':').map(Number);
+        const [eh,em] = s.end.split(':').map(Number);
+        totalMin += (eh*60+em) - (sh*60+sm);
       }
-      html += `<div class="shift-item">
-        <div><span class="day">${s.day}</span><span class="time">${s.slot.period} ${s.slot.label}</span></div>
-        ${cancelBtn}
-      </div>`
-    }
-    document.getElementById('myShifts').innerHTML = html
-  }
-  // 候补
-  const myWL = (waitlistData||[]).filter(w=>w.name===currentUser)
-  if (myWL.length>0) {
-    document.getElementById('myWaitlistSection').style.display='block'
-    let html=''
-    for (const w of myWL) {
-      const slot = (timeSlots||[]).find(s=>s.id===w.slotId)
-      const st = w.status||'pending'
-      let actionBtn=''
-      if (st==='pending') actionBtn = `<button class="cancel-btn" onclick="cancelWaitlist('${w.day}','${w.slotId}')">取消</button>`
-      else if (st==='rejected') actionBtn = `<button class="cancel-btn" onclick="cancelWaitlist('${w.day}','${w.slotId}')">删除</button>`
-      html += `<div class="shift-item">
-        <div><span class="day">${w.day} ${slot?slot.label:w.slotId}</span>
-        <span style="font-size:12px;${st==='approved'?'color:var(--success)':st==='rejected'?'color:var(--danger)':'color:var(--warn)'}"> ${st==='pending'?'⏳ 待处理':st==='approved'?'✅ 已批准':'❌ 已拒绝'}</span></div>
-        ${actionBtn}
-      </div>`
-    }
-    document.getElementById('myWaitlist').innerHTML = html
-  } else {
-    document.getElementById('myWaitlistSection').style.display='none'
-  }
-  // 取消申请
-  const myCR = (cancelRequests||[]).filter(r=>r.name===currentUser)
-  if (myCR.length>0) {
-    document.getElementById('myCancelSection').style.display='block'
-    let html=''
-    for (const r of myCR) {
-      const slot = (timeSlots||[]).find(s=>s.id===r.slotId)
-      const st = r.status||'pending'
-      let actionBtn=''
-      if (st==='pending') actionBtn = `<button class="cancel-btn" onclick="revokeCancelRequest('${r.day}','${r.slotId}')">撤销</button>`
-      else if (st==='rejected') actionBtn = `<button class="cancel-btn" onclick="revokeCancelRequest('${r.day}','${r.slotId}')">删除</button>`
-      html += `<div class="shift-item">
-        <div><span class="day">${r.day} ${slot?slot.label:r.slotId}</span>
-        <span style="font-size:12px;${st==='approved'?'color:var(--success)':'color:var(--warn)'}"> ${st==='pending'?'⏳ 待处理':st==='approved'?'✅ 已批准':'❌ 已拒绝'}</span></div>
-        ${actionBtn}
-      </div>`
-    }
-    document.getElementById('myCancelRequests').innerHTML = html
-  } else {
-    document.getElementById('myCancelSection').style.display='none'
-  }
+    });
+    document.getElementById('statTotalHours').textContent = (totalMin/60).toFixed(1) + 'h';
+
+    // 早班/午班次数
+    const morning = shifts.filter(s => s.slot && (s.slot.startsWith('am') || (s.time&&s.time.includes('8:00')))).length;
+    const afternoon = shifts.filter(s => s.slot && (s.slot.startsWith('pm') || (s.time&&(s.time.includes('14:30')||s.time.includes('16:00')))).length;
+    document.getElementById('statMorningShifts').textContent = morning || thisMonth.filter(s=>s.slot&&s.slot.startsWith('am')).length;
+    document.getElementById('statAfternoonShifts').textContent = afternoon || thisMonth.filter(s=>s.slot&&s.slot.startsWith('pm')).length;
+
+    // 渲染本周排班
+    renderMyShifts(shifts);
+
+    // 渲染日历热力图
+    renderCalendar(shifts, y, m);
+  } catch(e) { console.error('加载首页统计失败', e); }
 }
 
-/* ========== Tab 切换 ========== */
-function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'))
-  document.getElementById('scheduleView').style.display='none'
-  document.getElementById('statsView').style.display='none'
-  document.getElementById('adminView').style.display='none'
-  if (tab==='schedule') { document.querySelectorAll('.tab')[0].classList.add('active'); document.getElementById('scheduleView').style.display='block' }
-  else if (tab==='stats') { document.querySelectorAll('.tab')[1].classList.add('active'); document.getElementById('statsView').style.display='block' }
-  else if (tab==='admin') { document.getElementById('adminTab').classList.add('active'); document.getElementById('adminView').style.display='block'; loadPasswords(); }
-}
-
-/* ========== 管理功能 ========== */
-async function loadMembers() {
-  try {
-    const res = await fetchWithTimeout(API+'/admin/members', {}, 15000)
-    const data = await res.json()
-    let html = (data.members||[]).map(name=>`<li><span>${name}</span><button class="remove-btn" onclick="removeMember('${name}')">移除</button></li>`).join('')
-    document.getElementById('memberList').innerHTML = html || '<li style="color:#999">暂无成员</li>'
-  } catch(e) {}
-}
-function renderWaitlistPending() {
-  const pending = (waitlistData||[]).filter(w=>!w.status||w.status==='pending')
-  if (pending.length===0) { document.getElementById('waitlistPending').innerHTML='<li style="color:#999">暂无候补申请</li>'; return }
-  let html=''
-  for (const w of pending) {
-    const slot = (configData.timeSlots||[]).find(s=>s.id===w.slotId)
-    html += `<li><span><strong>${w.name}</strong> 申请 ${w.day} ${slot?slot.label:w.slotId}</span><div class="pending-btns">
-      <button class="approve-btn" onclick="approveWaitlist('${w.name}','${w.day}','${w.slotId}')">批准</button>
-      <button class="reject-btn" onclick="rejectWaitlist('${w.name}','${w.day}','${w.slotId}')">拒绝</button>
-    </div></li>`
-  }
-  document.getElementById('waitlistPending').innerHTML = html
-}
-function renderCancelPending() {
-  const pending = (cancelRequests||[]).filter(r=>!r.status||r.status==='pending')
-  if (pending.length===0) { document.getElementById('cancelPending').innerHTML='<li style="color:#999">暂无取消申请</li>'; return }
-  let html=''
-  for (const r of pending) {
-    const slot = (configData.timeSlots||[]).find(s=>s.id===r.slotId)
-    const reasonText = r.reason?`<br><span style="color:#888;font-size:12px">理由：${r.reason}</span>`:''
-    html += `<li><span><strong>${r.name}</strong> 申请取消 ${r.day} ${slot?slot.label:r.slotId}${reasonText}</span><div class="pending-btns">
-      <button class="approve-btn" onclick="approveCancel('${r.name}','${r.day}','${r.slotId}')">批准</button>
-      <button class="reject-btn" onclick="rejectCancel('${r.name}','${r.day}','${r.slotId}')">拒绝</button>
-    </div></li>`
-  }
-  document.getElementById('cancelPending').innerHTML = html
-}
-async function approveWaitlist(name,day,slotId) {
-  try {
-    const res = await fetchWithTimeout(API+'/admin/waitlist/approve', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name,day,slotId})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { showToast('已批准','success'); await loadSchedule(); renderWaitlistPending() }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('操作失败','error') }
-}
-async function rejectWaitlist(name,day,slotId) {
-  try {
-    await fetchWithTimeout(API+'/admin/waitlist/reject', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name,day,slotId})
-    },15000)
-    showToast('已拒绝','')
-    await loadSchedule(); renderWaitlistPending()
-  } catch(e) { showToast('操作失败','error') }
-}
-async function approveCancel(name,day,slotId) {
-  try {
-    const res = await fetchWithTimeout(API+'/admin/cancel/approve', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name,day,slotId})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { showToast('已批准取消','success'); await loadSchedule(); renderCancelPending() }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('操作失败','error') }
-}
-async function rejectCancel(name,day,slotId) {
-  try {
-    await fetchWithTimeout(API+'/admin/cancel/reject', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name,day,slotId})
-    },15000)
-    showToast('已拒绝','')
-    await loadSchedule(); renderCancelPending()
-  } catch(e) { showToast('操作失败','error') }
-}
-async function addMember() {
-  const input = document.getElementById('newMemberInput')
-  const name = input.value.trim()
-  if (!name) return
-  try {
-    const res = await fetchWithTimeout(API+'/admin/member', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { input.value=''; loadMembers(); loadConfig(); showToast('添加成功','success') }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('添加失败','error') }
-}
-async function removeMember(name) {
-  if (!confirm(`确定移除 ${name}？将同时清除其排班和候补。`)) return
-  try {
-    const res = await fetchWithTimeout(API+'/admin/member/remove', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { loadMembers(); loadSchedule(); showToast('已移除','') }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('操作失败','error') }
-}
-async function adminAssign() {
-  const name = document.getElementById('assignMember').value
-  const day = document.getElementById('assignDay').value
-  const slotId = document.getElementById('assignSlot').value
-  if (!name||!day||!slotId) { showToast('请选择成员、日期和时段','error'); return }
-  try {
-    const res = await fetchWithTimeout(API+'/admin/assign', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name,day,slotId})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { showToast(`已为 ${name} 分配班次`,'success'); await loadSchedule() }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('分配失败','error') }
-}
-function updateAssignMemberList() {
-  const select = document.getElementById('assignMember')
-  if (!select) return
-  select.innerHTML='<option value="">选择成员</option>'
-  for (const name of configData.members||[]) {
-    select.innerHTML+=`<option value="${name}">${name}</option>`
-  }
-}
-async function loadAdminStartTime() {
-  try {
-    const res = await fetchWithTimeout(API+'/admin/start-time',{},15000)
-    const data = await res.json()
-    const statusEl = document.getElementById('startTimeStatus')
-    if (data.startTime) {
-      const d = new Date(data.startTime)
-      const beijing = new Date(d.getTime()-8*60*60*1000)
-      const str = beijing.getFullYear()+'年'+(beijing.getMonth()+1)+'月'+beijing.getDate()+'日 '
-        +String(beijing.getHours()).padStart(2,'0')+':'+String(beijing.getMinutes()).padStart(2,'0')
-      statusEl.textContent = '当前设置：北京时间 '+str
-    } else {
-      statusEl.textContent = '当前：无限制'
+function renderCalendar(shifts, year, month) {
+  const grid = document.getElementById('calendarGrid');
+  if (!grid) return;
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const shiftMap = {};
+  shifts.forEach(s => {
+    if (s.dateObj) {
+      const d = new Date(s.dateObj);
+      const key = d.getDate();
+      if (!shiftMap[key]) shiftMap[key] = 0;
+      shiftMap[key]++;
     }
-  } catch(e) {}
-}
-async function saveStartTime() {
-  const val = document.getElementById('startTimeInput').value
-  let startTime = null
-  if (val) {
-    const localMs = new Date(val).getTime()
-    startTime = new Date(localMs+8*60*60*1000).toISOString()
+  });
+
+  let html = '';
+  const weekDays = ['日','一','二','三','四','五','六'];
+  weekDays.forEach(d => { html += '<div class="cal-cell cal-header" style="font-weight:700;font-size:11px;color:#999">' + d + '</div>'; });
+
+  // 月初空白
+  for (let i=0;i<firstDay;i++) { html += '<div class="cal-cell cal-empty"></div>'; }
+  const today = new Date();
+  for (let d=1;d<=daysInMonth;d++) {
+    const cnt = shiftMap[d] || 0;
+    let cls = 'cal-cell ';
+    if (cnt===0) cls += 'cal-none';
+    else if (cnt===1) cls += 'cal-1';
+    else if (cnt===2) cls += 'cal-2';
+    else cls += 'cal-3plus';
+    if (year===today.getFullYear()&&month===today.getMonth()&&d===today.getDate()) cls += ' cal-today';
+    html += '<div class="' + cls + '"><div class="cal-day">' + d + '</div>';
+    if (cnt>0) html += '<div class="cal-count">' + cnt + '班</div>';
+    html += '</div>';
   }
-  try {
-    const res = await fetchWithTimeout(API+'/admin/start-time', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({startTime})
-    },15000)
-    const data = await res.json()
-    if (data.ok) { showToast('保存成功','success'); loadAdminStartTime() }
-    else showToast(data.msg,'error')
-  } catch(e) { showToast('保存失败','error') }
-}
-async function clearStartTime() {
-  if (!confirm('确定清除限制？成员将可以立即开始选班次。')) return
-  try {
-    await fetchWithTimeout(API+'/admin/start-time', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({startTime:null})
-    },15000)
-    document.getElementById('startTimeInput').value=''
-    showToast('已清除限制','success')
-    loadAdminStartTime()
-  } catch(e) { showToast('操作失败','error') }
-}
-async function resetSchedule() {
-  if (!confirm('确定重置所有排班和候补？此操作不可恢复！')) return
-  try {
-    const res = await fetchWithTimeout(API+'/admin/reset', {
-      method:'POST', headers:{'Content-Type':'application/json'}
-    },15000)
-    const data = await res.json()
-    if (data.ok) { await loadSchedule(); renderWaitlistPending(); renderCancelPending(); showToast('排班已重置','success') }
-  } catch(e) { showToast('重置失败','error') }
+  grid.innerHTML = html;
 }
 
-
-// ========== 密码管理 ==========
+// ========== 修改密码 ==========
 function showChangePassword() {
   document.getElementById('oldPwdInput').value = '';
   document.getElementById('newPwdInput').value = '';
@@ -1561,23 +1816,16 @@ async function doChangePassword() {
   if (newP !== confirmP) { err.textContent = '两次输入的新密码不一致'; return; }
   try {
     const res = await fetch(API + '/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, oldPassword: oldP, newPassword: newP })
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser,oldPassword:oldP,newPassword:newP})
     });
     const data = await res.json();
-    if (data.ok) {
-      hideChangePassword();
-      showToast('密码修改成功，请重新登录');
-      setTimeout(() => doLogout(), 1500);
-    } else {
-      err.textContent = data.msg || '修改失败';
-    }
-  } catch (e) {
-    err.textContent = '网络错误';
-  }
+    if (data.ok) { hideChangePassword(); showToast('密码修改成功，请重新登录'); setTimeout(()=>doLogout(),1500); }
+    else { err.textContent = data.msg || '修改失败'; }
+  } catch(e) { err.textContent = '网络错误'; }
 }
-// 管理员：加载密码列表
+
+// ========== 管理员功能 ==========
 async function loadPasswords() {
   try {
     const res = await fetch(API + '/admin/passwords');
@@ -1587,59 +1835,224 @@ async function loadPasswords() {
     ul.innerHTML = '';
     Object.entries(data.passwords).forEach(([name, pwd]) => {
       const li = document.createElement('li');
-      li.innerHTML = `
-        <span class="name">${name}</span>
-        <span class="pwd-mask" id="pwd-${name}">••••••</span>
-        <span class="real-pwd" id="real-${name}" style="display:none;color:#c41230;font-weight:600">${pwd}</span>
-        <button class="admin-btn primary" style="padding:4px 10px;font-size:12px" onclick="togglePwd('${name}')">显示</button>
-        <input type="password" id="reset-pwd-${name}" placeholder="新密码" style="width:100px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
-        <button class="admin-btn success" style="padding:4px 10px;font-size:12px" onclick="resetPassword('${name}')">重置</button>
-      `;
+      li.innerHTML = '<span class="name">' + name + '</span><span style="color:#aaa;font-size:12px;margin-left:4px">••••••</span><button class="admin-btn warning" style="padding:5px 14px;font-size:12px;margin-left:auto" onclick="resetPassword(\'' + name + '\')">重置密码</button>';
       ul.appendChild(li);
     });
-  } catch (e) {
-    console.error('加载密码失败', e);
-  }
-}
-function togglePwd(name) {
-  const mask = document.getElementById('pwd-' + name);
-  const real = document.getElementById('real-' + name);
-  const btn = mask.nextElementSibling;
-  if (real.style.display === 'none') {
-    real.style.display = 'inline';
-    mask.style.display = 'none';
-    btn.textContent = '隐藏';
-  } else {
-    real.style.display = 'none';
-    mask.style.display = 'inline';
-    btn.textContent = '显示';
-  }
+  } catch(e) { console.error('加载密码失败',e); }
 }
 async function resetPassword(name) {
-  const input = document.getElementById('reset-pwd-' + name);
-  const newP = input.value.trim();
-  if (!newP || newP.length < 6) { showToast('新密码至少6位'); return; }
+  const digits = String(Math.floor(10000000 + Math.random() * 90000000));
+  if (!confirm(name + '\n\n将重置为随机密码：' + digits + '\n\n确定要重置吗？')) return;
   try {
     const res = await fetch(API + '/admin/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, newPassword: newP })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, newPassword: digits})
     });
     const data = await res.json();
     if (data.ok) {
-      showToast(`已重置 ${name} 的密码`);
-      input.value = '';
+      alert(name + ' 的密码已重置为：\n\n' + digits + '\n\n请及时通知该成员');
       loadPasswords();
-    } else {
-      showToast(data.msg || '重置失败');
+    } else { showToast(data.msg||'重置失败'); }
+  } catch(e) { showToast('网络错误'); }
+}
+async function loadMembers() {
+  try {
+    const res = await fetch(API + '/admin/members');
+    const data = await res.json();
+    const ul = document.getElementById('memberList');
+    if (!ul) return;
+    ul.innerHTML = '';
+    (data.members||[]).forEach(m => {
+      const li = document.createElement('li');
+      li.innerHTML = '<span>' + m + '</span><button class="admin-btn danger" style="padding:4px 10px;font-size:12px" onclick="removeMember(\'' + m + '\')">删除</button>';
+      ul.appendChild(li);
+    });
+    // 更新分配下拉
+    const sel = document.getElementById('assignMember');
+    if (sel) {
+      sel.innerHTML = '<option value="">选择成员</option>';
+      (data.members||[]).forEach(m => { sel.innerHTML += '<option value="' + m + '">' + m + '</option>'; });
     }
-  } catch (e) {
-    showToast('网络错误');
-  }
+  } catch(e) {}
+}
+async function addMember() {
+  const input = document.getElementById('newMemberInput');
+  const name = input.value.trim();
+  if (!name) return;
+  try {
+    const res = await fetch(API + '/admin/add-member', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name})
+    });
+    const data = await res.json();
+    if (data.ok) { input.value = ''; loadMembers(); showToast('添加成功，默认密码：' + (data.password||'123456')); }
+    else { showToast(data.msg||'添加失败'); }
+  } catch(e) { showToast('网络错误'); }
+}
+async function removeMember(name) {
+  showConfirm('删除成员', '确定删除 ' + name + ' 吗？', async () => {
+    try {
+      const res = await fetch(API + '/admin/remove-member', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name})
+      });
+      const data = await res.json();
+      if (data.ok) { showToast('删除成功'); loadMembers(); }
+    } catch(e) { showToast('网络错误'); }
+  });
+}
+async function adminAssign() {
+  const name = document.getElementById('assignMember').value;
+  const day = document.getElementById('assignDay').value;
+  const slot = document.getElementById('assignSlot').value;
+  if (!name||!day||!slot) { showToast('请填写完整'); return; }
+  try {
+    const res = await fetch(API + '/admin/assign', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name,day,slot})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('分配成功'); loadSchedule(); }
+    else { showToast(data.msg||'分配失败'); }
+  } catch(e) { showToast('网络错误'); }
+}
+async function loadStartTime() {
+  try {
+    const res = await fetch(API + '/config');
+    const data = await res.json();
+    const el = document.getElementById('startTimeInput');
+    const status = document.getElementById('startTimeStatus');
+    if (data.startTime) {
+      el.value = data.startTime.slice(0,16);
+      const d = new Date(data.startTime);
+      if (status) status.textContent = '当前设置：' + d.toLocaleString();
+    } else {
+      el.value = '';
+      if (status) status.textContent = '当前：无限制';
+    }
+  } catch(e) {}
+}
+async function saveStartTime() {
+  const val = document.getElementById('startTimeInput').value;
+  try {
+    const res = await fetch(API + '/admin/set-start-time', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({startTime: val||null})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('保存成功'); loadStartTime(); loadConfig(); }
+    else { showToast('保存失败'); }
+  } catch(e) { showToast('网络错误'); }
+}
+function clearStartTime() {
+  document.getElementById('startTimeInput').value = '';
+  saveStartTime();
+}
+async function loadWaitlist() {
+  try {
+    const res = await fetch(API + '/admin/waitlist');
+    const data = await res.json();
+    const ul = document.getElementById('waitlistPending');
+    if (!ul) return;
+    if (!data.waitlist || !data.waitlist.length) { ul.innerHTML = '<li style="color:#999">暂无候补申请</li>'; return; }
+    ul.innerHTML = '';
+    data.waitlist.forEach((w,i) => {
+      const li = document.createElement('li');
+      li.innerHTML = w.name + ' → ' + w.day + ' ' + w.slot + ' <button onclick="approveWaitlist(' + i + ')">批准</button> <button onclick="rejectWaitlist(' + i + ')">拒绝</button>';
+      ul.appendChild(li);
+    });
+  } catch(e) {}
+}
+async function approveWaitlist(idx) {
+  try {
+    const res = await fetch(API + '/admin/approve-waitlist', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({index:idx})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('已批准'); loadWaitlist(); loadSchedule(); }
+  } catch(e) { showToast('网络错误'); }
+}
+async function rejectWaitlist(idx) {
+  try {
+    const res = await fetch(API + '/admin/reject-waitlist', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({index:idx})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('已拒绝'); loadWaitlist(); }
+  } catch(e) { showToast('网络错误'); }
+}
+async function loadCancelRequests() {
+  try {
+    const res = await fetch(API + '/admin/cancel-requests');
+    const data = await res.json();
+    const ul = document.getElementById('cancelPending');
+    if (!ul) return;
+    if (!data.requests || !data.requests.length) { ul.innerHTML = '<li style="color:#999">暂无取消申请</li>'; return; }
+    ul.innerHTML = '';
+    data.requests.forEach((r,i) => {
+      const li = document.createElement('li');
+      li.innerHTML = r.name + ' → ' + r.day + ' ' + r.slot + ' <button onclick="approveCancel(' + i + ')">批准</button> <button onclick="rejectCancel(' + i + ')">拒绝</button>';
+      ul.appendChild(li);
+    });
+  } catch(e) {}
+}
+async function approveCancel(idx) {
+  try {
+    const res = await fetch(API + '/admin/approve-cancel', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({index:idx})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('已批准取消'); loadCancelRequests(); loadSchedule(); }
+  } catch(e) { showToast('网络错误'); }
+}
+async function rejectCancel(idx) {
+  try {
+    const res = await fetch(API + '/admin/reject-cancel', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({index:idx})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('已拒绝'); loadCancelRequests(); }
+  } catch(e) { showToast('网络错误'); }
+}
+async function resetSchedule() {
+  showConfirm('重置排班', '确定要清空所有人的排班选择和候补吗？此操作不可恢复！', async () => {
+    try {
+      const res = await fetch(API + '/admin/reset', { method:'POST' });
+      const data = await res.json();
+      if (data.ok) { showToast('重置成功'); loadSchedule(); }
+    } catch(e) { showToast('网络错误'); }
+  });
 }
 
+// ========== 初始化 ==========
+window.addEventListener('DOMContentLoaded', () => {
+  // 如果已登录，直接跳转
+  if (currentUser) {
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('mainPage').style.display = 'flex';
+    document.getElementById('headerUserName').textContent = currentUser;
+    document.getElementById('sidebarAvatar').textContent = currentUser.charAt(0);
+    document.getElementById('sidebarName').textContent = currentUser;
+    document.getElementById('sidebarRole').textContent = currentRole==='admin'?'管理员':'助理';
+    document.getElementById('userName').textContent = currentUser;
+    document.getElementById('userRole').textContent = currentRole==='admin'?'管理员':'助理';
+    if (currentRole==='admin') {
+      document.getElementById('adminNavGroupTitle').style.display = '';
+      document.getElementById('adminNavItem').style.display = '';
+    }
+    switchTab('home');
+    loadConfig();
+  }
+  // 回车登录
+  document.getElementById('passwordInput').addEventListener('keydown', e => {
+    if (e.key==='Enter') doLogin();
+  });
+  document.getElementById('adminPassword').addEventListener('keydown', e => {
+    if (e.key==='Enter') doAdminLogin();
+  });
+});
 </script>
-</body>
-</html>
-
-
