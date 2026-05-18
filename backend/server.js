@@ -82,7 +82,6 @@ async function readStore() {
   // 文件存储模式
   if (useFileFallback) {
     if (!localStore) {
-      console.log('[readStore] localStore is null, calling loadFromFile()...');
       loadFromFile()
     }
     // 合并默认值，确保所有字段存在（scheduleTime, waitlist, cancelRequests 等）
