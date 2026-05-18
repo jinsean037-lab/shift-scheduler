@@ -1761,17 +1761,19 @@ async function pickSlot(day, slot) {
   } catch(e) { console.error('[pick] error:', e); alert('网络错误：' + e.message); }
 }
 async function cancelSlot(day, slot) {
-  showConfirm('取消班次', '确定取消 ' + day + ' ' + slot + ' 的班次吗？', async () => {
-    try {
-      const res = await fetch(API + '/cancel', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({name:currentUser,day,slot})
-      });
-      const data = await res.json();
-      if (data.ok) { showToast('取消成功'); loadSchedule(); loadMyShifts(); }
-      else { showToast(data.msg||'操作失败'); }
-    } catch(e) { showToast('网络错误'); }
-  });
+  // 弹出理由输入框
+  const reason = prompt('请填写取消申请理由：', '');
+  if (!reason || !reason.trim()) { showToast('已取消操作'); return; }
+  try {
+    // 提交取消申请（管理员审核）
+    const res = await fetch(API + '/cancel-request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser, day, slot, reason:reason.trim()})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('取消申请已提交，等待管理员审核'); loadMyShifts(); }
+    else { showToast(data.msg||'提交失败'); }
+  } catch(e) { showToast('网络错误'); }
 }
 async function joinWaitlist(day, slot) {
   try {
@@ -1891,13 +1893,19 @@ function renderCalendar(shifts, year, month) {
   if (!grid) return;
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
+
+  // 根据 day(周一~周五) 映射到本月实际日期
+  const dayNameMap = {'周日':0,'周一':1,'周二':2,'周三':3,'周四':4,'周五':5,'周六':6};
   const shiftMap = {};
   shifts.forEach(s => {
-    if (s.dateObj) {
-      const d = new Date(s.dateObj);
-      const key = d.getDate();
-      if (!shiftMap[key]) shiftMap[key] = 0;
-      shiftMap[key]++;
+    const targetWeekDay = dayNameMap[s.day];
+    if (targetWeekDay === undefined) return;
+    // 找到本月所有匹配该星期的日期
+    for (let d=1; d<=daysInMonth; d++) {
+      if (new Date(year, month, d).getDay() === targetWeekDay) {
+        if (!shiftMap[d]) shiftMap[d] = 0;
+        shiftMap[d]++;
+      }
     }
   });
 
