@@ -40,7 +40,8 @@ function defaultStore() {
     scheduleTime: {},
     waitlist: [],
     cancelRequests: [],
-    checkins: []
+    checkins: [],
+    overtimes: []
   }
 }
 
@@ -751,48 +752,164 @@ app.get('/api/my-shifts', async (req, res) => {
 
 // ========== 打卡功能 (v4.0) ==========
 
-// POST /api/checkin — 签到（上班打卡）
+// 班次时间窗口（±15分钟）
+const SLOT_WINDOWS = {
+  am1: { start: '07:45', end: '10:15' },
+  am2: { start: '09:45', end: '12:15' },
+  pm1: { start: '14:15', end: '16:15' },
+  pm2: { start: '15:45', end: '17:45' }
+}
+
+// 获取用户今天所有可打卡班次（在时间窗口内的）
+function getTodaySlots(store, name) {
+  const schedule = store.schedule || {}
+  const todayWeekday = ['周日','周一','周二','周三','周四','周五','周六'][new Date().getDay()]
+  const daySchedule = schedule[todayWeekday]
+  if (!daySchedule) return []
+  const nowHHMM = new Date().toTimeString().slice(0,5)
+  const result = []
+  for (const [slotId, members] of Object.entries(daySchedule)) {
+    if (Array.isArray(members) && members.includes(name)) {
+      const win = SLOT_WINDOWS[slotId]
+      if (win && nowHHMM >= win.start && nowHHMM <= win.end) {
+        result.push({ slotId, ...win })
+      }
+    }
+  }
+  return result
+}
+
+// POST /api/checkin — 签到（必须在排班时间窗口内）
 app.post('/api/checkin', async (req, res) => {
   try {
     const { name, lat, lng } = req.body
     if (!name) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
-    const now = new Date().toISOString()
-    // 检查今天是否已签到
-    const today = now.slice(0, 10)
-    const existing = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'in')
-    if (existing) return res.json({ ok: false, msg: '今日已签到，请直接签退' })
+    const now = new Date()
+    const today = now.toISOString().slice(0, 10)
+    // 检查今天是否已有未签退的签到
+    const pendingIn = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'in'
+      && !(store.checkins || []).find(o => o.name === name && o.date === today && o.type === 'out'))
+    if (pendingIn) return res.json({ ok: false, msg: '当前处于值班中状态，请先签退后再签到下一班次' })
+    // 检查是否在排班时间窗口内
+    const slots = getTodaySlots(store, name)
+    if (slots.length === 0) return res.json({ ok: false, msg: '当前不在你的值班时间段内（需在班次前后15分钟内），无法打卡' })
 
-    const record = { name, date: today, time: now, type: 'in', lat: lat || null, lng: lng || null }
+    const record = { name, date: today, time: now.toISOString(), type: 'in', slotId: slots[0].slotId, lat: lat || null, lng: lng || null }
     const checkins = store.checkins || []
     checkins.push(record)
     await writeStore({ checkins })
-    res.json({ ok: true, msg: '签到成功', record })
+    res.json({ ok: true, msg: '签到成功', record, slotLabel: slots[0].slotId })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
 })
 
-// POST /api/checkout — 签退（下班打卡）
+// POST /api/checkout — 签退（需在时间窗口内）
 app.post('/api/checkout', async (req, res) => {
   try {
     const { name, lat, lng } = req.body
     if (!name) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
-    const now = new Date().toISOString()
-    const today = now.slice(0, 10)
-    // 检查今天是否已签到
-    const checkinRecord = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'in')
+    const now = new Date()
+    const today = now.toISOString().slice(0, 10)
+    // 找到最近一次未签退的签到记录
+    const allIns = (store.checkins || []).filter(c => c.name === name && c.date === today && c.type === 'in').sort((a,b)=>b.time.localeCompare(a.time))
+    let checkinRecord = null
+    for (const inRec of allIns) {
+      const hasOut = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'out' && new Date(c.time) > new Date(inRec.time))
+      if (!hasOut) { checkinRecord = inRec; break; }
+    }
     if (!checkinRecord) return res.json({ ok: false, msg: '请先签到' })
-    // 检查今天是否已签退
-    const existingOut = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'out')
-    if (existingOut) return res.json({ ok: false, msg: '今日已签退' })
+    // 检查是否仍在时间窗口内
+    const slotWin = SLOT_WINDOWS[checkinRecord.slotId]
+    const nowHHMM = now.toTimeString().slice(0,5)
+    if (slotWin && (nowHHMM < slotWin.start || nowHHMM > slotWin.end)) {
+      return res.json({ ok: false, msg: '已超出该班次打卡时间窗口（前后15分钟），无法签退' })
+    }
 
-    const record = { name, date: today, time: now, type: 'out', lat: lat || null, lng: lng || null }
+    const record = { name, date: today, time: now.toISOString(), type: 'out', slotId: checkinRecord.slotId, lat: lat || null, lng: lng || null }
     const checkins = store.checkins || []
     checkins.push(record)
     await writeStore({ checkins })
     res.json({ ok: true, msg: '签退成功', record })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// POST /api/checkout/revoke — 3分钟内撤回签退
+app.post('/api/checkout/revoke', async (req, res) => {
+  try {
+    const { name } = req.body
+    if (!name) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const today = new Date().toISOString().slice(0, 10)
+    const checkins = store.checkins || []
+    // 找最近一条签退记录
+    const outs = checkins.filter(c => c.name === name && c.date === today && c.type === 'out').sort((a,b)=>b.time.localeCompare(a.time))
+    if (outs.length === 0) return res.json({ ok: false, msg: '没有可撤回的签退记录' })
+    const lastOut = outs[0]
+    const diffMs = Date.now() - new Date(lastOut.time).getTime()
+    if (diffMs > 180000) return res.json({ ok: false, msg: '超过3分钟，无法撤回' })
+    // 删除这条签退记录
+    const idx = checkins.indexOf(lastOut)
+    if (idx > -1) checkins.splice(idx, 1)
+    await writeStore({ checkins })
+    res.json({ ok: true, msg: '签退已撤回，恢复为值班中状态' })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// POST /api/overtime — 工作补报申请
+app.post('/api/overtime', async (req, res) => {
+  try {
+    const { name, date, hours, content } = req.body
+    if (!name || !date || !hours || !content) return res.json({ ok: false, msg: '请填写完整信息' })
+    const h = parseFloat(hours)
+    if (isNaN(h) || h <= 0 || h > 24) return res.json({ ok: false, msg: '工作时长需为正数且不超过24小时' })
+    const store = await readStore()
+    const overtimes = store.overtimes || []
+    overtimes.push({
+      id: Date.now().toString(36), name, date, hours: h, content,
+      status: 'pending', createdAt: new Date().toISOString()
+    })
+    await writeStore({ overtimes })
+    res.json({ ok: true, msg: '补报申请已提交，等待管理员审核' })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// GET /api/overtime?name=xxx — 个人补报记录
+app.get('/api/overtime', async (req, res) => {
+  try {
+    const name = req.query.name
+    const store = await readStore()
+    let list = store.overtimes || []
+    if (name) list = list.filter(o => o.name === name)
+    list.sort((a,b) => b.createdAt.localeCompare(a.createdAt))
+    res.json({ ok: true, list })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// POST /api/admin/overtime/approve — 审核补报
+app.post('/api/admin/overtime/approve', async (req, res) => {
+  try {
+    const { id, action } = req.body  // action: approve | reject
+    if (!id || !action) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const overtimes = store.overtimes || []
+    const item = overtimes.find(o => o.id === id)
+    if (!item) return res.json({ ok: false, msg: '记录不存在' })
+    if (item.status !== 'pending') return res.json({ ok: false, msg: '该申请已处理过' })
+    item.status = action === 'approve' ? 'approved' : 'rejected'
+    item.reviewedAt = new Date().toISOString()
+    await writeStore({ overtimes })
+    res.json({ ok: true, msg: action === 'approve' ? '已批准补报' : '已拒绝补报' })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
