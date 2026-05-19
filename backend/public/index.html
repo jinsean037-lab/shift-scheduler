@@ -2302,7 +2302,7 @@ async function loadCancelRequests() {
     if (!data.cancelRequests || !data.cancelRequests.length) { container.innerHTML = '<p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无取消申请</p>'; return; }
     let html = '';
     data.cancelRequests.forEach((r,i) => {
-      html += '<div class="req-card">';
+      html += '<div class="req-card" data-name="' + r.name + '" data-day="' + r.day + '" data-slot="' + (r.slotId || r.slot) + '">';
       html += '<div class="req-info"><div class="req-name">' + r.name + '</div><div class="req-detail">' + r.day + ' ' + slotLabel(r.slotId || r.slot) + (r.reason ? '<br><span style="color:#666;font-size:12px">理由：' + r.reason + '</span>' : '') + '</div></div>';
       html += '<div class="req-actions"><button class="approve-btn" style="background:var(--danger)" onclick="approveCancel(' + i + ')">✓ 批准取消</button><button class="reject-btn" onclick="rejectCancel(' + i + ')">✕ 拒绝</button></div>';
       html += '</div>';
@@ -2312,9 +2312,15 @@ async function loadCancelRequests() {
 }
 async function approveCancel(idx) {
   try {
+    const rows = document.querySelectorAll('#cancelPending .req-card');
+    const card = rows[idx];
+    if (!card) return;
+    const name = card.dataset.name;
+    const day = card.dataset.day;
+    const slotId = card.dataset.slot;
     const res = await fetch(API + '/admin/cancel/approve', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({index:idx})
+      body: JSON.stringify({name, day, slotId})
     });
     const data = await res.json();
     if (data.ok) { showToast('已批准取消'); loadCancelRequests(); loadSchedule(); }
@@ -2323,9 +2329,15 @@ async function approveCancel(idx) {
 }
 async function rejectCancel(idx) {
   try {
+    const rows = document.querySelectorAll('#cancelPending .req-card');
+    const card = rows[idx];
+    if (!card) return;
+    const name = card.dataset.name;
+    const day = card.dataset.day;
+    const slotId = card.dataset.slot;
     const res = await fetch(API + '/admin/cancel/reject', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({index:idx})
+      body: JSON.stringify({name, day, slotId})
     });
     const data = await res.json();
     if (data.ok) { showToast('已拒绝'); loadCancelRequests(); }
