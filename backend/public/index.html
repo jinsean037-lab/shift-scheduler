@@ -2314,18 +2314,20 @@ async function approveCancel(idx) {
   try {
     const rows = document.querySelectorAll('#cancelPending .req-card');
     const card = rows[idx];
-    if (!card) return;
+    if (!card) { alert('找不到卡片 idx=' + idx); return; }
     const name = card.dataset.name;
     const day = card.dataset.day;
     const slotId = card.dataset.slot;
+    alert('发送: name=' + name + ' day=' + day + ' slotId=' + slotId);
     const res = await fetch(API + '/admin/cancel/approve', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({name, day, slotId})
     });
     const data = await res.json();
+    alert('返回: ' + JSON.stringify(data));
     if (data.ok) { showToast('已批准取消'); loadCancelRequests(); loadSchedule(); }
     else showToast(data.msg || '操作失败');
-  } catch(e) { showToast('网络错误'); }
+  } catch(e) { showToast('网络错误: ' + e.message); }
 }
 async function rejectCancel(idx) {
   try {
