@@ -1107,6 +1107,37 @@ body {
 /* 首页区块 */
 .home-section { margin-bottom: 20px; }
 
+/* 首页并排布局 */
+.home-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.home-half {
+  flex: 1;
+  min-width: 0;
+}
+.home-half h3 { font-size: 14px !important; margin-bottom: 10px !important; }
+
+/* 首页紧凑卡片 */
+.shift-card-sm {
+  padding: 10px 14px !important;
+  gap: 10px !important;
+}
+.shift-card-sm .shift-day {
+  min-width: 44px !important;
+  font-size: 14px !important;
+  padding: 5px 10px !important;
+  border-radius: 6px !important;
+}
+.shift-card-sm .shift-slot {
+  font-size: 13px !important;
+}
+
+@media (max-width: 768px) {
+  .home-row { flex-direction: column; }
+}
+
 /* 日历网格 */
 .calendar-grid {
   display: grid;
@@ -1115,12 +1146,12 @@ body {
 }
 .cal-cell {
   aspect-ratio: 1;
-  border-radius: 6px;
+  border-radius: 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   transition: transform 0.15s;
   cursor: default;
@@ -1390,17 +1421,17 @@ body {
           </div>
         </div>
 
-        <!-- 本周排班 -->
-        <div class="section-card home-section">
-          <h3>📅 本周我的排班</h3>
-          <div id="homeMyShifts"><p style="color:#999;text-align:center;padding:20px 0">暂无排班记录</p></div>
-        </div>
-
-        <!-- 值班日历热力图 -->
-        <div class="section-card home-section">
-          <h3>📊 本月值班分布</h3>
-          <div id="homeCalendar" style="padding:10px 0">
-            <div class="calendar-grid" id="calendarGrid"></div>
+        <!-- 本周排班 + 月度分布（并排） -->
+        <div class="home-row">
+          <div class="section-card home-section home-half">
+            <h3>📅 本周我的排班</h3>
+            <div id="homeMyShifts"><p style="color:#999;text-align:center;padding:12px 0;font-size:13px">暂无排班记录</p></div>
+          </div>
+          <div class="section-card home-section home-half">
+            <h3>📊 本月值班分布</h3>
+            <div id="homeCalendar" style="padding:6px 0">
+              <div class="calendar-grid" id="calendarGrid"></div>
+            </div>
           </div>
         </div>
 
@@ -1881,22 +1912,32 @@ async function loadMyShifts() {
     renderCancelRequests(data.cancelRequests||[]);
   } catch(e) { console.error('加载我的班次失败',e); }
 }
-function renderMyShifts(shifts) {
+function renderMyShifts(shifts, forHome) {
   const el = document.getElementById('myShifts');
-  if (!shifts.length) { el.innerHTML = '<p class="empty-tip">暂无排班记录</p>'; return; }
+  if (!shifts.length) {
+    const emptyHtml = '<p class="empty-tip">暂无排班记录</p>';
+    el.innerHTML = emptyHtml;
+    const he = document.getElementById('homeMyShifts');
+    if (he) he.innerHTML = '<p style="color:#999;text-align:center;padding:12px 0;font-size:13px">暂无排班记录</p>';
+    return;
+  }
   let html = '<div class="shift-list">';
   shifts.forEach(s => {
-    html += '<div class="shift-card">';
+    const cls = forHome ? 'shift-card shift-card-sm' : 'shift-card';
+    html += '<div class="' + cls + '">';
     html += '<div class="shift-day">' + s.day + '</div>';
     html += '<div class="shift-slot">' + (s.slotLabel || s.slot) + '</div>';
-    html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>';
+    if (!forHome) { html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>'; }
     html += '</div>';
   });
   html += '</div>';
   el.innerHTML = html;
-  // 同时更新首页
+  // 同步更新首页（紧凑版）
   const homeEl = document.getElementById('homeMyShifts');
-  if (homeEl) homeEl.innerHTML = html;
+  if (homeEl && !forHome) {
+    renderMyShifts(shifts, true);
+    homeEl.innerHTML = document.getElementById('myShifts').innerHTML;
+  }
 }
 function renderWaitlist(wl) {
   const el = document.getElementById('myWaitlist');
