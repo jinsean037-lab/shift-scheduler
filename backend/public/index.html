@@ -2040,8 +2040,8 @@ async function loadHomeStats() {
     // 早班/午班次数
     const morning = shifts.filter(s => s.slot && s.slot.startsWith('am')).length;
     const afternoon = shifts.filter(s => s.slot && s.slot.startsWith('pm')).length;
-    document.getElementById('statMorningShifts').textContent = morning || thisMonth.filter(s=>s.slot&&s.slot.startsWith('am')).length;
-    document.getElementById('statAfternoonShifts').textContent = afternoon || thisMonth.filter(s=>s.slot&&s.slot.startsWith('pm')).length;
+    document.getElementById('statMorningShifts').textContent = morning;
+    document.getElementById('statAfternoonShifts').textContent = afternoon;
 
     // 渲染本周排班
     renderMyShifts(shifts);
