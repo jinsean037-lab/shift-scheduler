@@ -741,7 +741,8 @@ app.get('/api/my-shifts', async (req, res) => {
       }
     }
     const wl = (store.waitlist || []).filter(w => w.name === name)
-    res.json({ shifts, waitlist: wl })
+    const cr = (store.cancelRequests || []).filter(r => r.name === name)
+    res.json({ shifts, waitlist: wl, cancelRequests: cr })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
