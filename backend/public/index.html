@@ -1946,11 +1946,23 @@ function renderWaitlist(wl) {
   if(sec) sec.style.display = '';
   let html = '<div class="shift-list">';
   wl.forEach(w => {
-    html += '<div class="shift-card" style="border-left:4px solid #f59e0b">';
+    const st = w.status || 'pending';
+    let statusTag = '', statusColor = '#f59e0b', statusText = '候补中';
+    if (st === 'approved' || st === 'auto-approved') { statusColor = '#22c55e'; statusText = '已批准'; }
+    else if (st === 'rejected') { statusColor = '#ef4444'; statusText = '已拒绝'; }
+    else { statusText = '等待审核'; }
+    statusTag = '<span class="status-badge" style="background:'+statusColor+'15;color:'+statusColor+';border:1px solid '+statusColor+'40;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600">' + statusText + '</span>';
+    html += '<div class="shift-card" style="border-left:4px solid ' + statusColor + '">';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
     html += '<div class="shift-day">' + w.day + '</div>';
     html += '<div class="shift-slot">' + slotLabel(w.slot) + '</div>';
-    html += '<span style="color:#f59e0b;font-size:12px;font-weight:600">候补中</span>';
-    html += '<button class="cancel-btn" onclick="cancelWaitlist(\'' + w.day + '\',\'' + w.slot + '\')">取消候补</button>';
+    html += statusTag;
+    html += '</div>';
+    if (st === 'pending') {
+      html += '<button class="cancel-btn" onclick="cancelWaitlist(\'' + w.day + '\',\'' + w.slot + '\')">取消候补</button>';
+    } else if (st === 'rejected') {
+      html += '<span style="color:#999;font-size:12px">可重新申请候补</span>';
+    }
     html += '</div>';
   });
   html += '</div>';
@@ -1963,10 +1975,24 @@ function renderCancelRequests(reqs) {
   if(sec) sec.style.display = '';
   let html = '<div class="shift-list">';
   reqs.forEach(r => {
-    html += '<div class="shift-card" style="border-left:4px solid var(--danger)">';
+    const st = r.status || 'pending';
+    let statusTag = '', statusColor = 'var(--danger)', statusText = '审核中';
+    if (st === 'approved') { statusColor = '#22c55e'; statusText = '已批准取消'; }
+    else if (st === 'rejected') { statusColor = '#ef4444'; statusText = '已拒绝'; }
+    else { statusText = '等待审核'; }
+    statusTag = '<span class="status-badge" style="background:'+statusColor+'15;color:'+statusColor+';border:1px solid '+statusColor+'40;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600">' + statusText + '</span>';
+    html += '<div class="shift-card" style="border-left:4px solid ' + statusColor + '">';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
     html += '<div class="shift-day">' + r.day + '</div>';
     html += '<div class="shift-slot">' + slotLabel(r.slotId || r.slot) + '</div>';
-    html += '<span style="color:var(--danger);font-size:12px;font-weight:600">审核中</span>';
+    html += statusTag;
+    html += '</div>';
+    if (r.reason) { html += '<div style="color:#888;font-size:12px;margin-top:4px">理由：' + r.reason + '</div>'; }
+    if (st === 'pending') {
+      html += '<button class="cancel-btn" onclick="revokeCancel(\'' + r.day + '\',\'' + (r.slotId||r.slot) + '\')" style="background:#666">撤回申请</button>';
+    } else if (st === 'rejected') {
+      html += '<span style="color:#999;font-size:12px">可重新申请取消</span>';
+    }
     html += '</div>';
   });
   html += '</div>';
@@ -1982,6 +2008,17 @@ async function cancelWaitlist(day, slot) {
     if (data.ok) { showToast('已取消候补'); loadMyShifts(); }
   } catch(e) { showToast('网络错误'); }
 }
+async function revokeCancel(day, slotId) {
+  try {
+    const res = await fetch(API + '/cancel-request/revoke', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser,day,slot:slotId})
+    });
+    const data = await res.json();
+    if (data.ok) { showToast('已撤回申请'); loadMyShifts(); }
+    else showToast(data.msg || '撤回失败');
+  } catch(e) { showToast('网络错误'); }
+}
 
 // ========== 首页统计 ==========
 async function loadHomeStats() {
@@ -1994,26 +2031,15 @@ async function loadHomeStats() {
     const y = now.getFullYear(), m = now.getMonth();
 
     // 本月值班次数
-    const thisMonth = shifts.filter(s => {
-      const d = s.dateObj ? new Date(s.dateObj) : null;
-      return d && d.getFullYear()===y && d.getMonth()===m;
-    });
-    document.getElementById('statTotalShifts').textContent = thisMonth.length;
+    document.getElementById('statTotalShifts').textContent = shifts.length;
 
-    // 累计时长
-    let totalMin = 0;
-    shifts.forEach(s => {
-      if (s.start && s.end) {
-        const [sh,sm] = s.start.split(':').map(Number);
-        const [eh,em] = s.end.split(':').map(Number);
-        totalMin += (eh*60+em) - (sh*60+sm);
-      }
-    });
-    document.getElementById('statTotalHours').textContent = (totalMin/60).toFixed(1) + 'h';
+    // 累计时长（每个时段按2h估算）
+    const hoursPerSlot = 2;
+    document.getElementById('statTotalHours').textContent = (shifts.length * hoursPerSlot) + 'h';
 
     // 早班/午班次数
-    const morning = shifts.filter(s => s.slot && (s.slot.startsWith('am') || (s.time&&s.time.includes('8:00')))).length;
-    const afternoon = shifts.filter(s => s.slot && (s.slot.startsWith('pm') || (s.time && (s.time.includes('14:30')||s.time.includes('16:00')))).length);
+    const morning = shifts.filter(s => s.slot && s.slot.startsWith('am')).length;
+    const afternoon = shifts.filter(s => s.slot && s.slot.startsWith('pm')).length;
     document.getElementById('statMorningShifts').textContent = morning || thisMonth.filter(s=>s.slot&&s.slot.startsWith('am')).length;
     document.getElementById('statAfternoonShifts').textContent = afternoon || thisMonth.filter(s=>s.slot&&s.slot.startsWith('pm')).length;
 
@@ -2286,22 +2312,24 @@ async function loadCancelRequests() {
 }
 async function approveCancel(idx) {
   try {
-    const res = await fetch(API + '/admin/approve-cancel', {
+    const res = await fetch(API + '/admin/cancel/approve', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({index:idx})
     });
     const data = await res.json();
     if (data.ok) { showToast('已批准取消'); loadCancelRequests(); loadSchedule(); }
+    else showToast(data.msg || '操作失败');
   } catch(e) { showToast('网络错误'); }
 }
 async function rejectCancel(idx) {
   try {
-    const res = await fetch(API + '/admin/reject-cancel', {
+    const res = await fetch(API + '/admin/cancel/reject', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({index:idx})
     });
     const data = await res.json();
     if (data.ok) { showToast('已拒绝'); loadCancelRequests(); }
+    else showToast(data.msg || '操作失败');
   } catch(e) { showToast('网络错误'); }
 }
 async function resetSchedule() {
