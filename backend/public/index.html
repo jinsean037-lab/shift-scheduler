@@ -2299,9 +2299,10 @@ async function loadCancelRequests() {
     const data = await res.json();
     const container = document.getElementById('cancelPending');
     if (!container) return;
-    if (!data.cancelRequests || !data.cancelRequests.length) { container.innerHTML = '<p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无取消申请</p>'; return; }
+    const pending = (data.cancelRequests || []).filter(r => r.status !== 'approved' && r.status !== 'rejected');
+    if (!pending.length) { container.innerHTML = '<p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无取消申请</p>'; return; }
     let html = '';
-    data.cancelRequests.forEach((r,i) => {
+    pending.forEach((r,i) => {
       html += '<div class="req-card" data-name="' + r.name + '" data-day="' + r.day + '" data-slot="' + (r.slotId || r.slot) + '">';
       html += '<div class="req-info"><div class="req-name">' + r.name + '</div><div class="req-detail">' + r.day + ' ' + slotLabel(r.slotId || r.slot) + (r.reason ? '<br><span style="color:#666;font-size:12px">理由：' + r.reason + '</span>' : '') + '</div></div>';
       html += '<div class="req-actions"><button class="approve-btn" style="background:var(--danger)" onclick="approveCancel(' + i + ')">✓ 批准取消</button><button class="reject-btn" onclick="rejectCancel(' + i + ')">✕ 拒绝</button></div>';
@@ -2314,20 +2315,18 @@ async function approveCancel(idx) {
   try {
     const rows = document.querySelectorAll('#cancelPending .req-card');
     const card = rows[idx];
-    if (!card) { alert('找不到卡片 idx=' + idx); return; }
+    if (!card) return;
     const name = card.dataset.name;
     const day = card.dataset.day;
     const slotId = card.dataset.slot;
-    alert('发送: name=' + name + ' day=' + day + ' slotId=' + slotId);
     const res = await fetch(API + '/admin/cancel/approve', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({name, day, slotId})
     });
     const data = await res.json();
-    alert('返回: ' + JSON.stringify(data));
     if (data.ok) { showToast('已批准取消'); loadCancelRequests(); loadSchedule(); }
     else showToast(data.msg || '操作失败');
-  } catch(e) { showToast('网络错误: ' + e.message); }
+  } catch(e) { showToast('网络错误'); }
 }
 async function rejectCancel(idx) {
   try {
