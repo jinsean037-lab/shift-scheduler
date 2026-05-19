@@ -1363,6 +1363,9 @@ body {
         <a class="nav-item" data-page="schedule" onclick="switchTab('schedule')">
           <span class="nav-icon">📅</span><span>排班表</span>
         </a>
+        <a class="nav-item" data-page="checkin" onclick="switchTab('checkin')">
+          <span class="nav-icon">📍</span><span>值班打卡</span>
+        </a>
         <a class="nav-item" data-page="stats" onclick="switchTab('stats')">
           <span class="nav-icon">📋</span><span>取消与候补申请</span>
         </a>
@@ -1443,6 +1446,23 @@ body {
             <button class="quick-btn" onclick="switchTab('stats')">📋 取消与候补申请</button>
             <button class="quick-btn quick-btn-primary" onclick="showChangePassword()">🔑 修改密码</button>
           </div>
+        </div>
+      </div>
+
+      <!-- ===== 值班打卡视图 ===== -->
+      <div class="page-view" id="checkinView">
+        <div class="page-title-row">
+          <h2>📍 值班打卡</h2>
+        </div>
+        <div class="section-card">
+          <h3>今日打卡</h3>
+          <div id="checkinStatus" style="margin-bottom:12px"><span style="color:#999;font-size:13px">加载中...</span></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="quick-btn quick-btn-primary" id="btnCheckin" onclick="doCheckin()">📍 上班签到</button>
+            <button class="quick-btn" style="background:linear-gradient(135deg,#e65100,#ff9800);color:#fff;border:none" id="btnCheckout" onclick="doCheckout()">🏠 下班签退</button>
+          </div>
+          <div id="checkinError" style="color:#c41230;font-size:12px;margin-top:8px;display:none"></div>
+          <div id="recentCheckins" style="margin-top:14px"></div>
         </div>
       </div>
 
@@ -1560,6 +1580,19 @@ body {
           </div>
         </div>
 
+        <!-- 打卡记录管理 (v4.0) -->
+        <div class="admin-section">
+          <h3>📍 成员打卡记录</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">查看所有成员的签到/签退记录。</p>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <input type="date" id="adminCheckinDate" style="padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
+            <button class="admin-btn" onclick="loadAdminCheckins()">查询</button>
+            <button class="admin-btn" style="background:#e0e0e0;color:#666" onclick="loadAdminCheckins('all')">全部记录</button>
+          </div>
+          <!-- 默认显示今天 -->
+          <div id="adminCheckinList"><p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无打卡记录</p></div>
+        </div>
+
         <!-- 重置 -->
         <div class="admin-section" style="border:1.5px solid #ffe0e0">
           <h3 style="color:var(--danger)">⚠️ 重置排班</h3>
@@ -1638,6 +1671,11 @@ function switchTab(tab) {
       if (schTab) schTab.classList.add('active');
     }
     loadSchedule();
+  } else if (tab === 'checkin') {
+    document.getElementById('checkinView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="checkin"]');
+    if (nav) nav.classList.add('active');
+    loadCheckinStatus();
   } else if (tab === 'stats') {
     document.getElementById('statsView').classList.add('active');
     const nav = document.querySelector('.nav-item[data-page="stats"]');
@@ -1652,6 +1690,7 @@ function switchTab(tab) {
     loadStartTime();
     loadWaitlist();
     loadCancelRequests();
+    loadAdminCheckins(); // v4.0 打卡记录
   }
   }
   catch(e) {
@@ -2029,26 +2068,215 @@ async function loadHomeStats() {
     const shifts = data.shifts || [];
     const now = new Date();
     const y = now.getFullYear(), m = now.getMonth();
+    const today = now.getDate();
+    const todayWeekDay = now.getDay(); // 0=周日
 
-    // 本月值班次数
-    document.getElementById('statTotalShifts').textContent = shifts.length;
+    // 将 day(周一~周五) 映射到本月实际日期列表
+    const dayNameMap = {'周日':0,'周一':1,'周二':2,'周三':3,'周四':4,'周五':5,'周六':6};
+    const daysInMonth = new Date(y, m+1, 0).getDate();
 
-    // 累计时长（每个时段按2h估算）
+    function getDatesForDay(dayName) {
+      const targetWd = dayNameMap[dayName];
+      if (targetWd === undefined) return [];
+      const dates = [];
+      for (let d=1; d<=daysInMonth; d++) {
+        if (new Date(y, m, d).getDay() === targetWd) dates.push(d);
+      }
+      return dates;
+    }
+
+    // 判断一个班次是否已过期（今天及之前）
+    function isPastOrToday(shift) {
+      const dates = getDatesForDay(shift.day);
+      // 取最后一个匹配日期与今天比较（本周/下周语义：如果本周该日已过算过期）
+      const lastDate = dates.length ? dates[dates.length-1] : 0;
+      return lastDate > 0 && lastDate <= today;
+    }
+
+    // 过滤出今天及之前的班次（已完成）
+    const completedShifts = shifts.filter(s => isPastOrToday(s));
+    const upcomingShifts = shifts.filter(s => !isPastOrToday(s));
+
+    // 统计卡片更新
+    document.getElementById('statTotalShifts').textContent = completedShifts.length;
+
+    // 累计时长（只算已完成的，每个时段按2h估算）
     const hoursPerSlot = 2;
-    document.getElementById('statTotalHours').textContent = (shifts.length * hoursPerSlot) + 'h';
+    document.getElementById('statTotalHours').textContent = (completedShifts.length * hoursPerSlot) + 'h';
 
-    // 早班/午班次数
-    const morning = shifts.filter(s => s.slot && s.slot.startsWith('am')).length;
-    const afternoon = shifts.filter(s => s.slot && s.slot.startsWith('pm')).length;
+    // 早班/午班次数（只算已完成的）
+    const morning = completedShifts.filter(s => s.slot && s.slot.startsWith('am')).length;
+    const afternoon = completedShifts.filter(s => s.slot && s.slot.startsWith('pm')).length;
     document.getElementById('statMorningShifts').textContent = morning;
     document.getElementById('statAfternoonShifts').textContent = afternoon;
 
-    // 渲染本周排班
+    // 更新标签文案
+    const totalLabel = document.querySelector('#statTotalShifts').closest('.stat-info').querySelector('.stat-label');
+    if (totalLabel) totalLabel.textContent = '已值班次数';
+    const hoursLabel = document.querySelector('#statTotalHours').closest('.stat-info').querySelector('.stat-label');
+    if (hoursLabel) hoursLabel.textContent = '已累计时长';
+
+    // 渲染本周排班（全部显示）
     renderMyShifts(shifts);
 
-    // 渲染日历热力图
+    // 渲染日历热力图（全部）
     renderCalendar(shifts, y, m);
   } catch(e) { console.error('加载首页统计失败', e); }
+}
+
+// ========== 打卡功能 (v4.0) ==========
+
+function loadCheckinStatus() {
+  if (!currentUser) return;
+  const statusEl = document.getElementById('checkinStatus');
+  const recentEl = document.getElementById('recentCheckins');
+  const errEl = document.getElementById('checkinError');
+  if (!statusEl) return;
+  
+  fetch(API + '/my-checkins?name=' + encodeURIComponent(currentUser))
+    .then(r => r.json())
+    .then(data => {
+      const checkins = data.checkins || [];
+      const stats = data.stats || {};
+      const today = new Date().toISOString().slice(0, 10);
+      const todayIn = checkins.find(c => c.date === today && c.type === 'in');
+      const todayOut = checkins.find(c => c.date === today && c.type === 'out');
+      
+      // 更新状态显示
+      if (todayOut) {
+        statusEl.innerHTML = '<span style="color:#2e7d32;font-weight:600;font-size:14px">✅ 今日已签退</span>' +
+          '<span style="color:#666;font-size:12px;margin-left:8px">签到 ' + formatTime(todayIn.time) + ' → 签退 ' + formatTime(todayOut.time) + '</span>';
+        document.getElementById('btnCheckin').disabled = true;
+        document.getElementById('btnCheckin').style.opacity = '0.5';
+        document.getElementById('btnCheckout').disabled = true;
+        document.getElementById('btnCheckout').style.opacity = '0.5';
+      } else if (todayIn) {
+        statusEl.innerHTML = '<span style="color:#1a6bc4;font-weight:600;font-size:14px">🔵 已签到，工作中...</span>' +
+          '<span style="color:#666;font-size:12px;margin-left:8px">签到时间：' + formatTime(todayIn.time) + '</span>';
+        document.getElementById('btnCheckin').disabled = true;
+        document.getElementById('btnCheckin').style.opacity = '0.5';
+        document.getElementById('btnCheckout').disabled = false;
+        document.getElementById('btnCheckout').style.opacity = '1';
+      } else {
+        statusEl.innerHTML = '<span style="#888;font-size:13px">今日尚未签到</span>';
+        document.getElementById('btnCheckin').disabled = false;
+        document.getElementById('btnCheckin').style.opacity = '1';
+        document.getElementById('btnCheckout').disabled = true;
+        document.getElementById('btnCheckout').style.opacity = '0.5';
+      }
+      
+      // 显示本周打卡记录（最近7天）
+      const recent = checkins.filter(c => {
+        const d = new Date(c.date);
+        const diff = (Date.now() - d.getTime()) / 86400000;
+        return diff <= 7;
+      }).sort((a, b) => b.time.localeCompare(a.time));
+      
+      if (recent.length > 0) {
+        let html = '<div style="margin-top:10px"><p style="font-size:12px;color:#888;margin-bottom:6px">📋 最近打卡记录：</p>';
+        recent.forEach(c => {
+          const icon = c.type === 'in' ? '🟢' : '🔴';
+          const label = c.type === 'in' ? '签到' : '签退';
+          html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid #f0f0f0">' +
+            '<span>' + icon + ' ' + c.date + ' ' + label + '</span>' +
+            '<span style="color:#666">' + formatTime(c.time) + '</span></div>';
+        });
+        html += '</div>';
+        recentEl.innerHTML = html;
+      } else {
+        recentEl.innerHTML = '';
+      }
+      
+      // 统计信息追加到状态区
+      if (stats.completedDays > 0) {
+        statusEl.innerHTML += '<div style="margin-top:6px;font-size:12px;color:#888">累计完成 ' + stats.completedDays + ' 天，共 ' + stats.totalHours + ' 小时</div>';
+      }
+    })
+    .catch(() => { statusEl.innerHTML = '<span style="color:#999">加载失败</span>'; });
+}
+
+function formatTime(isoStr) {
+  if (!isoStr) return '--';
+  try { return new Date(isoStr).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); }
+  catch { return isoStr.slice(11, 16); }
+}
+
+function doCheckin() {
+  if (!currentUser) return;
+  const errEl = document.getElementById('checkinError');
+  errEl.style.display = 'none';
+  
+  if (!navigator.geolocation) {
+    showCheckinError('您的浏览器不支持定位功能，无法打卡');
+    return;
+  }
+  
+  showToast('正在获取位置...');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      sendCheckin(pos.coords.latitude, pos.coords.longitude);
+    },
+    err => {
+      console.warn('定位失败:', err.message);
+      showCheckinError('定位失败，请允许浏览器获取位置后重试');
+    },
+    { timeout: 10000, enableHighAccuracy: true }
+  );
+}
+
+function sendCheckin(lat, lng) {
+  fetch(API + '/checkin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: currentUser, lat, lng })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) { showToast('✅ 签到成功'); loadCheckinStatus(); }
+    else { showCheckinError(data.msg || '签到失败'); }
+  })
+  .catch(() => { showCheckinError('网络错误'); });
+}
+
+function doCheckout() {
+  if (!currentUser) return;
+  const errEl = document.getElementById('checkinError');
+  errEl.style.display = 'none';
+  
+  if (!navigator.geolocation) {
+    showCheckinError('您的浏览器不支持定位功能，无法打卡');
+    return;
+  }
+  
+  showToast('正在获取位置...');
+  navigator.geolocation.getCurrentPosition(
+    pos => { sendCheckout(pos.coords.latitude, pos.coords.longitude); },
+    err => {
+      console.warn('定位失败:', err.message);
+      showCheckinError('定位失败，请允许浏览器获取位置后重试');
+    },
+    { timeout: 10000, enableHighAccuracy: true }
+  );
+}
+
+function sendCheckout(lat, lng) {
+  fetch(API + '/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: currentUser, lat, lng })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) { showToast('✅ 签退成功'); loadCheckinStatus(); }
+    else { showCheckinError(data.msg || '签退失败'); }
+  })
+  .catch(() => { showCheckinError('网络错误'); });
+}
+
+function showCheckinError(msg) {
+  const el = document.getElementById('checkinError');
+  el.textContent = msg;
+  el.style.display = 'block';
 }
 
 function renderCalendar(shifts, year, month) {
@@ -2353,6 +2581,66 @@ async function resetSchedule() {
       if (data.ok) { showToast('重置成功'); loadSchedule(); }
     } catch(e) { showToast('网络错误'); }
   });
+}
+
+// ========== 管理员打卡记录 (v4.0) ==========
+
+function loadAdminCheckins(mode) {
+  const listEl = document.getElementById('adminCheckinList');
+  const dateInput = document.getElementById('adminCheckinDate');
+  let url = API + '/admin/checkins';
+  if (mode === 'all') {
+    url += '?date=';
+  } else if (dateInput && dateInput.value) {
+    url += '?date=' + dateInput.value;
+  } else {
+    url += '?date=' + new Date().toISOString().slice(0, 10);
+  }
+  
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      const checkins = data.checkins || [];
+      if (checkins.length === 0) {
+        listEl.innerHTML = '<p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无打卡记录</p>';
+        return;
+      }
+      // 按姓名分组
+      const groups = {};
+      checkins.forEach(c => {
+        if (!groups[c.name]) groups[c.name] = [];
+        groups[c.name].push(c);
+      });
+      
+      let html = '';
+      Object.keys(groups).sort().forEach(name => {
+        const records = groups[name].sort((a, b) => a.time.localeCompare(b.time));
+        html += '<div style="margin-bottom:12px;padding:10px;background:#fafafa;border-radius:8px">';
+        html += '<div style="font-weight:600;font-size:14px;margin-bottom:6px">👤 ' + name + '</div>';
+        records.forEach(c => {
+          const icon = c.type === 'in' ? '🟢 签到' : '🔴 签退';
+          const loc = c.lat ? ' 📍' + c.lat.toFixed(4) + ',' + c.lng.toFixed(4) : '';
+          html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:#555">' +
+            '<span>' + icon + '</span>' +
+            '<span>' + c.date + ' ' + formatTime(c.time) + loc + '</span></div>';
+        });
+        // 计算当日工时
+        const ins = records.filter(c => c.type === 'in');
+        const outs = records.filter(c => c.type === 'out');
+        ins.forEach((iRec, idx) => {
+          const oRec = outs[idx];
+          if (oRec) {
+            const mins = (new Date(oRec.time) - new Date(iRec.time)) / 60000;
+            const h = Math.floor(mins / 60);
+            const m = Math.round(mins % 60);
+            html += '<div style="font-size:11px;color:#888;text-align:right">工时：' + h + 'h' + (m > 0 ? m + 'm' : '') + '</div>';
+          }
+        });
+        html += '</div>';
+      });
+      listEl.innerHTML = html;
+    })
+    .catch(() => { listEl.innerHTML = '<p style="color:#c41230;font-size:13px">加载失败</p>'; });
 }
 
 // ========== 初始化 ==========
