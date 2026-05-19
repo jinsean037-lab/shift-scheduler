@@ -2129,7 +2129,7 @@ async function loadStartTime() {
 async function saveStartTime() {
   const val = document.getElementById('startTimeInput').value;
   try {
-    const res = await fetch(API + '/admin/set-start-time', {
+    const res = await fetch(API + '/admin/start-time', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({startTime: val||null})
     });
@@ -2183,9 +2183,9 @@ async function loadCancelRequests() {
     const data = await res.json();
     const ul = document.getElementById('cancelPending');
     if (!ul) return;
-    if (!data.requests || !data.requests.length) { ul.innerHTML = '<li style="color:#999">暂无取消申请</li>'; return; }
+    if (!data.cancelRequests || !data.cancelRequests.length) { ul.innerHTML = '<li style="color:#999">暂无取消申请</li>'; return; }
     ul.innerHTML = '';
-    data.requests.forEach((r,i) => {
+    data.cancelRequests.forEach((r,i) => {
       const li = document.createElement('li');
       li.innerHTML = r.name + ' → ' + r.day + ' ' + r.slot + ' <button onclick="approveCancel(' + i + ')">批准</button> <button onclick="rejectCancel(' + i + ')">拒绝</button>';
       ul.appendChild(li);
