@@ -39,7 +39,8 @@ function defaultStore() {
     schedule: {},
     scheduleTime: {},
     waitlist: [],
-    cancelRequests: []
+    cancelRequests: [],
+    checkins: []
   }
 }
 
@@ -743,6 +744,105 @@ app.get('/api/my-shifts', async (req, res) => {
     const wl = (store.waitlist || []).filter(w => w.name === name)
     const cr = (store.cancelRequests || []).filter(r => r.name === name)
     res.json({ shifts, waitlist: wl, cancelRequests: cr })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// ========== 打卡功能 (v4.0) ==========
+
+// POST /api/checkin — 签到（上班打卡）
+app.post('/api/checkin', async (req, res) => {
+  try {
+    const { name, lat, lng } = req.body
+    if (!name) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const now = new Date().toISOString()
+    // 检查今天是否已签到
+    const today = now.slice(0, 10)
+    const existing = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'in')
+    if (existing) return res.json({ ok: false, msg: '今日已签到，请直接签退' })
+
+    const record = { name, date: today, time: now, type: 'in', lat: lat || null, lng: lng || null }
+    const checkins = store.checkins || []
+    checkins.push(record)
+    await writeStore({ checkins })
+    res.json({ ok: true, msg: '签到成功', record })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// POST /api/checkout — 签退（下班打卡）
+app.post('/api/checkout', async (req, res) => {
+  try {
+    const { name, lat, lng } = req.body
+    if (!name) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const now = new Date().toISOString()
+    const today = now.slice(0, 10)
+    // 检查今天是否已签到
+    const checkinRecord = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'in')
+    if (!checkinRecord) return res.json({ ok: false, msg: '请先签到' })
+    // 检查今天是否已签退
+    const existingOut = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'out')
+    if (existingOut) return res.json({ ok: false, msg: '今日已签退' })
+
+    const record = { name, date: today, time: now, type: 'out', lat: lat || null, lng: lng || null }
+    const checkins = store.checkins || []
+    checkins.push(record)
+    await writeStore({ checkins })
+    res.json({ ok: true, msg: '签退成功', record })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// GET /api/my-checkins?name=xxx — 获取个人打卡记录
+app.get('/api/my-checkins', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ checkins: [], stats: {} })
+    const store = await readStore()
+    const checkins = (store.checkins || []).filter(c => c.name === name).sort((a, b) => a.time.localeCompare(b.time))
+    // 统计：配对的签到-签退算一次完整值班，计算时长
+    let totalMinutes = 0
+    let completedDays = 0
+    const processed = new Set()
+    checkins.forEach(c => {
+      if (c.type === 'in' && !processed.has(c.date)) {
+        const outRec = checkins.find(o => o.date === c.date && o.type === 'out')
+        if (outRec) {
+          totalMinutes += (new Date(outRec.time) - new Date(c.time)) / 60000
+          completedDays++
+        }
+        processed.add(c.date)
+      }
+    })
+    res.json({
+      checkins,
+      stats: {
+        totalCheckins: checkins.filter(c => c.type === 'in').length,
+        totalCheckouts: checkins.filter(c => c.type === 'out').length,
+        completedDays,
+        totalHours: Math.round(totalMinutes / 60 * 10) / 10
+      }
+    })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// GET /api/admin/checkins?date=YYYY-MM-DD — 管理员查看所有打卡记录
+app.get('/api/admin/checkins', async (req, res) => {
+  try {
+    const store = await readStore()
+    let checkins = store.checkins || []
+    if (req.query.date) {
+      checkins = checkins.filter(c => c.date === req.query.date)
+    }
+    checkins.sort((a, b) => b.time.localeCompare(a.time))
+    res.json({ ok: true, checkins })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
