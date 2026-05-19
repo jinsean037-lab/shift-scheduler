@@ -762,9 +762,38 @@ body {
   padding: 10px 0; border-bottom: 1px solid #f8f9fa; font-size: 14px;
 }
 .pending-list li:last-child { border-bottom: none; }
+
+/* 管理员端申请卡片 */
+.req-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; margin-bottom: 10px;
+  background: #fafbfc; border-radius: 10px;
+  border: 1px solid #e8ecf0;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.req-card:hover {
+  box-shadow: 0 2px 12px rgba(139,26,26,0.08);
+  transform: translateY(-1px);
+}
+.req-info { flex: 1; min-width: 0; }
+.req-name { font-weight: 600; font-size: 14px; color: #1a1a2e; margin-bottom: 3px; }
+.req-detail { font-size: 13px; color: #666; }
+.req-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: 16px; }
 .pending-btns { display: flex; gap: 6px; }
-.approve-btn { background: var(--success); color: white; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
-.reject-btn { background: white; border: 1.5px solid var(--danger); color: var(--danger); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+.approve-btn {
+  background: var(--success); color: white; border: none;
+  padding: 7px 16px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 600;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.approve-btn:hover { opacity: 0.85; transform: scale(1.03); }
+.reject-btn {
+  background: white; border: 1.5px solid #d0d5dd; color: #555;
+  padding: 7px 16px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 600;
+  transition: all 0.2s;
+}
+.reject-btn:hover { border-color: var(--danger); color: var(--danger); background: #fef2f2; }
 
 /* Toast */
 .toast {
@@ -1304,7 +1333,7 @@ body {
           <span class="nav-icon">📅</span><span>排班表</span>
         </a>
         <a class="nav-item" data-page="stats" onclick="switchTab('stats')">
-          <span class="nav-icon">📌</span><span>我的班次</span>
+          <span class="nav-icon">📋</span><span>取消与候补申请</span>
         </a>
 
         <div class="nav-group-title" id="adminNavGroupTitle" style="display:none">管理功能</div>
@@ -1380,7 +1409,7 @@ body {
           <h3>⚡ 快捷操作</h3>
           <div class="quick-actions">
             <button class="quick-btn" onclick="switchTab('schedule')">📅 查看排班表</button>
-            <button class="quick-btn" onclick="switchTab('stats')">📌 我的班次详情</button>
+            <button class="quick-btn" onclick="switchTab('stats')">📋 取消与候补申请</button>
             <button class="quick-btn quick-btn-primary" onclick="showChangePassword()">🔑 修改密码</button>
           </div>
         </div>
@@ -1401,22 +1430,28 @@ body {
         </div>
       </div>
 
-      <!-- ===== 我的班次视图 ===== -->
+      <!-- ===== 取消与候补申请视图 ===== -->
       <div class="page-view" id="statsView">
         <div class="page-title-row">
-          <h2>我的班次</h2>
-          <p class="page-subtitle">查看和管理你的值班记录</p>
+          <h2>取消与候补申请</h2>
+          <p class="page-subtitle">查看和管理你的值班申请状态</p>
         </div>
+        <!-- 已选班次 -->
         <div class="section-card">
-          <h3>📌 我的班次</h3>
+          <h3 style="color:var(--primary)">📌 已选班次</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">以下是你已选中的班次，可点击取消按钮提交取消申请。</p>
           <div id="myShifts"></div>
         </div>
+        <!-- 候补中 -->
         <div class="section-card" id="myWaitlistSection" style="display:none">
-          <h3>⏳ 我的候补</h3>
+          <h3 style="color:var(--warning,#f59e0b)">⏳ 候补中</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">你正在等待这些班次的空位。</p>
           <div id="myWaitlist"></div>
         </div>
+        <!-- 取消申请审核中 -->
         <div class="section-card" id="myCancelSection" style="display:none">
-          <h3>❌ 我的取消申请</h3>
+          <h3 style="color:var(--danger)">❌ 取消申请审核中</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">你的取消申请已提交，等待管理员审批。</p>
           <div id="myCancelRequests"></div>
         </div>
       </div>
@@ -1442,17 +1477,13 @@ body {
         <!-- 候补申请 -->
         <div class="admin-section">
           <h3>⏳ 候补申请</h3>
-          <ul class="pending-list" id="waitlistPending">
-            <li style="color:#999">暂无候补申请</li>
-          </ul>
+          <div id="waitlistPending"><p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无候补申请</p></div>
         </div>
 
         <!-- 取消申请 -->
         <div class="admin-section">
           <h3>❌ 取消班次申请</h3>
-          <ul class="pending-list" id="cancelPending">
-            <li style="color:#999">暂无取消申请</li>
-          </ul>
+          <div id="cancelPending"><p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无取消申请</p></div>
         </div>
 
         <!-- 密码管理 -->
@@ -1872,9 +1903,16 @@ function renderWaitlist(wl) {
   const sec = document.getElementById('myWaitlistSection');
   if (!wl || !wl.length) { if(el) el.innerHTML = ''; if(sec) sec.style.display='none'; return; }
   if(sec) sec.style.display = '';
-  let html = '<ul>';
-  wl.forEach(w => { html += '<li>' + w.day + ' ' + w.slot + ' <button onclick="cancelWaitlist(\'' + w.day + '\',\'' + w.slot + '\')">取消候补</button></li>'; });
-  html += '</ul>';
+  let html = '<div class="shift-list">';
+  wl.forEach(w => {
+    html += '<div class="shift-card" style="border-left:4px solid #f59e0b">';
+    html += '<div class="shift-day">' + w.day + '</div>';
+    html += '<div class="shift-slot">' + slotLabel(w.slot) + '</div>';
+    html += '<span style="color:#f59e0b;font-size:12px;font-weight:600">候补中</span>';
+    html += '<button class="cancel-btn" onclick="cancelWaitlist(\'' + w.day + '\',\'' + w.slot + '\')">取消候补</button>';
+    html += '</div>';
+  });
+  html += '</div>';
   if(el) el.innerHTML = html;
 }
 function renderCancelRequests(reqs) {
@@ -1882,9 +1920,15 @@ function renderCancelRequests(reqs) {
   const sec = document.getElementById('myCancelSection');
   if (!reqs || !reqs.length) { if(el) el.innerHTML = ''; if(sec) sec.style.display='none'; return; }
   if(sec) sec.style.display = '';
-  let html = '<ul>';
-  reqs.forEach(r => { html += '<li>' + r.day + ' ' + r.slot + ' — 审核中</li>'; });
-  html += '</ul>';
+  let html = '<div class="shift-list">';
+  reqs.forEach(r => {
+    html += '<div class="shift-card" style="border-left:4px solid var(--danger)">';
+    html += '<div class="shift-day">' + r.day + '</div>';
+    html += '<div class="shift-slot">' + slotLabel(r.slotId || r.slot) + '</div>';
+    html += '<span style="color:var(--danger);font-size:12px;font-weight:600">审核中</span>';
+    html += '</div>';
+  });
+  html += '</div>';
   if(el) el.innerHTML = html;
 }
 async function cancelWaitlist(day, slot) {
@@ -2142,19 +2186,24 @@ function clearStartTime() {
   document.getElementById('startTimeInput').value = '';
   saveStartTime();
 }
+const SLOT_LABELS = { am1:'8:00-10:00', am2:'10:00-12:00', pm1:'14:30-16:00', pm2:'16:00-17:30' };
+function slotLabel(key) { return SLOT_LABELS[key] || key; }
+
 async function loadWaitlist() {
   try {
     const res = await fetch(API + '/admin/waitlist');
     const data = await res.json();
-    const ul = document.getElementById('waitlistPending');
-    if (!ul) return;
-    if (!data.waitlist || !data.waitlist.length) { ul.innerHTML = '<li style="color:#999">暂无候补申请</li>'; return; }
-    ul.innerHTML = '';
+    const container = document.getElementById('waitlistPending');
+    if (!container) return;
+    if (!data.waitlist || !data.waitlist.length) { container.innerHTML = '<p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无候补申请</p>'; return; }
+    let html = '';
     data.waitlist.forEach((w,i) => {
-      const li = document.createElement('li');
-      li.innerHTML = w.name + ' → ' + w.day + ' ' + w.slot + ' <button onclick="approveWaitlist(' + i + ')">批准</button> <button onclick="rejectWaitlist(' + i + ')">拒绝</button>';
-      ul.appendChild(li);
+      html += '<div class="req-card">';
+      html += '<div class="req-info"><div class="req-name">' + w.name + '</div><div class="req-detail">' + w.day + ' ' + slotLabel(w.slot) + '</div></div>';
+      html += '<div class="req-actions"><button class="approve-btn" onclick="approveWaitlist(' + i + ')">✓ 批准</button><button class="reject-btn" onclick="rejectWaitlist(' + i + ')">✕ 拒绝</button></div>';
+      html += '</div>';
     });
+    container.innerHTML = html;
   } catch(e) {}
 }
 async function approveWaitlist(idx) {
@@ -2181,15 +2230,17 @@ async function loadCancelRequests() {
   try {
     const res = await fetch(API + '/admin/cancel-requests');
     const data = await res.json();
-    const ul = document.getElementById('cancelPending');
-    if (!ul) return;
-    if (!data.cancelRequests || !data.cancelRequests.length) { ul.innerHTML = '<li style="color:#999">暂无取消申请</li>'; return; }
-    ul.innerHTML = '';
+    const container = document.getElementById('cancelPending');
+    if (!container) return;
+    if (!data.cancelRequests || !data.cancelRequests.length) { container.innerHTML = '<p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无取消申请</p>'; return; }
+    let html = '';
     data.cancelRequests.forEach((r,i) => {
-      const li = document.createElement('li');
-      li.innerHTML = r.name + ' → ' + r.day + ' ' + r.slot + ' <button onclick="approveCancel(' + i + ')">批准</button> <button onclick="rejectCancel(' + i + ')">拒绝</button>';
-      ul.appendChild(li);
+      html += '<div class="req-card">';
+      html += '<div class="req-info"><div class="req-name">' + r.name + '</div><div class="req-detail">' + r.day + ' ' + slotLabel(r.slotId || r.slot) + (r.reason ? '<br><span style="color:#666;font-size:12px">理由：' + r.reason + '</span>' : '') + '</div></div>';
+      html += '<div class="req-actions"><button class="approve-btn" style="background:var(--danger)" onclick="approveCancel(' + i + ')">✓ 批准取消</button><button class="reject-btn" onclick="rejectCancel(' + i + ')">✕ 拒绝</button></div>';
+      html += '</div>';
     });
+    container.innerHTML = html;
   } catch(e) {}
 }
 async function approveCancel(idx) {
