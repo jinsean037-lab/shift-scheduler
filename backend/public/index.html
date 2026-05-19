@@ -2012,7 +2012,7 @@ async function revokeCancel(day, slotId) {
   try {
     const res = await fetch(API + '/cancel-request/revoke', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser,day,slot:slotId})
+      body: JSON.stringify({name:currentUser,day,slotId:slotId})
     });
     const data = await res.json();
     if (data.ok) { showToast('已撤回申请'); loadMyShifts(); }
