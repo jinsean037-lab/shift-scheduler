@@ -264,7 +264,7 @@ app.post('/api/admin/schedule-confirm', async (req, res) => {
     const store = await readStore()
     store.scheduleStart = scheduleStart || null
     store.scheduleEnd = scheduleEnd || null
-    await writeStore({ scheduleStart: store.scheduleStart, scheduleEnd: store.scheduleEnd })
+    await writeStore(store)
     res.json({ ok: true, scheduleStart: store.scheduleStart, scheduleEnd: store.scheduleEnd })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
