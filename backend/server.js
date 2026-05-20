@@ -34,6 +34,8 @@ function defaultStore() {
     days: ['周一', '周二', '周三', '周四', '周五'],
     maxPerSlot: 2,
     startTime: null,
+    scheduleStart: null,
+    scheduleEnd: null,
     members: [...DEFAULT_MEMBERS],
     passwords: { ...DEFAULT_PASSWORDS },
     schedule: {},
@@ -166,6 +168,8 @@ function saveToFile() {
 function getDefaultStore() {
   return {
     startTime: null,
+    scheduleStart: null,
+    scheduleEnd: null,
     maxPerSlot: 2,
     schedule: {
       '周一': { am1:[], am2:[], pm1:[], pm2:[] },
@@ -220,6 +224,9 @@ app.get('/api/config', async (req, res) => {
       days: store.days,
       maxPerSlot: store.maxPerSlot,
       startTime: store.startTime,
+      scheduleStart: store.scheduleStart,
+      scheduleEnd: store.scheduleEnd,
+      confirmed: !!(store.scheduleStart && store.scheduleEnd),
       members: store.members
     })
   } catch (e) {
@@ -245,6 +252,20 @@ app.post('/api/admin/start-time', async (req, res) => {
     store.startTime = startTime || null
     await writeStore({ startTime: store.startTime })
     res.json({ ok: true, startTime: store.startTime })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 排班确认（设置起止时间）
+app.post('/api/admin/schedule-confirm', async (req, res) => {
+  try {
+    const { scheduleStart, scheduleEnd } = req.body
+    const store = await readStore()
+    store.scheduleStart = scheduleStart || null
+    store.scheduleEnd = scheduleEnd || null
+    await writeStore({ scheduleStart: store.scheduleStart, scheduleEnd: store.scheduleEnd })
+    res.json({ ok: true, scheduleStart: store.scheduleStart, scheduleEnd: store.scheduleEnd })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -314,6 +335,10 @@ app.post('/api/select', async (req, res) => {
     const slot = slotId || req.body.slot
     if (!name || !day || !slot) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
+    // 已确认的排班表不允许再选班（定格锁定）
+    if (store.scheduleStart && store.scheduleEnd) {
+      return res.json({ ok: false, msg: '当前排班表已确认生效，暂不可修改。请联系管理员重置后排班。' })
+    }
     if (isBeforeStartTime(store)) {
       return res.json({ ok: false, msg: '排班尚未开始，请等待管理员设置开始时间' })
     }
@@ -358,6 +383,10 @@ app.post('/api/cancel-request', async (req, res) => {
     const { name, day, slotId, reason } = req.body
     if (!name || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
+    // 已确认的排班表不允许取消
+    if (store.scheduleStart && store.scheduleEnd) {
+      return res.json({ ok: false, msg: '当前排班表已确认生效，暂不可取消。请联系管理员。' })
+    }
     // 兼容嵌套格式和扁平格式
     let list = null
     let key = ''
@@ -971,6 +1000,10 @@ app.post('/api/cancel', async (req, res) => {
     const { name, day, slot } = req.body
     if (!name || !day || !slot) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
+    // 已确认的排班表不允许取消
+    if (store.scheduleStart && store.scheduleEnd) {
+      return res.json({ ok: false, msg: '当前排班表已确认生效，暂不可取消。请联系管理员。' })
+    }
     // 嵌套格式
     const list = (store.schedule[day] && store.schedule[day][slot]) || []
     if (!list.includes(name)) return res.json({ ok: false, msg: '你不在该班次中' })
