@@ -2011,15 +2011,21 @@ function renderSchedule(data) {
 
   grid.innerHTML = html;
 
+  // 先移除旧的 badge，避免重复
+  const oldBadge = grid.parentElement.querySelector('.schedule-badge');
+  if (oldBadge) oldBadge.remove();
+
   // 已确认排班表时隐藏操作按钮，显示锁定标识
   if (configData.confirmed) {
     const badge = document.createElement('div');
+    badge.className = 'schedule-badge';
     badge.style.cssText = 'text-align:center;margin-bottom:8px;color:var(--success);font-weight:700;font-size:14px';
     badge.textContent = '✅ 排班表已确认（' + (configData.scheduleStart ? new Date(configData.scheduleStart).toLocaleDateString() : '') + ' ~ ' + (configData.scheduleEnd ? new Date(configData.scheduleEnd).toLocaleDateString() : '') + '）';
     grid.parentElement.insertBefore(badge, grid);
     grid.querySelectorAll('.pick-btn,.cancel-btn,.waitlist-btn').forEach(b => b.remove());
   } else {
     const badge = document.createElement('div');
+    badge.className = 'schedule-badge';
     badge.style.cssText = 'text-align:center;margin-bottom:8px;color:var(--warn);font-size:13px';
     badge.textContent = '📝 草稿 — 排班进行中，管理员确认后生效';
     grid.parentElement.insertBefore(badge, grid);
@@ -2301,8 +2307,8 @@ async function loadHomeStats() {
     // 渲染本周排班（全部显示）
     renderMyShifts(shifts);
 
-    // 渲染日历热力图（全部）
-    renderCalendar(shifts, y, m);
+    // 渲染日历热力图（按生效时间范围过滤）
+    renderCalendar(shifts, y, m, cfgData.scheduleStart, cfgData.scheduleEnd);
   } catch(e) { console.error('加载首页统计失败', e); }
 }
 
@@ -2555,13 +2561,17 @@ function showCheckinError(msg) {
   el.style.display = 'block';
 }
 
-function renderCalendar(shifts, year, month) {
+function renderCalendar(shifts, year, month, scheduleStart, scheduleEnd) {
   const grid = document.getElementById('calendarGrid');
   if (!grid) return;
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
 
-  // 根据 day(周一~周五) 映射到本月实际日期
+  // 解析生效时间范围
+  const rangeStart = scheduleStart ? new Date(scheduleStart) : null;
+  const rangeEnd = scheduleEnd ? new Date(scheduleEnd) : null;
+
+  // 根据 day(周一~周五) 映射到本月实际日期，并过滤生效范围
   const dayNameMap = {'周日':0,'周一':1,'周二':2,'周三':3,'周四':4,'周五':5,'周六':6};
   const shiftMap = {};
   shifts.forEach(s => {
@@ -2570,6 +2580,10 @@ function renderCalendar(shifts, year, month) {
     // 找到本月所有匹配该星期的日期
     for (let d=1; d<=daysInMonth; d++) {
       if (new Date(year, month, d).getDay() === targetWeekDay) {
+        // 过滤：只计入生效时间范围内的日期
+        const cur = new Date(year, month, d);
+        if (rangeStart && cur < rangeStart) continue;
+        if (rangeEnd && cur > rangeEnd) continue;
         if (!shiftMap[d]) shiftMap[d] = 0;
         shiftMap[d]++;
       }
