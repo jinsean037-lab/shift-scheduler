@@ -538,9 +538,16 @@ app.post('/api/admin/member/remove', async (req, res) => {
 // 管理员：重置排班
 app.post('/api/admin/reset', async (req, res) => {
   try {
-    await writeStore({ schedule: {}, waitlist: [], cancelRequests: [] })
+    const store = await readStore()
+    store.schedule = {}
+    store.waitlist = []
+    store.cancelRequests = []
+    store.scheduleStart = null
+    store.scheduleEnd = null
+    await writeStore(store)
     res.json({ ok: true })
   } catch (e) {
+    console.error('reset error:', e)
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
 })
