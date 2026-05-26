@@ -3088,8 +3088,8 @@ async function loadWaitlist() {
     if (!container) return;
     if (!data.waitlist || !data.waitlist.length) { container.innerHTML = '<p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无候补申请</p>'; return; }
     let html = '';
-    data.waitlist.forEach((w,i) => {
-      html += '<div class="req-card">';
+    data.waitlist.filter(w => w.status !== 'auto-approved' && w.status !== 'approved' && w.status !== 'rejected').forEach((w,i) => {
+      html += '<div class="req-card" data-name="' + w.name + '" data-day="' + w.day + '" data-slot="' + (w.slotId || w.slot) + '">';
       html += '<div class="req-info"><div class="req-name">' + w.name + '</div><div class="req-detail">' + w.day + ' ' + (slotLabel(w.slotId || w.slot) || w.slotId || w.slot || '') + '</div></div>';
       html += '<div class="req-actions"><button class="approve-btn" onclick="approveWaitlist(' + i + ')">✓ 批准</button><button class="reject-btn" onclick="rejectWaitlist(' + i + ')">✕ 拒绝</button></div>';
       html += '</div>';
@@ -3099,22 +3099,34 @@ async function loadWaitlist() {
 }
 async function approveWaitlist(idx) {
   try {
-    const res = await fetch(API + '/admin/approve-waitlist', {
+    const rows = document.querySelectorAll('#waitlistPending .req-card');
+    const card = rows[idx];
+    if (!card) return;
+    const name = card.dataset.name;
+    const day = card.dataset.day;
+    const slotId = card.dataset.slot;
+    const res = await fetch(API + '/admin/waitlist/approve', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({index:idx})
+      body: JSON.stringify({name, day, slotId})
     });
     const data = await res.json();
-    if (data.ok) { showToast('已批准'); loadWaitlist(); loadSchedule(); }
+    if (data.ok) { showToast('已批准'); loadWaitlist(); loadAdminSchedulePreview(); }
   } catch(e) { showToast('网络错误'); }
 }
 async function rejectWaitlist(idx) {
   try {
-    const res = await fetch(API + '/admin/reject-waitlist', {
+    const rows = document.querySelectorAll('#waitlistPending .req-card');
+    const card = rows[idx];
+    if (!card) return;
+    const name = card.dataset.name;
+    const day = card.dataset.day;
+    const slotId = card.dataset.slot;
+    const res = await fetch(API + '/admin/waitlist/reject', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({index:idx})
+      body: JSON.stringify({name, day, slotId})
     });
     const data = await res.json();
-    if (data.ok) { showToast('已拒绝'); loadWaitlist(); }
+    if (data.ok) { showToast('已拒绝'); loadWaitlist(); loadAdminSchedulePreview(); }
   } catch(e) { showToast('网络错误'); }
 }
 async function loadCancelRequests() {
@@ -3148,7 +3160,7 @@ async function approveCancel(idx) {
       body: JSON.stringify({name, day, slotId})
     });
     const data = await res.json();
-    if (data.ok) { showToast('已批准取消'); loadCancelRequests(); loadSchedule(); }
+    if (data.ok) { showToast('已批准取消'); loadCancelRequests(); loadAdminSchedulePreview(); }
     else showToast(data.msg || '操作失败');
   } catch(e) { showToast('网络错误'); }
 }
