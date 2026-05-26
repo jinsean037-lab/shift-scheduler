@@ -574,7 +574,9 @@ body {
 .cell.mine .time-label { color: rgba(255,255,255,0.7); }
 .cell.mine .period-badge { background: rgba(255,255,255,0.2); color: white; }
 .cell.mine .time-label { color: rgba(255,255,255,0.7); }
-.cell.full { background: #f5f5f5; border-color: #e8e8e8; cursor: not-allowed; opacity: 0.65; }
+.cell.full { background: #e8e8e8; border-color: #ccc; cursor: not-allowed; }
+.cell.full .names { color: #555; }
+.cell.full .count { color: #999; }
 .cell .names { font-size: 12px; line-height: 1.5; margin-top: 3px; }
 .cell .count {
   position: absolute; top: 4px; right: 6px;
@@ -631,7 +633,7 @@ body {
   display: inline-block; width: 12px; height: 12px; border-radius: 3px;
 }
 .legend-color.selected { background: var(--primary); }
-.legend-color.full { background: #f5f5f5; border: 1px solid #ddd; }
+.legend-color.full { background: #e8e8e8; border: 1px solid #ccc; }
 .legend-color.available { background: #fff; border: 1px solid #ddd; }
 
 /* 我的班次 */
@@ -1739,8 +1741,14 @@ function closeConfirm() {
   document.getElementById('confirmModal').classList.remove('show');
   window._confirmAction = null;
 }
-function confirmAction() {
-  if (window._confirmAction) { window._confirmAction(); }
+async function confirmAction() {
+  if (window._confirmAction) {
+    try {
+      await window._confirmAction();
+    } catch(e) {
+      console.error('confirm action error:', e);
+    }
+  }
   closeConfirm();
 }
 
