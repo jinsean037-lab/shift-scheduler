@@ -2009,18 +2009,17 @@ async function loadSchedule() {
     allScheduleData = await res.json();
     
     const currentSchedule = allScheduleData.current && allScheduleData.current.schedule ? allScheduleData.current.schedule : {};
-    const isConfirmed = !!(allScheduleData.current && allScheduleData.current.start && allScheduleData.current.end);
+    // 只在真正有归档记录时才算"已确认"
     const hasHistory = allScheduleData.confirmedPeriods && allScheduleData.confirmedPeriods.length > 0;
+    const hasScheduleData = currentSchedule && Object.keys(currentSchedule).length > 0;
     
-    // 草稿为空且已确认过 → 显示提示
-    if (!currentSchedule || Object.keys(currentSchedule).length === 0) {
-      if (isConfirmed || hasHistory) {
-        const grid = document.getElementById('scheduleGrid');
-        if (grid) {
-          grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#888"><p style="font-size:16px;margin-bottom:12px">📋 当前暂无选班中的排班</p><p style="font-size:13px">当前排班已确认完成，请前往 <a href="#" onclick="switchTab(\'history\');return false" style="color:#8B1A1A;font-weight:bold">历史排班</a> 查看</p></div>';
-        }
-        return;
+    // 只有 schedule 完全空 且 有历史归档记录 → 才显示"已确认"提示
+    if (!hasScheduleData && hasHistory) {
+      const grid = document.getElementById('scheduleGrid');
+      if (grid) {
+        grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#888"><p style="font-size:16px;margin-bottom:12px">📋 当前暂无选班中的排班</p><p style="font-size:13px">当前排班已确认完成，请前往 <a href="#" onclick="switchTab(\'history\');return false" style="color:#8B1A1A;font-weight:bold">历史排班</a> 查看</p></div>';
       }
+      return;
     }
     
     // 选班页面始终以可编辑模式渲染（confirmed 只用于历史排班只读展示）
