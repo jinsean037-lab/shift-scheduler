@@ -2083,9 +2083,16 @@ function switchPeriod(periodKey) {
 function renderSchedule(data) {
   const targetId = data.targetGrid || 'scheduleGrid';
   const grid = document.getElementById(targetId);
+  // 选班模式（草稿、未确认、非历史）：即使没有数据也渲染空表格，让用户可以选班
+  const isPickMode = !(data.isHistory || data.confirmed);
   if (!data.schedule || Object.keys(data.schedule).length === 0) { 
-    grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">该时间段暂无排班数据</p>'; 
-    return; 
+    if (isPickMode) {
+      // 选班模式：渲染空表格供选班
+      data.schedule = {};
+    } else {
+      grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">该时间段暂无排班数据</p>'; 
+      return;
+    }
   }
   console.log('[renderSchedule] currentUser="' + currentUser + '", schedule=', JSON.stringify(data.schedule));
   const days = ['周一','周二','周三','周四','周五'];
