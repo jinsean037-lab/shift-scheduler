@@ -595,7 +595,8 @@ app.post('/api/admin/reset', async (req, res) => {
     store.scheduleTime = {}
     store.waitlist = []
     store.cancelRequests = []
-    // 保留 scheduleStart/scheduleEnd，因为那是当前草稿周期的时间范围
+    store.scheduleStart = null
+    store.scheduleEnd = null
     await writeStore(store)
     res.json({ ok: true })
   } catch (e) {
