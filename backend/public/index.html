@@ -1974,12 +1974,13 @@ async function loadSchedule() {
     const res = await fetch(API + '/schedule-all');
     allScheduleData = await res.json();
     
-    // 默认显示当前草稿排班
+    // 默认显示当前草稿排班（处理 current 为 null 的情况）
+    const currentSchedule = allScheduleData.current && allScheduleData.current.schedule ? allScheduleData.current.schedule : {};
     renderSchedule({ 
-      schedule: allScheduleData.current.schedule,
-      scheduleStart: allScheduleData.current.start,
-      scheduleEnd: allScheduleData.current.end,
-      confirmed: !!(allScheduleData.current.start && allScheduleData.current.end)
+      schedule: currentSchedule,
+      scheduleStart: allScheduleData.current ? allScheduleData.current.start : null,
+      scheduleEnd: allScheduleData.current ? allScheduleData.current.end : null,
+      confirmed: !!(allScheduleData.current && allScheduleData.current.start && allScheduleData.current.end)
     });
     
     // 更新日期筛选器
@@ -2181,7 +2182,7 @@ async function joinWaitlist(day, slot) {
   try {
     const res = await fetch(API + '/waitlist', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name:currentUser,day,slot})
+      body: JSON.stringify({name:currentUser,day,slotId:slot})
     });
     const data = await res.json();
     if (data.ok) showToast('已加入候补');
