@@ -1736,7 +1736,7 @@ function showConfirm(title, msg, action) {
   window._confirmAction = action;
   document.getElementById('confirmModal').classList.add('show');
 }
-window.confirmAction = null;
+window._confirmAction = null;
 function closeConfirm() {
   document.getElementById('confirmModal').classList.remove('show');
   window._confirmAction = null;
