@@ -2350,7 +2350,7 @@ function renderWaitlist(wl) {
     html += '<div class="shift-card" style="border-left:4px solid ' + statusColor + '">';
     html += '<div style="display:flex;align-items:center;gap:8px">';
     html += '<div class="shift-day">' + w.day + '</div>';
-    html += '<div class="shift-slot">' + ((slotLabel(w.slotId||w.slot)||w.slotId||w.slot||" )||w.slot||'') + '</div>';
+    html += '<div class="shift-slot">' + (slotLabel(w.slotId || w.slot) || w.slotId || w.slot || '') + '</div>';
     html += statusTag;
     html += '</div>';
     if (st === 'pending') {
@@ -3090,7 +3090,7 @@ async function loadWaitlist() {
     let html = '';
     data.waitlist.forEach((w,i) => {
       html += '<div class="req-card">';
-      html += '<div class="req-info"><div class="req-name">' + w.name + '</div><div class="req-detail">' + w.day + ' ' + (slotLabel(w.slotId||w.slot)||w.slotId||w.slot||" ) + '</div></div>';
+      html += '<div class="req-info"><div class="req-name">' + w.name + '</div><div class="req-detail">' + w.day + ' ' + (slotLabel(w.slotId || w.slot) || w.slotId || w.slot || '') + '</div></div>';
       html += '<div class="req-actions"><button class="approve-btn" onclick="approveWaitlist(' + i + ')">✓ 批准</button><button class="reject-btn" onclick="rejectWaitlist(' + i + ')">✕ 拒绝</button></div>';
       html += '</div>';
     });
