@@ -1530,11 +1530,17 @@ body {
       <div class="page-view" id="scheduleView">
         <div class="page-title-row">
           <h2>排班表</h2>
-          <p class="page-subtitle">点击格子选择值班时段</p>
+          <p class="page-subtitle">查看当前或历史排班情况</p>
         </div>
-        <div class="tip-bar">
-          💡 点击格子选择时段（先到先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟需提交申请。每时段最多 <span id="maxHint">2</span> 人，满了可申请候补。
+        <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:13px;color:#666;font-weight:600">查看时间段：</label>
+          <select id="periodSelector" onchange="switchPeriod(this.value)" style="min-width:200px;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;cursor:pointer">
+            <option value="current">当前草稿</option>
+          </select>
           <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>
+        </div>
+        <div class="tip-bar" id="scheduleTipBar">
+          💡 点击格子选择时段（先到先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟需提交申请。每时段最多 <span id="maxHint">2</span> 人，满了可申请候补。
         </div>
         <div class="table-wrap">
           <div id="scheduleGrid"></div>
@@ -1960,16 +1966,79 @@ async function loadConfig() {
 }
 
 // ========== 排班表 ==========
+let allScheduleData = { current: null, confirmedPeriods: [], scheduleTime: {} };
+
 async function loadSchedule() {
   try {
-    const res = await fetch(API + '/schedule');
-    const data = await res.json();
-    renderSchedule(data);
+    // 加载所有排班数据（当前草稿 + 历史归档）
+    const res = await fetch(API + '/schedule-all');
+    allScheduleData = await res.json();
+    
+    // 默认显示当前草稿排班
+    renderSchedule({ 
+      schedule: allScheduleData.current.schedule,
+      scheduleStart: allScheduleData.current.start,
+      scheduleEnd: allScheduleData.current.end,
+      confirmed: !!(allScheduleData.current.start && allScheduleData.current.end)
+    });
+    
+    // 更新日期筛选器
+    updatePeriodSelector();
   } catch(e) { console.error('加载排班表失败', e); }
+}
+
+// 更新时间段选择器
+function updatePeriodSelector() {
+  const selector = document.getElementById('periodSelector');
+  if (!selector) return;
+  
+  let options = '<option value="current">当前草稿</option>';
+  
+  // 添加已确认的历史排班
+  if (allScheduleData.confirmedPeriods && allScheduleData.confirmedPeriods.length > 0) {
+    allScheduleData.confirmedPeriods.forEach((period, idx) => {
+      const start = period.start ? new Date(period.start).toLocaleDateString() : '?';
+      const end = period.end ? new Date(period.end).toLocaleDateString() : '?';
+      options += `<option value="period_${idx}">已确认: ${start} ~ ${end}</option>`;
+    });
+  }
+  
+  selector.innerHTML = options;
+}
+
+// 切换查看的时间段
+function switchPeriod(periodKey) {
+  const tipBar = document.getElementById('scheduleTipBar');
+  
+  if (periodKey === 'current') {
+    renderSchedule({ 
+      schedule: allScheduleData.current.schedule,
+      scheduleStart: allScheduleData.current.start,
+      scheduleEnd: allScheduleData.current.end,
+      confirmed: !!(allScheduleData.current.start && allScheduleData.current.end)
+    });
+    if (tipBar) tipBar.style.display = 'block';
+  } else if (periodKey.startsWith('period_')) {
+    const idx = parseInt(periodKey.replace('period_', ''));
+    const period = allScheduleData.confirmedPeriods[idx];
+    if (period) {
+      renderSchedule({ 
+        schedule: period.schedule,
+        scheduleStart: period.start,
+        scheduleEnd: period.end,
+        confirmed: true,
+        isHistory: true
+      });
+    }
+    if (tipBar) tipBar.style.display = 'none';
+  }
 }
 function renderSchedule(data) {
   const grid = document.getElementById('scheduleGrid');
-  if (!data.schedule) { grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">暂无数据</p>'; return; }
+  if (!data.schedule || Object.keys(data.schedule).length === 0) { 
+    grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">该时间段暂无排班数据</p>'; 
+    return; 
+  }
   console.log('[renderSchedule] currentUser="' + currentUser + '", schedule=', JSON.stringify(data.schedule));
   const days = ['周一','周二','周三','周四','周五'];
   const slots = [
@@ -1995,8 +2064,9 @@ function renderSchedule(data) {
       if (assigned.length > 0) {
         inner = '<div class="names">' + assigned.join('、') + '</div>';
       }
-      if (configData.confirmed) {
-        // 已确认：不显示任何操作按钮
+      // 历史排班或已确认：只读，不显示操作按钮
+      if (data.isHistory || data.confirmed) {
+        // 只读模式
       } else if (count < max && !isMe && currentRole !== 'admin') {
         inner += '<button class="pick-btn" onclick="pickSlot(\'' + d + '\',\'' + s.key + '\')">选择</button>';
       } else if (isMe) {
@@ -2023,12 +2093,19 @@ function renderSchedule(data) {
   const oldBadge = grid.parentElement.querySelector('.schedule-badge');
   if (oldBadge) oldBadge.remove();
 
-  // 已确认排班表时隐藏操作按钮，显示锁定标识
-  if (configData.confirmed) {
+  // 显示状态标识
+  if (data.isHistory) {
+    // 历史归档排班
+    const badge = document.createElement('div');
+    badge.className = 'schedule-badge';
+    badge.style.cssText = 'text-align:center;margin-bottom:8px;color:#666;font-size:14px';
+    badge.textContent = '📜 历史排班（' + (data.scheduleStart ? new Date(data.scheduleStart).toLocaleDateString() : '') + ' ~ ' + (data.scheduleEnd ? new Date(data.scheduleEnd).toLocaleDateString() : '') + '）- 已归档';
+    grid.parentElement.insertBefore(badge, grid);
+  } else if (data.confirmed) {
     const badge = document.createElement('div');
     badge.className = 'schedule-badge';
     badge.style.cssText = 'text-align:center;margin-bottom:8px;color:var(--success);font-weight:700;font-size:14px';
-    badge.textContent = '✅ 排班表已确认（' + (configData.scheduleStart ? new Date(configData.scheduleStart).toLocaleDateString() : '') + ' ~ ' + (configData.scheduleEnd ? new Date(configData.scheduleEnd).toLocaleDateString() : '') + '）';
+    badge.textContent = '✅ 排班表已确认（' + (data.scheduleStart ? new Date(data.scheduleStart).toLocaleDateString() : '') + ' ~ ' + (data.scheduleEnd ? new Date(data.scheduleEnd).toLocaleDateString() : '') + '）';
     grid.parentElement.insertBefore(badge, grid);
     grid.querySelectorAll('.pick-btn,.cancel-btn,.waitlist-btn').forEach(b => b.remove());
   } else {
@@ -2235,61 +2312,71 @@ async function revokeCancel(day, slotId) {
 async function loadHomeStats() {
   if (!currentUser) return;
   try {
-    // 先获取 config 检查排班确认状态
-    const cfgRes = await fetch(API + '/config');
-    const cfgData = await cfgRes.json();
-    // 更新全局 configData
-    configData = cfgData;
-
-    if (!cfgData.confirmed) {
-      // 草稿状态：首页统计区域显示提示
-      document.getElementById('statTotalShifts').textContent = '-';
-      document.getElementById('statTotalHours').textContent = '-';
-      document.getElementById('statAmCount').textContent = '-';
-      document.getElementById('statPmCount').textContent = '-';
-      const note = document.getElementById('homeScheduleNote');
-      if (note) note.textContent = '排班尚在草稿阶段，确认后统计数据将在此显示';
-      return;
-    }
-
-    const res = await fetch(API + '/my-shifts?name=' + encodeURIComponent(currentUser));
-    const data = await res.json();
-    const shifts = data.shifts || [];
+    // 获取所有排班数据（当前草稿 + 历史归档）
+    const res = await fetch(API + '/schedule-all');
+    const allData = await res.json();
+    
     const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth();
-    const today = now.getDate();
-    const todayWeekDay = now.getDay(); // 0=周日
+    const todayStr = now.toISOString().slice(0, 10);
+    const nowTime = now.getTime();
 
-    // 将 day(周一~周五) 映射到本月实际日期列表
-    const dayNameMap = {'周日':0,'周一':1,'周二':2,'周三':3,'周四':4,'周五':5,'周六':6};
-    const daysInMonth = new Date(y, m+1, 0).getDate();
-
-    function getDatesForDay(dayName) {
-      const targetWd = dayNameMap[dayName];
-      if (targetWd === undefined) return [];
-      const dates = [];
-      for (let d=1; d<=daysInMonth; d++) {
-        if (new Date(y, m, d).getDay() === targetWd) dates.push(d);
-      }
-      return dates;
+    // 合并所有排班：历史归档 + 当前草稿
+    let allShifts = [];
+    
+    // 从历史归档中提取该成员的班次
+    if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
+      allData.confirmedPeriods.forEach(period => {
+        if (!period.schedule) return;
+        const periodStart = period.start ? new Date(period.start).getTime() : 0;
+        const periodEnd = period.end ? new Date(period.end).getTime() : Infinity;
+        
+        Object.keys(period.schedule).forEach(day => {
+          Object.keys(period.schedule[day]).forEach(slot => {
+            const names = period.schedule[day][slot];
+            if (names && names.includes(currentUser)) {
+              allShifts.push({
+                day, slot, slotId: slot,
+                periodStart: period.start,
+                periodEnd: period.end,
+                periodStartTime: periodStart,
+                periodEndTime: periodEnd
+              });
+            }
+          });
+        });
+      });
+    }
+    
+    // 从当前草稿中提取该成员的班次
+    if (allData.current && allData.current.schedule) {
+      const currentSchedule = allData.current.schedule;
+      const periodStart = allData.current.start ? new Date(allData.current.start).getTime() : 0;
+      const periodEnd = allData.current.end ? new Date(allData.current.end).getTime() : Infinity;
+      
+      Object.keys(currentSchedule).forEach(day => {
+        Object.keys(currentSchedule[day]).forEach(slot => {
+          const names = currentSchedule[day][slot];
+          if (names && names.includes(currentUser)) {
+            allShifts.push({
+              day, slot, slotId: slot,
+              periodStart: allData.current.start,
+              periodEnd: allData.current.end,
+              periodStartTime: periodStart,
+              periodEndTime: periodEnd
+            });
+          }
+        });
+      });
     }
 
-    // 判断一个班次是否已过期（今天及之前）
-    function isPastOrToday(shift) {
-      const dates = getDatesForDay(shift.day);
-      // 取最后一个匹配日期与今天比较（本周/下周语义：如果本周该日已过算过期）
-      const lastDate = dates.length ? dates[dates.length-1] : 0;
-      return lastDate > 0 && lastDate <= today;
-    }
-
-    // 过滤出今天及之前的班次（已完成）
-    const completedShifts = shifts.filter(s => isPastOrToday(s));
-    const upcomingShifts = shifts.filter(s => !isPastOrToday(s));
+    // 判断班次是否已完成（班次结束时间 < 当前时间）
+    const completedShifts = allShifts.filter(s => s.periodEndTime && s.periodEndTime < nowTime);
+    const upcomingShifts = allShifts.filter(s => !s.periodEndTime || s.periodEndTime >= nowTime);
 
     // 统计卡片更新
     document.getElementById('statTotalShifts').textContent = completedShifts.length;
 
-    // 累计时长（只算已完成的，每个时段按2h估算 + 补报已批准的）
+    // 累计时长（已完成班次 + 补报已批准的）
     const hoursPerSlot = 2;
     let totalHours = completedShifts.length * hoursPerSlot;
     try {
@@ -2300,7 +2387,7 @@ async function loadHomeStats() {
     } catch(e) { /* 补报加载失败不影响主流程 */ }
     document.getElementById('statTotalHours').textContent = totalHours + 'h';
 
-    // 早班/午班次数（只算已完成的）
+    // 早班/午班次数
     const morning = completedShifts.filter(s => s.slot && s.slot.startsWith('am')).length;
     const afternoon = completedShifts.filter(s => s.slot && s.slot.startsWith('pm')).length;
     document.getElementById('statMorningShifts').textContent = morning;
@@ -2313,10 +2400,11 @@ async function loadHomeStats() {
     if (hoursLabel) hoursLabel.textContent = '已累计时长';
 
     // 渲染本周排班（全部显示）
-    renderMyShifts(shifts);
+    renderMyShifts(allShifts);
 
-    // 渲染日历热力图（按生效时间范围过滤）
-    renderCalendar(shifts, y, m, cfgData.scheduleStart, cfgData.scheduleEnd);
+    // 渲染日历热力图
+    const y = now.getFullYear(), m = now.getMonth();
+    renderCalendar(allShifts, y, m, null, null);
   } catch(e) { console.error('加载首页统计失败', e); }
 }
 
@@ -2574,26 +2662,26 @@ function renderCalendar(shifts, year, month, scheduleStart, scheduleEnd) {
   if (!grid) return;
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
+  const now = new Date();
+  const nowTime = now.getTime();
 
-  // 解析生效时间范围
-  const rangeStart = scheduleStart ? new Date(scheduleStart) : null;
-  const rangeEnd = scheduleEnd ? new Date(scheduleEnd) : null;
-
-  // 根据 day(周一~周五) 映射到本月实际日期，并过滤生效范围
+  // 根据 day(周一~周五) 映射到本月实际日期
   const dayNameMap = {'周日':0,'周一':1,'周二':2,'周三':3,'周四':4,'周五':5,'周六':6};
-  const shiftMap = {};
+  const shiftMap = {}; // { date: { total: n, completed: m } }
+  
   shifts.forEach(s => {
     const targetWeekDay = dayNameMap[s.day];
     if (targetWeekDay === undefined) return;
+    
     // 找到本月所有匹配该星期的日期
     for (let d=1; d<=daysInMonth; d++) {
       if (new Date(year, month, d).getDay() === targetWeekDay) {
-        // 过滤：只计入生效时间范围内的日期
-        const cur = new Date(year, month, d);
-        if (rangeStart && cur < rangeStart) continue;
-        if (rangeEnd && cur > rangeEnd) continue;
-        if (!shiftMap[d]) shiftMap[d] = 0;
-        shiftMap[d]++;
+        if (!shiftMap[d]) shiftMap[d] = { total: 0, completed: 0 };
+        shiftMap[d].total++;
+        // 如果该排班周期已结束，标记为已完成
+        if (s.periodEndTime && s.periodEndTime < nowTime) {
+          shiftMap[d].completed++;
+        }
       }
     }
   });
@@ -2604,17 +2692,24 @@ function renderCalendar(shifts, year, month, scheduleStart, scheduleEnd) {
 
   // 月初空白
   for (let i=0;i<firstDay;i++) { html += '<div class="cal-cell cal-empty"></div>'; }
-  const today = new Date();
   for (let d=1;d<=daysInMonth;d++) {
-    const cnt = shiftMap[d] || 0;
+    const info = shiftMap[d] || { total: 0, completed: 0 };
+    const total = info.total;
+    const completed = info.completed;
     let cls = 'cal-cell ';
-    if (cnt===0) cls += 'cal-none';
-    else if (cnt===1) cls += 'cal-1';
-    else if (cnt===2) cls += 'cal-2';
-    else cls += 'cal-3plus';
-    if (year===today.getFullYear()&&month===today.getMonth()&&d===today.getDate()) cls += ' cal-today';
+    if (total === 0) cls += 'cal-none';
+    else if (completed === total) cls += 'cal-2'; // 全部完成
+    else if (completed > 0) cls += 'cal-1'; // 部分完成
+    else cls += 'cal-3plus'; // 未开始
+    if (year===now.getFullYear()&&month===now.getMonth()&&d===now.getDate()) cls += ' cal-today';
     html += '<div class="' + cls + '"><div class="cal-day">' + d + '</div>';
-    if (cnt>0) html += '<div class="cal-count">' + cnt + '班</div>';
+    if (total>0) {
+      if (completed === total) {
+        html += '<div class="cal-count" style="color:#8B1A1A">✓ ' + completed + '班</div>';
+      } else {
+        html += '<div class="cal-count">' + completed + '/' + total + '班</div>';
+      }
+    }
     html += '</div>';
   }
   grid.innerHTML = html;
