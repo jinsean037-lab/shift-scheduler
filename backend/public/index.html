@@ -2023,11 +2023,12 @@ async function loadSchedule() {
       }
     }
     
+    // 选班页面始终以可编辑模式渲染（confirmed 只用于历史排班只读展示）
     renderSchedule({ 
       schedule: currentSchedule,
       scheduleStart: allScheduleData.current ? allScheduleData.current.start : null,
       scheduleEnd: allScheduleData.current ? allScheduleData.current.end : null,
-      confirmed: isConfirmed
+      confirmed: false
     });
   } catch(e) { console.error('加载排班表失败', e); }
 }
