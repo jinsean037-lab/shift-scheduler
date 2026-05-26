@@ -1379,7 +1379,10 @@ body {
           <span class="nav-icon">🏠</span><span>首页概览</span>
         </a>
         <a class="nav-item" data-page="schedule" onclick="switchTab('schedule')">
-          <span class="nav-icon">📅</span><span>排班表</span>
+          <span class="nav-icon">📅</span><span>选班</span>
+        </a>
+        <a class="nav-item" data-page="history" onclick="switchTab('history')">
+          <span class="nav-icon">📜</span><span>历史排班</span>
         </a>
         <a class="nav-item" data-page="checkin" onclick="switchTab('checkin')">
           <span class="nav-icon">📍</span><span>值班打卡</span>
@@ -1527,23 +1530,38 @@ body {
       </div>
 
       <!-- ===== 排班表视图 ===== -->
+      <!-- ===== 排班表视图（选班） ===== -->
       <div class="page-view" id="scheduleView">
         <div class="page-title-row">
-          <h2>排班表</h2>
-          <p class="page-subtitle">查看当前或历史排班情况</p>
-        </div>
-        <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <label style="font-size:13px;color:#666;font-weight:600">查看时间段：</label>
-          <select id="periodSelector" onchange="switchPeriod(this.value)" style="min-width:200px;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;cursor:pointer">
-            <option value="current">当前草稿</option>
-          </select>
-          <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>
+          <h2>📋 选班</h2>
+          <p class="page-subtitle">点击格子选择你想要的值班时段</p>
         </div>
         <div class="tip-bar" id="scheduleTipBar">
           💡 点击格子选择时段（先到先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟需提交申请。每时段最多 <span id="maxHint">2</span> 人，满了可申请候补。
         </div>
+        <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>
+        </div>
         <div class="table-wrap">
           <div id="scheduleGrid"></div>
+        </div>
+      </div>
+
+      <!-- ===== 历史排班视图（只读） ===== -->
+      <div class="page-view" id="historyView">
+        <div class="page-title-row">
+          <h2>📜 历史排班</h2>
+          <p class="page-subtitle">查看已确认生效的历史排班记录</p>
+        </div>
+        <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:13px;color:#666;font-weight:600">选择周期：</label>
+          <select id="periodSelector" onchange="switchPeriod(this.value)" style="min-width:200px;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;cursor:pointer">
+            <option value="">-- 请选择已确认的排班周期 --</option>
+          </select>
+          <button class="refresh-btn" onclick="updatePeriodSelector()">🔄 刷新列表</button>
+        </div>
+        <div class="table-wrap">
+          <div id="historyGrid"></div>
         </div>
       </div>
 
@@ -1812,16 +1830,12 @@ function switchTab(tab) {
     document.getElementById('scheduleView').classList.add('active');
     const nav = document.querySelector('.nav-item[data-page="schedule"]');
     if (nav) nav.classList.add('active');
-    // 兼容旧 tab 样式
-    const tabEl = document.getElementById('tabsBar');
-    if (tabEl) { 
-      Array.from(tabEl.children).forEach(t => t.classList.remove('active'));
-      const st = document.getElementById('myShiftsTab');
-      if (st) st.classList.remove('active');
-      const schTab = tabEl.querySelector('.tab');
-      if (schTab) schTab.classList.add('active');
-    }
     loadSchedule();
+  } else if (tab === 'history') {
+    document.getElementById('historyView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="history"]');
+    if (nav) nav.classList.add('active');
+    loadHistorySchedule();
   } else if (tab === 'checkin') {
     document.getElementById('checkinView').classList.add('active');
     const nav = document.querySelector('.nav-item[data-page="checkin"]');
@@ -1986,11 +2000,10 @@ let allScheduleData = { current: null, confirmedPeriods: [], scheduleTime: {} };
 
 async function loadSchedule() {
   try {
-    // 加载所有排班数据（当前草稿 + 历史归档）
+    // 选班页面：只加载当前草稿排班
     const res = await fetch(API + '/schedule-all');
     allScheduleData = await res.json();
     
-    // 默认显示当前草稿排班（处理 current 为 null 的情况）
     const currentSchedule = allScheduleData.current && allScheduleData.current.schedule ? allScheduleData.current.schedule : {};
     renderSchedule({ 
       schedule: currentSchedule,
@@ -1998,20 +2011,32 @@ async function loadSchedule() {
       scheduleEnd: allScheduleData.current ? allScheduleData.current.end : null,
       confirmed: !!(allScheduleData.current && allScheduleData.current.start && allScheduleData.current.end)
     });
-    
-    // 更新日期筛选器
-    updatePeriodSelector();
   } catch(e) { console.error('加载排班表失败', e); }
 }
 
-// 更新时间段选择器
+// 历史排班：加载已确认的周期列表
+async function loadHistorySchedule() {
+  try {
+    const res = await fetch(API + '/schedule-all');
+    allScheduleData = await res.json();
+    updatePeriodSelector();
+    
+    // 默认清空历史表格
+    const grid = document.getElementById('historyGrid');
+    if (grid) {
+      grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">请在上方选择一个已确认的排班周期</p>';
+    }
+  } catch(e) { console.error('加载历史排班失败', e); }
+}
+
+// 更新时间段选择器（历史排班页面）
 function updatePeriodSelector() {
   const selector = document.getElementById('periodSelector');
   if (!selector) return;
   
-  let options = '<option value="current">当前草稿</option>';
+  let options = '<option value="">-- 请选择已确认的排班周期 --</option>';
   
-  // 添加已确认的历史排班
+  // 只添加已确认的历史排班（不含当前草稿）
   if (allScheduleData.confirmedPeriods && allScheduleData.confirmedPeriods.length > 0) {
     allScheduleData.confirmedPeriods.forEach((period, idx) => {
       const start = period.start ? new Date(period.start).toLocaleDateString() : '?';
@@ -2023,18 +2048,23 @@ function updatePeriodSelector() {
   selector.innerHTML = options;
 }
 
-// 切换查看的时间段
+// 切换查看的时间段（历史排班页面）
 function switchPeriod(periodKey) {
-  const tipBar = document.getElementById('scheduleTipBar');
+  const grid = document.getElementById('historyGrid');
+  
+  if (!periodKey || periodKey === '') {
+    if (grid) grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">请在上方选择一个已确认的排班周期</p>';
+    return;
+  }
   
   if (periodKey === 'current') {
     renderSchedule({ 
       schedule: allScheduleData.current.schedule,
       scheduleStart: allScheduleData.current.start,
       scheduleEnd: allScheduleData.current.end,
-      confirmed: !!(allScheduleData.current.start && allScheduleData.current.end)
+      confirmed: !!(allScheduleData.current.start && allScheduleData.current.end),
+      targetGrid: 'historyGrid'
     });
-    if (tipBar) tipBar.style.display = 'block';
   } else if (periodKey.startsWith('period_')) {
     const idx = parseInt(periodKey.replace('period_', ''));
     const period = allScheduleData.confirmedPeriods[idx];
@@ -2044,14 +2074,15 @@ function switchPeriod(periodKey) {
         scheduleStart: period.start,
         scheduleEnd: period.end,
         confirmed: true,
-        isHistory: true
+        isHistory: true,
+        targetGrid: 'historyGrid'
       });
     }
-    if (tipBar) tipBar.style.display = 'none';
   }
 }
 function renderSchedule(data) {
-  const grid = document.getElementById('scheduleGrid');
+  const targetId = data.targetGrid || 'scheduleGrid';
+  const grid = document.getElementById(targetId);
   if (!data.schedule || Object.keys(data.schedule).length === 0) { 
     grid.innerHTML = '<p style="color:#999;text-align:center;padding:40px">该时间段暂无排班数据</p>'; 
     return; 
