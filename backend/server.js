@@ -735,12 +735,13 @@ app.post('/api/admin/waitlist/approve', async (req, res) => {
   try {
     const { name, day, slotId } = req.body
     const store = await readStore()
-    const key = `${day}|${slotId}`
-    if (!store.schedule[key]) store.schedule[key] = []
-    const list = store.schedule[key]
+    // 使用嵌套格式
+    if (!store.schedule[day]) store.schedule[day] = {}
+    if (!store.schedule[day][slotId]) store.schedule[day][slotId] = []
+    const list = store.schedule[day][slotId]
     if (list.length >= 3) return res.json({ ok: false, msg: '该时段已有3人，无法继续添加' })
     if (!list.includes(name)) list.push(name)
-    store.scheduleTime[`${key}|${name}`] = Date.now()
+    store.scheduleTime[`${day}|${slotId}|${name}`] = Date.now()
     const item = store.waitlist.find(w => w.name === name && w.day === day && w.slotId === slotId)
     if (item) item.status = 'approved'
     await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, waitlist: store.waitlist })
