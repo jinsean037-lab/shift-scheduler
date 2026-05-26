@@ -1585,6 +1585,21 @@ body {
           <h3>📊 当前排班状态</h3>
           <div id="scheduleStatusInfo" style="padding:16px;background:#f8f9fa;border-radius:8px;font-size:14px"></div>
         </div>
+        
+        <!-- 设置选班开始时间 -->
+        <div class="admin-section">
+          <h3>⏰ 设置选班开始时间</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">设置后，成员在此时间前无法选班/候补，用于统一开放选班时间。</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <input type="datetime-local" id="startTimeInput" style="min-width:200px;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
+            <span id="startTimeStatus" style="font-size:13px;color:#888"></span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="admin-btn" onclick="saveStartTime()">💾 保存</button>
+            <button class="admin-btn" style="background:#e0e0e0;color:#666" onclick="clearStartTime()">清除</button>
+          </div>
+        </div>
+        
         <!-- 设置排班执行时间（起止） -->
         <div class="admin-section">
           <h3>⏰ 设置排班执行时间</h3>
@@ -1827,6 +1842,7 @@ function switchTab(tab) {
     highlightAdminSub('admin-schedule');
     loadScheduleStatus();
     loadScheduleTimeRange();
+    loadStartTime();
     loadAdminSchedulePreview();
     loadMembers(); // for assign dropdown
   } else if (tab === 'admin-waitlist') {
