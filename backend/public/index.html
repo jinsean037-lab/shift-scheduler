@@ -2735,12 +2735,12 @@ async function removeMember(name) {
 async function adminAssign() {
   const name = document.getElementById('assignMember').value;
   const day = document.getElementById('assignDay').value;
-  const slot = document.getElementById('assignSlot').value;
-  if (!name||!day||!slot) { showToast('请填写完整'); return; }
+  const slotId = document.getElementById('assignSlot').value;
+  if (!name||!day||!slotId) { showToast('请填写完整'); return; }
   try {
     const res = await fetch(API + '/admin/assign', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name,day,slot})
+      body: JSON.stringify({name,day,slotId})
     });
     const data = await res.json();
     if (data.ok) { showToast('分配成功'); loadSchedule(); }
