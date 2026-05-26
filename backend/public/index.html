@@ -2212,9 +2212,11 @@ function renderMyShifts(shifts, forHome) {
   let html = '<div class="shift-list">';
   shifts.forEach(s => {
     const cls = forHome ? 'shift-card shift-card-sm' : 'shift-card';
+    // 用 slotLabel() 转换 slotId 为可读标签
+    const displaySlot = (typeof slotLabel === 'function') ? (slotLabel(s.slotId || s.slot)) : (s.slotId || s.slot);
     html += '<div class="' + cls + '">';
     html += '<div class="shift-day">' + s.day + '</div>';
-    html += '<div class="shift-slot">' + (s.slotLabel || s.slot) + '</div>';
+    html += '<div class="shift-slot">' + displaySlot + '</div>';
     if (!forHome) { html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>'; }
     html += '</div>';
   });
@@ -2320,10 +2322,13 @@ async function loadHomeStats() {
     const todayStr = now.toISOString().slice(0, 10);
     const nowTime = now.getTime();
 
-    // 合并所有排班：历史归档 + 当前草稿
-    let allShifts = [];
+    // 判断当前是否为草稿状态（未确认）
+    const isDraft = !(allData.current && allData.current.start && allData.current.end);
+
+    // 只统计已确认的排班（历史归档），草稿不算
+    let confirmedShifts = [];
     
-    // 从历史归档中提取该成员的班次
+    // 从历史归档中提取该成员的班次（已确认的才统计）
     if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
       allData.confirmedPeriods.forEach(period => {
         if (!period.schedule) return;
@@ -2334,7 +2339,7 @@ async function loadHomeStats() {
           Object.keys(period.schedule[day]).forEach(slot => {
             const names = period.schedule[day][slot];
             if (names && names.includes(currentUser)) {
-              allShifts.push({
+              confirmedShifts.push({
                 day, slot, slotId: slot,
                 periodStart: period.start,
                 periodEnd: period.end,
@@ -2346,32 +2351,27 @@ async function loadHomeStats() {
         });
       });
     }
-    
-    // 从当前草稿中提取该成员的班次
-    if (allData.current && allData.current.schedule) {
-      const currentSchedule = allData.current.schedule;
-      const periodStart = allData.current.start ? new Date(allData.current.start).getTime() : 0;
-      const periodEnd = allData.current.end ? new Date(allData.current.end).getTime() : Infinity;
-      
-      Object.keys(currentSchedule).forEach(day => {
-        Object.keys(currentSchedule[day]).forEach(slot => {
-          const names = currentSchedule[day][slot];
-          if (names && names.includes(currentUser)) {
-            allShifts.push({
-              day, slot, slotId: slot,
-              periodStart: allData.current.start,
-              periodEnd: allData.current.end,
-              periodStartTime: periodStart,
-              periodEndTime: periodEnd
-            });
-          }
-        });
-      });
+
+    // 如果是草稿状态，显示提示，不显示统计数据
+    if (isDraft && confirmedShifts.length === 0) {
+      document.getElementById('statTotalShifts').textContent = '-';
+      document.getElementById('statTotalHours').textContent = '-';
+      document.getElementById('statMorningShifts').textContent = '-';
+      document.getElementById('statAfternoonShifts').textContent = '-';
+      const note = document.getElementById('homeScheduleNote');
+      if (note) note.textContent = '排班尚在草稿阶段，确认后统计数据将在此显示';
+      // 清空日历
+      const calGrid = document.getElementById('calendarGrid');
+      if (calGrid) calGrid.innerHTML = '';
+      // 清空本周我的排班
+      const homeMy = document.getElementById('homeMyShifts');
+      if (homeMy) homeMy.innerHTML = '<p style="color:#999;text-align:center;padding:12px 0;font-size:13px">暂无已确认排班</p>';
+      return;
     }
 
     // 判断班次是否已完成（班次结束时间 < 当前时间）
-    const completedShifts = allShifts.filter(s => s.periodEndTime && s.periodEndTime < nowTime);
-    const upcomingShifts = allShifts.filter(s => !s.periodEndTime || s.periodEndTime >= nowTime);
+    const completedShifts = confirmedShifts.filter(s => s.periodEndTime && s.periodEndTime < nowTime);
+    const upcomingShifts = confirmedShifts.filter(s => !s.periodEndTime || s.periodEndTime >= nowTime);
 
     // 统计卡片更新
     document.getElementById('statTotalShifts').textContent = completedShifts.length;
@@ -2399,12 +2399,12 @@ async function loadHomeStats() {
     const hoursLabel = document.querySelector('#statTotalHours').closest('.stat-info').querySelector('.stat-label');
     if (hoursLabel) hoursLabel.textContent = '已累计时长';
 
-    // 渲染本周排班（全部显示）
-    renderMyShifts(allShifts);
+    // 渲染本周排班（只显示已确认的）
+    renderMyShifts(confirmedShifts);
 
-    // 渲染日历热力图
+    // 渲染日历热力图（只显示已确认的）
     const y = now.getFullYear(), m = now.getMonth();
-    renderCalendar(allShifts, y, m, null, null);
+    renderCalendar(confirmedShifts, y, m, null, null);
   } catch(e) { console.error('加载首页统计失败', e); }
 }
 
