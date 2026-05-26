@@ -2009,11 +2009,25 @@ async function loadSchedule() {
     allScheduleData = await res.json();
     
     const currentSchedule = allScheduleData.current && allScheduleData.current.schedule ? allScheduleData.current.schedule : {};
+    const isConfirmed = !!(allScheduleData.current && allScheduleData.current.start && allScheduleData.current.end);
+    const hasHistory = allScheduleData.confirmedPeriods && allScheduleData.confirmedPeriods.length > 0;
+    
+    // 草稿为空且已确认过 → 显示提示
+    if (!currentSchedule || Object.keys(currentSchedule).length === 0) {
+      if (isConfirmed || hasHistory) {
+        const grid = document.getElementById('scheduleGrid');
+        if (grid) {
+          grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#888"><p style="font-size:16px;margin-bottom:12px">📋 当前暂无选班中的排班</p><p style="font-size:13px">当前排班已确认完成，请前往 <a href="#" onclick="switchTab(\'history\');return false" style="color:#8B1A1A;font-weight:bold">历史排班</a> 查看</p></div>';
+        }
+        return;
+      }
+    }
+    
     renderSchedule({ 
       schedule: currentSchedule,
       scheduleStart: allScheduleData.current ? allScheduleData.current.start : null,
       scheduleEnd: allScheduleData.current ? allScheduleData.current.end : null,
-      confirmed: !!(allScheduleData.current && allScheduleData.current.start && allScheduleData.current.end)
+      confirmed: isConfirmed
     });
   } catch(e) { console.error('加载排班表失败', e); }
 }
@@ -2430,10 +2444,10 @@ async function loadHomeStats() {
     // 判断当前是否为草稿状态（未确认）
     const isDraft = !(allData.current && allData.current.start && allData.current.end);
 
-    // 只统计已确认的排班（历史归档），草稿不算
+    // 统计所有班次：已确认的（历史归档）+ 当前草稿
     let confirmedShifts = [];
     
-    // 从历史归档中提取该成员的班次（已确认的才统计）
+    // 从历史归档中提取该成员的班次（已确认的）
     if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
       allData.confirmedPeriods.forEach(period => {
         if (!period.schedule) return;
@@ -2457,14 +2471,36 @@ async function loadHomeStats() {
       });
     }
 
-    // 如果是草稿状态，显示提示，不显示统计数据
-    if (isDraft && confirmedShifts.length === 0) {
+    // 也从当前草稿中提取该成员的班次
+    const draftSchedule = allData.current && allData.current.schedule ? allData.current.schedule : {};
+    if (draftSchedule && Object.keys(draftSchedule).length > 0) {
+      const draftStart = allData.current.start ? new Date(allData.current.start).getTime() : 0;
+      const draftEnd = allData.current.end ? new Date(allData.current.end).getTime() : Infinity;
+      Object.keys(draftSchedule).forEach(day => {
+        if (typeof draftSchedule[day] !== 'object' || Array.isArray(draftSchedule[day])) return; // 跳过扁平格式残留
+        Object.keys(draftSchedule[day]).forEach(slot => {
+          const names = draftSchedule[day][slot];
+          if (names && names.includes(currentUser)) {
+            confirmedShifts.push({
+              day, slot, slotId: slot,
+              periodStart: allData.current.start,
+              periodEnd: allData.current.end,
+              periodStartTime: draftStart,
+              periodEndTime: draftEnd
+            });
+          }
+        });
+      });
+    }
+
+    // 如果完全没有班次数据，显示提示
+    if (confirmedShifts.length === 0) {
       document.getElementById('statTotalShifts').textContent = '-';
       document.getElementById('statTotalHours').textContent = '-';
       document.getElementById('statMorningShifts').textContent = '-';
       document.getElementById('statAfternoonShifts').textContent = '-';
       const note = document.getElementById('homeScheduleNote');
-      if (note) note.textContent = '排班尚在草稿阶段，确认后统计数据将在此显示';
+      if (note) note.textContent = isDraft ? '排班尚在草稿阶段，确认后统计数据将在此显示' : '暂无排班记录';
       // 清空日历
       const calGrid = document.getElementById('calendarGrid');
       if (calGrid) calGrid.innerHTML = '';
