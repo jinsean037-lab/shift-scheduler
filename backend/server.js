@@ -264,12 +264,12 @@ app.post('/api/admin/schedule-confirm', async (req, res) => {
     const { scheduleStart, scheduleEnd } = req.body
     const store = await readStore()
     
-    // 如果有当前排班数据，先归档到历史
-    if (store.schedule && Object.keys(store.schedule).length > 0 && store.scheduleStart && store.scheduleEnd) {
+    // 如果有当前排班数据，先归档到历史（只要有数据就归档，不管之前有没有设置过时间）
+    if (store.schedule && Object.keys(store.schedule).length > 0) {
       if (!store.confirmedPeriods) store.confirmedPeriods = []
       store.confirmedPeriods.push({
-        start: store.scheduleStart,
-        end: store.scheduleEnd,
+        start: store.scheduleStart || new Date().toISOString().slice(0, 10),
+        end: store.scheduleEnd || new Date().toISOString().slice(0, 10),
         schedule: JSON.parse(JSON.stringify(store.schedule)),
         confirmedAt: new Date().toISOString()
       })
