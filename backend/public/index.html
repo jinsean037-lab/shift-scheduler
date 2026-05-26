@@ -552,12 +552,12 @@ body {
 }
 .period-badge.am { background: #e8f4fd; color: #1565c0; }
 .period-badge.pm { background: #fff3e0; color: #e65100; }
-.time-label { font-size: 11px; color: #90a4ae; }
+.time-label { font-size: 12px; color: #90a4ae; white-space: nowrap; }
 
 .cell {
-  min-height: 62px;
+  min-height: 68px;
   border-radius: 8px;
-  padding: 6px 7px;
+  padding: 8px 8px;
   cursor: pointer;
   transition: all 0.15s;
   background: #f8fafd;
@@ -830,12 +830,12 @@ body {
   .header-badge { display: none; }
   .welcome-banner { flex-direction: column; gap: 12px; text-align: center; }
   .content-wrap { padding: 12px 8px 80px; }
-  .schedule-table th, .schedule-table td { padding: 6px 4px; font-size: 12px; }
-  .cell { min-height: 56px; padding: 6px 4px 24px 4px; }
+  .schedule-table th, .schedule-table td { padding: 8px 5px; font-size: 12px; }
+  .cell { min-height: 64px; padding: 8px 5px 28px 5px; }
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .schedule-table { min-width: 520px; }
-  .cell .names { font-size: 11px; line-height: 1.4; margin-top: 2px; word-break: break-all; }
-  .pick-btn, .cell .cancel-btn, .waitlist-btn { font-size: 10px; padding: 2px 6px; bottom: 2px; right: 2px; }
+  .cell .names { font-size: 12px; line-height: 1.5; margin-top: 4px; word-break: break-all; }
+  .pick-btn, .cell .cancel-btn, .waitlist-btn { font-size: 11px; padding: 4px 10px; bottom: 4px; right: 4px; }
   .login-page { min-height: 100dvh; background: white; }
   .login-topbar { padding: 10px 20px; gap: 10px; }
   .login-topbar-logo { height: 38px; }
@@ -1815,6 +1815,8 @@ function highlightAdminSub(page) {
 // ========== Tab 切换（新：page-view + sidebar nav）==========
 function switchTab(tab) {
   try {
+  // 切换页面时停止选班自动刷新（会在 schedule case 中重新启动）
+  if (tab !== 'schedule') stopScheduleAutoRefresh();
   // 隐藏所有 page-view
   document.querySelectorAll('.page-view').forEach(v => v.classList.remove('active'));
   // 移除所有 nav 激活态
@@ -1831,6 +1833,7 @@ function switchTab(tab) {
     const nav = document.querySelector('.nav-item[data-page="schedule"]');
     if (nav) nav.classList.add('active');
     loadSchedule();
+    startScheduleAutoRefresh();
   } else if (tab === 'history') {
     document.getElementById('historyView').classList.add('active');
     const nav = document.querySelector('.nav-item[data-page="history"]');
@@ -1997,6 +2000,7 @@ async function loadConfig() {
 
 // ========== 排班表 ==========
 let allScheduleData = { current: null, confirmedPeriods: [], scheduleTime: {} };
+let scheduleRefreshTimer = null;
 
 async function loadSchedule() {
   try {
@@ -2012,6 +2016,28 @@ async function loadSchedule() {
       confirmed: !!(allScheduleData.current && allScheduleData.current.start && allScheduleData.current.end)
     });
   } catch(e) { console.error('加载排班表失败', e); }
+}
+
+// 启动选班页面自动刷新（3秒间隔）
+function startScheduleAutoRefresh() {
+  stopScheduleAutoRefresh(); // 先清除已有的
+  scheduleRefreshTimer = setInterval(() => {
+    // 只在选班页面可见时才刷新（检查 DOM 是否 active）
+    const view = document.getElementById('scheduleView');
+    if (view && view.classList.contains('active')) {
+      loadSchedule();
+    } else {
+      stopScheduleAutoRefresh();
+    }
+  }, 1000);
+}
+
+// 停止自动刷新
+function stopScheduleAutoRefresh() {
+  if (scheduleRefreshTimer) {
+    clearInterval(scheduleRefreshTimer);
+    scheduleRefreshTimer = null;
+  }
 }
 
 // 历史排班：加载已确认的周期列表
@@ -2230,6 +2256,30 @@ async function doCancelRequest() {
   } catch(e) { err.textContent = '网络错误，请重试'; }
 }
 async function cancelSlot(day, slot) {
+  // 先检查是否在3分钟内（可直接取消，不需要原因）
+  try {
+    const res = await fetch(API + '/check-cancel-time', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:currentUser, day, slotId:slot})
+    });
+    const data = await res.json();
+    if (data.canDirectCancel) {
+      // 3分钟内：直接确认弹窗，不需要输入原因
+      showConfirm('确认取消', '确定要取消 ' + day + ' ' + (slotLabel(slot)||slot) + ' 的班次吗？取消后候补同学将自动填补。', async function() {
+        try {
+          const cr = await fetch(API + '/cancel-request', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({name:currentUser, day, slotId:slot, reason:'3分钟内直接取消'})
+          });
+          const cd = await cr.json();
+          if (cd.ok) { showToast(cd.msg || '已取消'); loadSchedule(); loadMyShifts(); }
+          else alert(cd.msg || '操作失败');
+        } catch(e) { alert('网络错误'); }
+      });
+      return;
+    }
+  } catch(e) { /* 接口不存在时走原有逻辑 */ }
+  // 超过3分钟：显示原因输入弹窗
   showCancelReasonModal(day, slot);
 }
 async function joinWaitlist(day, slot) {
@@ -2300,7 +2350,7 @@ function renderWaitlist(wl) {
     html += '<div class="shift-card" style="border-left:4px solid ' + statusColor + '">';
     html += '<div style="display:flex;align-items:center;gap:8px">';
     html += '<div class="shift-day">' + w.day + '</div>';
-    html += '<div class="shift-slot">' + slotLabel(w.slot) + '</div>';
+    html += '<div class="shift-slot">' + (slotLabel(w.slot)||w.slot||'') + '</div>';
     html += statusTag;
     html += '</div>';
     if (st === 'pending') {
