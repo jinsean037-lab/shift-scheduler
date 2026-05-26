@@ -382,20 +382,52 @@ app.post('/api/select', async (req, res) => {
 
 // 自动候补填补
 function autoFillFromWaitlist(store, day, slotId) {
-  const key = `${day}|${slotId}`
-  if (!store.schedule[key]) store.schedule[key] = []
-  const list = store.schedule[key]
+  // 兼容嵌套格式和扁平格式
+  let list = null
+  if (store.schedule[day] && Array.isArray(store.schedule[day][slotId])) {
+    list = store.schedule[day][slotId]
+  } else if (Array.isArray(store.schedule[`${day}|${slotId}`])) {
+    list = store.schedule[`${day}|${slotId}`]
+  }
+  if (!list) return null
   const pending = store.waitlist
     .filter(w => w.day === day && w.slotId === slotId && (!w.status || w.status === 'pending'))
     .sort((a, b) => new Date(a.time) - new Date(b.time))
   if (pending.length > 0 && !list.includes(pending[0].name)) {
     list.push(pending[0].name)
+    const key = `${day}|${slotId}`
     store.scheduleTime[`${key}|${pending[0].name}`] = Date.now()
     pending[0].status = 'auto-approved'
     return pending[0].name
   }
   return null
 }
+
+// 检查是否可3分钟内直接取消（不需要原因）
+app.post('/api/check-cancel-time', async (req, res) => {
+  try {
+    const { name, day, slotId } = req.body
+    if (!name || !day || !slotId) return res.json({ canDirectCancel: false })
+    const store = await readStore()
+    let list = null
+    let key = ''
+    if (store.schedule[day] && Array.isArray(store.schedule[day][slotId])) {
+      list = store.schedule[day][slotId]
+      key = `${day}|${slotId}`
+    }
+    if (!list && Array.isArray(store.schedule[`${day}|${slotId}`])) {
+      list = store.schedule[`${day}|${slotId}`]
+      key = `${day}|${slotId}`
+    }
+    if (!list || !list.includes(name)) return res.json({ canDirectCancel: false })
+    const entryTime = store.scheduleTime[`${key}|${name}`]
+    if (entryTime) {
+      const elapsed = Date.now() - entryTime
+      return res.json({ canDirectCancel: elapsed <= 3 * 60 * 1000 })
+    }
+    return res.json({ canDirectCancel: false })
+  } catch(e) { res.json({ canDirectCancel: false }) }
+})
 
 // 申请取消班次
 app.post('/api/cancel-request', async (req, res) => {
