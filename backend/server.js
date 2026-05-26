@@ -43,7 +43,8 @@ function defaultStore() {
     waitlist: [],
     cancelRequests: [],
     checkins: [],
-    overtimes: []
+    overtimes: [],
+    confirmedPeriods: []
   }
 }
 
@@ -257,15 +258,34 @@ app.post('/api/admin/start-time', async (req, res) => {
   }
 })
 
-// 排班确认（设置起止时间）
+// 排班确认（设置起止时间，归档当前排班）
 app.post('/api/admin/schedule-confirm', async (req, res) => {
   try {
     const { scheduleStart, scheduleEnd } = req.body
     const store = await readStore()
+    
+    // 如果有当前排班数据，先归档到历史
+    if (store.schedule && Object.keys(store.schedule).length > 0 && store.scheduleStart && store.scheduleEnd) {
+      if (!store.confirmedPeriods) store.confirmedPeriods = []
+      store.confirmedPeriods.push({
+        start: store.scheduleStart,
+        end: store.scheduleEnd,
+        schedule: JSON.parse(JSON.stringify(store.schedule)),
+        confirmedAt: new Date().toISOString()
+      })
+    }
+    
+    // 设置新的排班周期
     store.scheduleStart = scheduleStart || null
     store.scheduleEnd = scheduleEnd || null
+    // 清空当前草稿排班，准备下一次排班
+    store.schedule = {}
+    store.scheduleTime = {}
+    store.waitlist = []
+    store.cancelRequests = []
+    
     await writeStore(store)
-    res.json({ ok: true, scheduleStart: store.scheduleStart, scheduleEnd: store.scheduleEnd })
+    res.json({ ok: true, scheduleStart: store.scheduleStart, scheduleEnd: store.scheduleEnd, confirmedPeriods: store.confirmedPeriods })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -535,15 +555,15 @@ app.post('/api/admin/member/remove', async (req, res) => {
   }
 })
 
-// 管理员：重置排班
+// 管理员：重置排班（只清空当前草稿，不影响已确认的历史排班）
 app.post('/api/admin/reset', async (req, res) => {
   try {
     const store = await readStore()
     store.schedule = {}
+    store.scheduleTime = {}
     store.waitlist = []
     store.cancelRequests = []
-    store.scheduleStart = null
-    store.scheduleEnd = null
+    // 保留 scheduleStart/scheduleEnd，因为那是当前草稿周期的时间范围
     await writeStore(store)
     res.json({ ok: true })
   } catch (e) {
@@ -738,6 +758,24 @@ app.post('/api/admin/reset-password', async (req, res) => {
     store.passwords[name] = newPassword
     await writeStore({ passwords: store.passwords })
     res.json({ ok: true, passwords: store.passwords, msg: `已重置 ${name} 的密码` })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 获取所有排班数据（当前草稿 + 历史归档）
+app.get('/api/schedule-all', async (req, res) => {
+  try {
+    const store = await readStore()
+    res.json({
+      current: {
+        start: store.scheduleStart,
+        end: store.scheduleEnd,
+        schedule: store.schedule
+      },
+      confirmedPeriods: store.confirmedPeriods || [],
+      scheduleTime: store.scheduleTime
+    })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
