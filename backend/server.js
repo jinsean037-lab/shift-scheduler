@@ -653,13 +653,14 @@ app.post('/api/admin/cancel/approve', async (req, res) => {
   try {
     const { name, day, slotId } = req.body
     const store = await readStore()
-    const key = `${day}|${slotId}`
-    const list = store.schedule[key] || []
+    // 嵌套格式: schedule[day][slotId]
+    const daySchedule = store.schedule[day] || {}
+    const list = daySchedule[slotId] || []
     const idx = list.indexOf(name)
     if (idx >= 0) {
       list.splice(idx, 1)
-      if (list.length === 0) delete store.schedule[key]
-      delete store.scheduleTime[`${key}|${name}`]
+      if (list.length === 0) delete daySchedule[slotId]
+      delete store.scheduleTime[`${day}|${slotId}|${name}`]
     }
     const item = store.cancelRequests.find(r => r.name === name && r.day === day && r.slotId === slotId)
     if (item) item.status = 'approved'
