@@ -592,6 +592,7 @@ app.post('/api/admin/reset', async (req, res) => {
     store.scheduleTime = {}
     store.waitlist = []
     store.cancelRequests = []
+    store.confirmedPeriods = []
     store.scheduleStart = null
     store.scheduleEnd = null
     await writeStore(store)
