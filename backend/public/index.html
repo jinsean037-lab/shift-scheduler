@@ -2534,8 +2534,29 @@ async function loadHomeStats() {
     const hoursLabel = document.querySelector('#statTotalHours').closest('.stat-info').querySelector('.stat-label');
     if (hoursLabel) hoursLabel.textContent = '已累计时长';
 
-    // 渲染本周排班（只显示已确认的）
-    renderMyShifts(confirmedShifts);
+    // 渲染本周排班：只取最后一个（最新的）确认周期的排班
+    let displayShifts = confirmedShifts;
+    if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
+      // 找最新的 period
+      const latestPeriod = allData.confirmedPeriods[allData.confirmedPeriods.length - 1];
+      if (latestPeriod && latestPeriod.schedule) {
+        displayShifts = [];
+        const seen = new Set();
+        Object.keys(latestPeriod.schedule).forEach(day => {
+          Object.keys(latestPeriod.schedule[day]).forEach(slot => {
+            const names = latestPeriod.schedule[day][slot];
+            if (names && names.includes(currentUser)) {
+              const key = day + '|' + slot;
+              if (!seen.has(key)) {
+                seen.add(key);
+                displayShifts.push({ day, slot, slotId: slot });
+              }
+            }
+          });
+        });
+      }
+    }
+    renderMyShifts(displayShifts);
 
     // 渲染日历热力图（只显示已确认的）
     const y = now.getFullYear(), m = now.getMonth();
