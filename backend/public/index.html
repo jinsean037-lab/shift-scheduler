@@ -2331,7 +2331,9 @@ async function loadMyShifts() {
   } catch(e) { console.error('加载我的班次失败',e); }
 }
 function renderMyShifts(shifts, forHome) {
-  const el = document.getElementById('myShifts');
+  const targetId = (forHome ? 'homeMyShifts' : 'myShifts');
+  const el = document.getElementById(targetId);
+  if (!el) return;
   if (!shifts.length) {
     const emptyHtml = '<p class="empty-tip">暂无排班记录</p>';
     el.innerHTML = emptyHtml;
@@ -2344,19 +2346,20 @@ function renderMyShifts(shifts, forHome) {
     const cls = forHome ? 'shift-card shift-card-sm' : 'shift-card';
     // 用 slotLabel() 转换 slotId 为可读标签
     const displaySlot = (typeof slotLabel === 'function') ? (slotLabel(s.slotId || s.slot)) : (s.slotId || s.slot);
+    // 首页模式：优先显示实际日期，否则显示 day 名称
+    const displayDay = (forHome && s.actualDate) ? s.actualDate : s.day;
     html += '<div class="' + cls + '">';
-    html += '<div class="shift-day">' + s.day + '</div>';
+    html += '<div class="shift-day">' + displayDay + '</div>';
     html += '<div class="shift-slot">' + displaySlot + '</div>';
     if (!forHome) { html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>'; }
     html += '</div>';
   });
   html += '</div>';
   el.innerHTML = html;
-  // 同步更新首页（紧凑版）
+  // 非首页模式时同步更新首页
   const homeEl = document.getElementById('homeMyShifts');
   if (homeEl && !forHome) {
-    renderMyShifts(shifts, true);
-    homeEl.innerHTML = document.getElementById('myShifts').innerHTML;
+    homeEl.innerHTML = html;
   }
 }
 function renderWaitlist(wl) {
@@ -2549,13 +2552,17 @@ async function loadHomeStats() {
     const hoursLabel = document.querySelector('#statTotalHours').closest('.stat-info').querySelector('.stat-label');
     if (hoursLabel) hoursLabel.textContent = '已累计时长';
 
-    // 渲染本周排班：只取最后一个（最新的）确认周期的排班
-    let displayShifts = confirmedShifts;
+    // 渲染本周排班：只取最后一个（最新的）确认周期，且过滤到实际日期范围内
+    let displayShifts = [];
+    let calendarShifts = []; // 日历用：所有已确认周期的班次
     if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
       // 找最新的 period
       const latestPeriod = allData.confirmedPeriods[allData.confirmedPeriods.length - 1];
       if (latestPeriod && latestPeriod.schedule) {
-        displayShifts = [];
+        const pStart = latestPeriod.start ? new Date(latestPeriod.start) : null;
+        const pEnd = latestPeriod.end ? new Date(latestPeriod.end) : null;
+        // 将 day 名称映射到 period 范围内的实际日期
+        const dayNameMap = {'周一':1,'周二':2,'周三':3,'周四':4,'周五':5};
         const seen = new Set();
         Object.keys(latestPeriod.schedule).forEach(day => {
           Object.keys(latestPeriod.schedule[day]).forEach(slot => {
@@ -2564,18 +2571,49 @@ async function loadHomeStats() {
               const key = day + '|' + slot;
               if (!seen.has(key)) {
                 seen.add(key);
-                displayShifts.push({ day, slot, slotId: slot });
+                // 计算 day 在 period 范围内的实际日期
+                const targetWd = dayNameMap[day];
+                let actualDate = null;
+                if (pStart && pEnd && targetWd !== undefined) {
+                  for (let d = new Date(pStart); d <= pEnd; d.setDate(d.getDate() + 1)) {
+                    if (d.getDay() === targetWd) { actualDate = new Date(d); break; }
+                  }
+                }
+                displayShifts.push({ 
+                  day, slot, slotId: slot,
+                  actualDate: actualDate ? actualDate.toISOString().slice(0,10) : null,
+                  periodStart: latestPeriod.start,
+                  periodEnd: latestPeriod.end
+                });
               }
             }
           });
         });
       }
+      // 日历用所有 confirmedPeriods 的数据，每个都带上自己的 period 范围
+      allData.confirmedPeriods.forEach(period => {
+        if (!period.schedule) return;
+        Object.keys(period.schedule).forEach(day => {
+          Object.keys(period.schedule[day]).forEach(slot => {
+            const names = period.schedule[day][slot];
+            if (names && names.includes(currentUser)) {
+              calendarShifts.push({
+                day, slot, slotId: slot,
+                periodStart: period.start,
+                periodEnd: period.end,
+                periodStartTime: period.start ? new Date(period.start).getTime() : 0,
+                periodEndTime: period.end ? new Date(period.end).getTime() : Infinity
+              });
+            }
+          });
+        });
+      });
     }
-    renderMyShifts(displayShifts);
+    renderMyShifts(displayShifts, true);
 
-    // 渲染日历热力图（只显示已确认的）
+    // 渲染日历热力图（基于 calendarShifts，每个都带正确的 period 范围）
     const y = now.getFullYear(), m = now.getMonth();
-    renderCalendar(confirmedShifts, y, m, null, null);
+    renderCalendar(calendarShifts, y, m, null, null);
   } catch(e) { console.error('加载首页统计失败', e); }
 }
 
