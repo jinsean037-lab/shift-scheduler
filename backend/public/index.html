@@ -557,12 +557,13 @@ body {
 .cell {
   min-height: 68px;
   border-radius: 8px;
-  padding: 8px 8px;
+  padding: 6px 5px;
   cursor: pointer;
   transition: all 0.15s;
   background: #f8fafd;
   border: 1.5px solid #e8edf2;
   position: relative;
+  vertical-align: top;
 }
 .cell:hover { border-color: var(--primary-light); box-shadow: 0 2px 8px rgba(164,30,34,0.12); }
 .cell.mine {
@@ -577,7 +578,8 @@ body {
 .cell.full { background: #e8e8e8; border-color: #ccc; cursor: not-allowed; }
 .cell.full .names { color: #555; }
 .cell.full .count { color: #999; }
-.cell .names { font-size: 12px; line-height: 1.5; margin-top: 3px; }
+.cell .names { font-size: 12px; line-height: 1.4; margin-top: 2px; word-break: break-word; }
+.cell .names span { display: block; }
 .cell .count {
   position: absolute; top: 4px; right: 6px;
   font-size: 11px; font-weight: 700; color: #aab;
@@ -599,11 +601,14 @@ body {
 .waitlist-btn:hover { background: #e67e22; }
 /* 排班表格子内的取消按钮（绝对定位） */
 .cell .cancel-btn {
-  position: absolute; bottom: 4px; right: 5px;
+  position: absolute; bottom: 3px; right: 4px;
   font-size: 11px; background: var(--danger); color: white;
-  border: none; padding: 3px 10px; border-radius: 4px; cursor: pointer;
+  border: none; padding: 2px 7px; border-radius: 4px; cursor: pointer;
 }
 .cell .cancel-btn:hover { background: #c0392b; }
+/* 多人时按钮换行排列 */
+.cell .btn-row { display: flex; gap: 2px; justify-content: flex-end; position: absolute; bottom: 3px; right: 4px; }
+.cell .btn-row button { font-size: 10px; padding: 2px 6px; white-space: nowrap; }
 
 /* 我的班次卡片内的取消按钮（行内） */
 .shift-card .cancel-btn {
@@ -831,11 +836,12 @@ body {
   .welcome-banner { flex-direction: column; gap: 12px; text-align: center; }
   .content-wrap { padding: 12px 8px 80px; }
   .schedule-table th, .schedule-table td { padding: 8px 5px; font-size: 12px; }
-  .cell { min-height: 64px; padding: 8px 5px 28px 5px; }
+  .cell { min-height: 72px; padding: 5px 3px 26px 3px; }
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .schedule-table { min-width: 520px; }
-  .cell .names { font-size: 12px; line-height: 1.5; margin-top: 4px; word-break: break-all; }
-  .pick-btn, .cell .cancel-btn, .waitlist-btn { font-size: 11px; padding: 4px 10px; bottom: 4px; right: 4px; }
+  .schedule-table { min-width: 520px; table-layout: fixed; }
+  .cell .names { font-size: 11px; line-height: 1.4; margin-top: 2px; word-break: break-all; }
+  .cell .names span { display: block; }
+  .pick-btn, .cell .cancel-btn, .waitlist-btn { font-size: 10px; padding: 2px 6px; bottom: 3px; right: 3px; }
   .login-page { min-height: 100dvh; background: white; }
   .login-topbar { padding: 10px 20px; gap: 10px; }
   .login-topbar-logo { height: 38px; }
@@ -2156,17 +2162,23 @@ function renderSchedule(data) {
       else if (count >= max) cls += ' full';
       let inner = '';
       if (assigned.length > 0) {
-        inner = '<div class="names">' + assigned.join('、') + '</div>';
+        inner = '<div class="names"><span>' + assigned.join('</span><span>') + '</span></div>';
       }
       // 历史排班或已确认：只读，不显示操作按钮
       if (data.isHistory || data.confirmed) {
         // 只读模式
       } else if (count < max && !isMe && currentRole !== 'admin') {
         inner += '<button class="pick-btn" onclick="pickSlot(\'' + d + '\',\'' + s.key + '\')">选择</button>';
-      } else if (isMe) {
-        inner += '<button class="cancel-btn" onclick="cancelSlot(\'' + d + '\',\'' + s.key + '\')">取消</button>';
-      } else if (count >= max && !isMe && currentRole !== 'admin') {
-        inner += '<button class="waitlist-btn" onclick="joinWaitlist(\'' + d + '\',\'' + s.key + '\')">候补</button>';
+      } else if (isMe || (count >= max && !isMe && currentRole !== 'admin')) {
+        // 多人时按钮竖向排列
+        const btns = [];
+        if (isMe) btns.push('<button class="cancel-btn" onclick="cancelSlot(\'' + d + '\',\'' + s.key + '\')">取消</button>');
+        if (count >= max && !isMe && currentRole !== 'admin') btns.push('<button class="waitlist-btn" onclick="joinWaitlist(\'' + d + '\',\'' + s.key + '\')">候补</button>');
+        if (btns.length > 1) {
+          inner += '<div class="btn-row">' + btns.join('') + '</div>';
+        } else {
+          inner += btns[0];
+        }
       }
       html += '<td class="' + cls + '" data-day="' + d + '" data-slot="' + s.key + '">' + inner + '</td>';
     });
