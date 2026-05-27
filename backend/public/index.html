@@ -2458,7 +2458,8 @@ async function loadHomeStats() {
     // 统计所有班次：已确认的（历史归档）+ 当前草稿
     let confirmedShifts = [];
     
-    // 从历史归档中提取该成员的班次（已确认的）
+    // 从历史归档中提取该成员的班次（已确认的），按 day+slot 去重
+    const seen = new Set();
     if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
       allData.confirmedPeriods.forEach(period => {
         if (!period.schedule) return;
@@ -2469,13 +2470,17 @@ async function loadHomeStats() {
           Object.keys(period.schedule[day]).forEach(slot => {
             const names = period.schedule[day][slot];
             if (names && names.includes(currentUser)) {
-              confirmedShifts.push({
-                day, slot, slotId: slot,
-                periodStart: period.start,
-                periodEnd: period.end,
-                periodStartTime: periodStart,
-                periodEndTime: periodEnd
-              });
+              const key = day + '|' + slot;
+              if (!seen.has(key)) {
+                seen.add(key);
+                confirmedShifts.push({
+                  day, slot, slotId: slot,
+                  periodStart: period.start,
+                  periodEnd: period.end,
+                  periodStartTime: periodStart,
+                  periodEndTime: periodEnd
+                });
+              }
             }
           });
         });
@@ -2795,7 +2800,7 @@ function renderCalendar(shifts, year, month, scheduleStart, scheduleEnd) {
   const now = new Date();
   const nowTime = now.getTime();
 
-  // 根据 day(周一~周五) 映射到本月实际日期
+  // 根据 day(周一~周五) + period 日期范围 映射到本月实际日期
   const dayNameMap = {'周日':0,'周一':1,'周二':2,'周三':3,'周四':4,'周五':5,'周六':6};
   const shiftMap = {}; // { date: { total: n, completed: m } }
   
@@ -2803,12 +2808,19 @@ function renderCalendar(shifts, year, month, scheduleStart, scheduleEnd) {
     const targetWeekDay = dayNameMap[s.day];
     if (targetWeekDay === undefined) return;
     
-    // 找到本月所有匹配该星期的日期
+    // 只在 period 的日期范围内查找匹配的日期
+    const pStart = s.periodStart ? new Date(s.periodStart) : null;
+    const pEnd = s.periodEnd ? new Date(s.periodEnd) : null;
+    
     for (let d=1; d<=daysInMonth; d++) {
-      if (new Date(year, month, d).getDay() === targetWeekDay) {
+      const date = new Date(year, month, d);
+      // 跳过不在 period 日期范围内的日期
+      if (pStart && date < new Date(pStart.getFullYear(), pStart.getMonth(), pStart.getDate())) continue;
+      if (pEnd && date > new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate())) continue;
+      
+      if (date.getDay() === targetWeekDay) {
         if (!shiftMap[d]) shiftMap[d] = { total: 0, completed: 0 };
         shiftMap[d].total++;
-        // 如果该排班周期已结束，标记为已完成
         if (s.periodEndTime && s.periodEndTime < nowTime) {
           shiftMap[d].completed++;
         }
@@ -2835,9 +2847,11 @@ function renderCalendar(shifts, year, month, scheduleStart, scheduleEnd) {
     html += '<div class="' + cls + '"><div class="cal-day">' + d + '</div>';
     if (total>0) {
       if (completed === total) {
-        html += '<div class="cal-count" style="color:#8B1A1A">✓ ' + completed + '班</div>';
+        html += '<div class="cal-count" style="color:#8B1A1A">✓ ' + total + '班</div>';
+      } else if (completed > 0) {
+        html += '<div class="cal-count" style="color:#f59e0b">' + completed + '/' + total + '班</div>';
       } else {
-        html += '<div class="cal-count">' + completed + '/' + total + '班</div>';
+        html += '<div class="cal-count" style="color:#666">' + total + '班</div>';
       }
     }
     html += '</div>';
