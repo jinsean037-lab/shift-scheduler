@@ -3046,7 +3046,7 @@ async function confirmSchedule() {
       body: JSON.stringify({scheduleStart: startVal, scheduleEnd: endVal})
     });
     const data = await res.json();
-    if (data.ok) { showToast('✅ 排班表已确认生效！'); loadScheduleStatus(); loadConfig(); }
+    if (data.ok) { showToast('✅ 排班表已确认生效！'); loadScheduleStatus(); loadConfig(); loadSchedule(); }
     else { showToast(data.msg || '确认失败'); }
   } catch(e) { showToast('网络错误'); }
 }
