@@ -278,11 +278,8 @@ app.post('/api/admin/schedule-confirm', async (req, res) => {
     // 设置新的排班周期
     store.scheduleStart = scheduleStart || null
     store.scheduleEnd = scheduleEnd || null
-    // 清空当前草稿排班，准备下一次排班
-    store.schedule = {}
-    store.scheduleTime = {}
-    store.waitlist = []
-    store.cancelRequests = []
+    // 确认后排班数据保留（前端通过 confirmedPeriods 判断只读模式）
+    // 不清空 schedule，不清空 waitlist/cancelRequests（保留完整记录）
     
     await writeStore(store)
     res.json({ ok: true, scheduleStart: store.scheduleStart, scheduleEnd: store.scheduleEnd, confirmedPeriods: store.confirmedPeriods })
