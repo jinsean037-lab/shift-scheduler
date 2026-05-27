@@ -288,6 +288,35 @@ app.post('/api/admin/schedule-confirm', async (req, res) => {
   }
 })
 
+// 管理员：开始新一轮排班（归档当前+清空草稿）
+app.post('/api/admin/schedule-archive', async (req, res) => {
+  try {
+    const store = await readStore()
+    // 归档当前排班
+    if (store.schedule && Object.keys(store.schedule).length > 0) {
+      if (!store.confirmedPeriods) store.confirmedPeriods = []
+      store.confirmedPeriods.push({
+        start: store.scheduleStart || new Date().toISOString().slice(0, 10),
+        end: store.scheduleEnd || new Date().toISOString().slice(0, 10),
+        schedule: JSON.parse(JSON.stringify(store.schedule)),
+        confirmedAt: new Date().toISOString()
+      })
+    }
+    // 清空草稿
+    store.schedule = {}
+    store.scheduleTime = {}
+    store.waitlist = []
+    store.cancelRequests = []
+    store.scheduleStart = null
+    store.scheduleEnd = null
+    await writeStore(store)
+    res.json({ ok: true })
+  } catch (e) {
+    console.error('archive error:', e)
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 // 登录验证（姓名+密码）
 app.post('/api/login', async (req, res) => {
   try {
