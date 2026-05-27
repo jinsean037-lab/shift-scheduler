@@ -2507,39 +2507,48 @@ async function loadHomeStats() {
       return;
     }
 
-    // 统计卡片更新：基于打卡数据
+    // 统计卡片更新：基于打卡数据 + 已通过补报
     let totalShifts = 0;
     let totalHours = 0;
     let morningShifts = 0;
     let afternoonShifts = 0;
+    const processedDates = new Set(); // 打卡已处理的日期（避免与补报重复）
     try {
+      // 1. 打卡数据
       const ckRes = await fetch(API + '/my-checkins?name=' + encodeURIComponent(currentUser));
       const ckData = await ckRes.json();
       const checkins = (ckData.checkins || []).sort((a, b) => a.time.localeCompare(b.time));
-      const processedDates = new Set();
       // 每个日期配对 in+out 算一次值班
       checkins.forEach(c => {
         if (c.type === 'in' && !processedDates.has(c.date)) {
           const outRec = checkins.find(o => o.date === c.date && o.type === 'out');
           if (outRec) {
             totalShifts++;
-            // 计算时长（分钟），向上取整到0.5h
+            processedDates.add(c.date);
             const minutes = (new Date(outRec.time) - new Date(c.time)) / 60000;
             const hoursRaw = minutes / 60;
-            // 向上取整到0.5h：Math.ceil(x*2)/2
             const hoursRounded = Math.ceil(hoursRaw * 2) / 2;
-            // 不超过班次时长（默认2h）
-            const slotMaxHours = 2; // 所有班次都是2小时
-            totalHours += Math.min(hoursRounded, slotMaxHours);
-            // 早班/午班统计
+            totalHours += Math.min(hoursRounded, 2);
             const slotId = c.slotId || '';
             if (slotId.startsWith('am')) morningShifts++;
             else if (slotId.startsWith('pm')) afternoonShifts++;
           }
-          processedDates.add(c.date);
         }
       });
-    } catch(e) { console.error('加载打卡数据失败', e); }
+      // 2. 补报数据（只算 approved 且不在打卡日期内的）
+      const otRes = await fetch(API + '/overtime?name=' + encodeURIComponent(currentUser));
+      const otData = await otRes.json();
+      const overtimes = (otData.list || []).filter(o => o.status === 'approved');
+      overtimes.forEach(ot => {
+        if (!processedDates.has(ot.date)) {
+          totalShifts++;
+          processedDates.add(ot.date);
+          const otHours = parseFloat(ot.hours) || 0;
+          totalHours += Math.min(otHours, 8); // 补报时长上限8h
+          // 补报无 slotId，不计入早/午班分类
+        }
+      });
+    } catch(e) { console.error('加载统计数据失败', e); }
 
     document.getElementById('statTotalShifts').textContent = totalShifts || '-';
     document.getElementById('statTotalHours').textContent = totalHours > 0 ? totalHours + 'h' : '-';
