@@ -2582,15 +2582,21 @@ async function loadHomeStats() {
           
           // 将 day 映射到 period 范围内的实际日期
           let actualDate = null;
+          const realWdNames = ['周日','周一','周二','周三','周四','周五','周六'];
           if (pStart && pEnd) {
-            for (let d = new Date(pStart); d <= pEnd; d.setDate(d.getDate() + 1)) {
-              if (d.getDay() === targetWd) { actualDate = new Date(d); break; }
+            const startMs = pStart.getTime(), endMs = pEnd.getTime();
+            // 用时间戳遍历避免 setDate 副作用
+            for (let ms = startMs; ms <= endMs; ms += 86400000) {
+              const td = new Date(ms);
+              if (td.getDay() === targetWd) { actualDate = td; break; }
             }
           }
           // 如果该 day 在 period 日期范围内找不到对应实际日期，跳过（无效数据）
           if (!actualDate) return;
           
           const dateStr = actualDate.toISOString().slice(0, 10);
+          // 用实际日期算出真实星期几作为显示标签（而非 schedule key）
+          const realWdLabel = realWdNames[actualDate.getDay()];
           
           Object.keys(period.schedule[day]).forEach(slot => {
             const names = period.schedule[day][slot];
@@ -2599,7 +2605,7 @@ async function loadHomeStats() {
               displayShifts.push({
                 day, slot, slotId: slot,
                 actualDate: dateStr,
-                weekdayLabel: day,
+                weekdayLabel: realWdLabel,
                 periodStart: period.start,
                 periodEnd: period.end
               });
