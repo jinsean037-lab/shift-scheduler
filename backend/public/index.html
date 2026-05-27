@@ -2482,29 +2482,7 @@ async function loadHomeStats() {
       });
     }
 
-    // 也从当前草稿中提取该成员的班次
-    const draftSchedule = allData.current && allData.current.schedule ? allData.current.schedule : {};
-    if (draftSchedule && Object.keys(draftSchedule).length > 0) {
-      const draftStart = allData.current.start ? new Date(allData.current.start).getTime() : 0;
-      const draftEnd = allData.current.end ? new Date(allData.current.end).getTime() : Infinity;
-      Object.keys(draftSchedule).forEach(day => {
-        if (typeof draftSchedule[day] !== 'object' || Array.isArray(draftSchedule[day])) return; // 跳过扁平格式残留
-        Object.keys(draftSchedule[day]).forEach(slot => {
-          const names = draftSchedule[day][slot];
-          if (names && names.includes(currentUser)) {
-            confirmedShifts.push({
-              day, slot, slotId: slot,
-              periodStart: allData.current.start,
-              periodEnd: allData.current.end,
-              periodStartTime: draftStart,
-              periodEndTime: draftEnd
-            });
-          }
-        });
-      });
-    }
-
-    // 如果完全没有班次数据，显示提示
+    // 如果完全没有已确认的班次数据，显示提示
     if (confirmedShifts.length === 0) {
       document.getElementById('statTotalShifts').textContent = '-';
       document.getElementById('statTotalHours').textContent = '-';
