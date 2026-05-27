@@ -2346,8 +2346,8 @@ function renderMyShifts(shifts, forHome) {
     const cls = forHome ? 'shift-card shift-card-sm' : 'shift-card';
     // 用 slotLabel() 转换 slotId 为可读标签
     const displaySlot = (typeof slotLabel === 'function') ? (slotLabel(s.slotId || s.slot)) : (s.slotId || s.slot);
-    // 首页模式：优先显示实际日期，否则显示 day 名称
-    const displayDay = (forHome && s.actualDate) ? s.actualDate : s.day;
+    // 首页模式：显示 日期（周X）格式
+    const displayDay = (forHome && s.actualDate) ? s.actualDate + ' (' + (s.weekdayLabel || s.day) + ')' : s.day;
     html += '<div class="' + cls + '">';
     html += '<div class="shift-day">' + displayDay + '</div>';
     html += '<div class="shift-slot">' + displaySlot + '</div>';
@@ -2552,68 +2552,68 @@ async function loadHomeStats() {
     const hoursLabel = document.querySelector('#statTotalHours').closest('.stat-info').querySelector('.stat-label');
     if (hoursLabel) hoursLabel.textContent = '已累计时长';
 
-    // 渲染本周排班：只取最后一个（最新的）确认周期，且过滤到实际日期范围内
-    let displayShifts = [];
-    let calendarShifts = []; // 日历用：所有已确认周期的班次
+    // ========== 渲染「本周我的排班」+ 月度分布 ==========
+    // 核心原则：
+    // 1. 左边列表：遍历所有已确认周期，将 day 映射为实际日期，只在 period 范围内的才显示
+    // 2. 右边日历：每个日期格只统计该日期所属 period 的班次，不跨周期混算
+    const dayNameMap = {'周一':1,'周二':2,'周三':3,'周四':4,'周五':5};
+    let displayShifts = [];   // 左边列表用
+    const datePeriodMap = {}; // { '2026-05-27': { total, completed } } 日历用
+    
     if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
-      // 找最新的 period
-      const latestPeriod = allData.confirmedPeriods[allData.confirmedPeriods.length - 1];
-      if (latestPeriod && latestPeriod.schedule) {
-        const pStart = latestPeriod.start ? new Date(latestPeriod.start) : null;
-        const pEnd = latestPeriod.end ? new Date(latestPeriod.end) : null;
-        // 将 day 名称映射到 period 范围内的实际日期
-        const dayNameMap = {'周一':1,'周二':2,'周三':3,'周四':4,'周五':5};
-        const seen = new Set();
-        Object.keys(latestPeriod.schedule).forEach(day => {
-          Object.keys(latestPeriod.schedule[day]).forEach(slot => {
-            const names = latestPeriod.schedule[day][slot];
-            if (names && names.includes(currentUser)) {
-              const key = day + '|' + slot;
-              if (!seen.has(key)) {
-                seen.add(key);
-                // 计算 day 在 period 范围内的实际日期
-                const targetWd = dayNameMap[day];
-                let actualDate = null;
-                if (pStart && pEnd && targetWd !== undefined) {
-                  for (let d = new Date(pStart); d <= pEnd; d.setDate(d.getDate() + 1)) {
-                    if (d.getDay() === targetWd) { actualDate = new Date(d); break; }
-                  }
-                }
-                displayShifts.push({ 
-                  day, slot, slotId: slot,
-                  actualDate: actualDate ? actualDate.toISOString().slice(0,10) : null,
-                  periodStart: latestPeriod.start,
-                  periodEnd: latestPeriod.end
-                });
-              }
-            }
-          });
-        });
-      }
-      // 日历用所有 confirmedPeriods 的数据，每个都带上自己的 period 范围
       allData.confirmedPeriods.forEach(period => {
         if (!period.schedule) return;
+        const pStart = period.start ? new Date(period.start + 'T00:00:00') : null;
+        const pEnd = period.end ? new Date(period.end + 'T23:59:59') : null;
+        const pEndTimeMs = period.end ? new Date(period.end).getTime() : Infinity;
+        
         Object.keys(period.schedule).forEach(day => {
+          const targetWd = dayNameMap[day];
+          if (targetWd === undefined) return; // 跳过非周一~周五的 key
+          
+          // 将 day 映射到 period 范围内的实际日期
+          let actualDate = null;
+          if (pStart && pEnd) {
+            for (let d = new Date(pStart); d <= pEnd; d.setDate(d.getDate() + 1)) {
+              if (d.getDay() === targetWd) { actualDate = new Date(d); break; }
+            }
+          }
+          // 如果该 day 在 period 日期范围内找不到对应实际日期，跳过（无效数据）
+          if (!actualDate) return;
+          
+          const dateStr = actualDate.toISOString().slice(0, 10);
+          
           Object.keys(period.schedule[day]).forEach(slot => {
             const names = period.schedule[day][slot];
             if (names && names.includes(currentUser)) {
-              calendarShifts.push({
+              // 加入左边列表
+              displayShifts.push({
                 day, slot, slotId: slot,
+                actualDate: dateStr,
+                weekdayLabel: day,
                 periodStart: period.start,
-                periodEnd: period.end,
-                periodStartTime: period.start ? new Date(period.start).getTime() : 0,
-                periodEndTime: period.end ? new Date(period.end).getTime() : Infinity
+                periodEnd: period.end
               });
+              
+              // 累加到日历统计（按日期分组）
+              if (!datePeriodMap[dateStr]) datePeriodMap[dateStr] = { total: 0, completed: 0 };
+              datePeriodMap[dateStr].total++;
+              if (pEndTimeMs < nowTime) {
+                datePeriodMap[dateStr].completed++;
+              }
             }
           });
         });
       });
     }
+    
+    // 按日期排序显示
+    displayShifts.sort((a, b) => (a.actualDate || '').localeCompare(b.actualDate || ''));
     renderMyShifts(displayShifts, true);
 
-    // 渲染日历热力图（基于 calendarShifts，每个都带正确的 period 范围）
+    // 渲染日历热力图
     const y = now.getFullYear(), m = now.getMonth();
-    renderCalendar(calendarShifts, y, m, null, null);
+    renderCalendarFromDateMap(datePeriodMap, y, m);
   } catch(e) { console.error('加载首页统计失败', e); }
 }
 
@@ -2866,60 +2866,31 @@ function showCheckinError(msg) {
   el.style.display = 'block';
 }
 
-function renderCalendar(shifts, year, month, scheduleStart, scheduleEnd) {
+function renderCalendarFromDateMap(datePeriodMap, year, month) {
   const grid = document.getElementById('calendarGrid');
   if (!grid) return;
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
   const now = new Date();
-  const nowTime = now.getTime();
-
-  // 根据 day(周一~周五) + period 日期范围 映射到本月实际日期
-  const dayNameMap = {'周日':0,'周一':1,'周二':2,'周三':3,'周四':4,'周五':5,'周六':6};
-  const shiftMap = {}; // { date: { total: n, completed: m } }
-  
-  shifts.forEach(s => {
-    const targetWeekDay = dayNameMap[s.day];
-    if (targetWeekDay === undefined) return;
-    
-    // 只在 period 的日期范围内查找匹配的日期
-    const pStart = s.periodStart ? new Date(s.periodStart) : null;
-    const pEnd = s.periodEnd ? new Date(s.periodEnd) : null;
-    
-    for (let d=1; d<=daysInMonth; d++) {
-      const date = new Date(year, month, d);
-      // 跳过不在 period 日期范围内的日期
-      if (pStart && date < new Date(pStart.getFullYear(), pStart.getMonth(), pStart.getDate())) continue;
-      if (pEnd && date > new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate())) continue;
-      
-      if (date.getDay() === targetWeekDay) {
-        if (!shiftMap[d]) shiftMap[d] = { total: 0, completed: 0 };
-        shiftMap[d].total++;
-        if (s.periodEndTime && s.periodEndTime < nowTime) {
-          shiftMap[d].completed++;
-        }
-      }
-    }
-  });
 
   let html = '';
   const weekDays = ['日','一','二','三','四','五','六'];
   weekDays.forEach(d => { html += '<div class="cal-cell cal-header" style="font-weight:700;font-size:11px;color:#999">' + d + '</div>'; });
 
-  // 月初空白
   for (let i=0;i<firstDay;i++) { html += '<div class="cal-cell cal-empty"></div>'; }
   for (let d=1;d<=daysInMonth;d++) {
-    const info = shiftMap[d] || { total: 0, completed: 0 };
+    const dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const info = datePeriodMap[dateStr] || { total: 0, completed: 0 };
     const total = info.total;
     const completed = info.completed;
     let cls = 'cal-cell ';
     if (total === 0) cls += 'cal-none';
-    else if (completed === total) cls += 'cal-2'; // 全部完成
-    else if (completed > 0) cls += 'cal-1'; // 部分完成
-    else cls += 'cal-3plus'; // 未开始
+    else if (completed === total && total > 0) cls += 'cal-2';
+    else if (completed > 0) cls += 'cal-1';
+    else cls += 'cal-3plus';
     if (year===now.getFullYear()&&month===now.getMonth()&&d===now.getDate()) cls += ' cal-today';
     html += '<div class="' + cls + '"><div class="cal-day">' + d + '</div>';
-    if (total>0) {
+    if (total > 0) {
       if (completed === total) {
         html += '<div class="cal-count" style="color:#8B1A1A">✓ ' + total + '班</div>';
       } else if (completed > 0) {
