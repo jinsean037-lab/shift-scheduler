@@ -3233,6 +3233,22 @@ async function resetSchedule() {
   });
 }
 
+async function archiveSchedule() {
+  showConfirm('开始新一轮排班', '确定要将当前排班归档到历史，并清空草稿开始新一轮选班吗？', async () => {
+    try {
+      const res = await fetch(API + '/admin/schedule-archive', { method:'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('已开始新一轮排班');
+        loadSchedule();
+        loadScheduleStatus();
+      } else {
+        showToast(data.msg || '操作失败');
+      }
+    } catch(e) { showToast('网络错误'); }
+  });
+}
+
 // ========== 管理员打卡记录 (v4.0) ==========
 
 function loadAdminCheckins(mode) {
