@@ -888,12 +888,40 @@ app.get('/api/my-shifts', async (req, res) => {
 
 // ========== 打卡功能 (v4.0) ==========
 
-// 班次时间窗口（±15分钟）
+// 班次时间窗口（北京时间，±15分钟）
 const SLOT_WINDOWS = {
   am1: { start: '07:45', end: '10:15' },
   am2: { start: '09:45', end: '12:15' },
   pm1: { start: '14:15', end: '16:15' },
   pm2: { start: '15:45', end: '17:45' }
+}
+
+// 打卡地点围栏（中山大学南校园岭南行政中心）
+const CHECKIN_LOCATION = {
+  name: '岭南行政中心（中山大学南校园）',
+  lat: 23.0948,
+  lng: 113.2997,
+  radius: 100 // 米
+}
+
+// 计算两个经纬度之间的球面距离（Haversine公式，返回米）
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000 // 地球半径（米）
+  const toRad = d => d * Math.PI / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  return R * c
+}
+
+// 获取北京时间的 HH:MM 字符串
+function getBeijingTimeHHMM() {
+  const now = new Date()
+  // 北京时间 = UTC+8
+  const beijingMs = now.getTime() + 8 * 3600 * 1000
+  const beijing = new Date(beijingMs)
+  return beijing.toISOString().slice(11, 16)
 }
 
 // 获取用户今天所有可打卡班次（在时间窗口内的）
@@ -902,7 +930,7 @@ function getTodaySlots(store, name) {
   const todayWeekday = ['周日','周一','周二','周三','周四','周五','周六'][new Date().getDay()]
   const daySchedule = schedule[todayWeekday]
   if (!daySchedule) return []
-  const nowHHMM = new Date().toTimeString().slice(0,5)
+  const nowHHMM = getBeijingTimeHHMM()
   const result = []
   for (const [slotId, members] of Object.entries(daySchedule)) {
     if (Array.isArray(members) && members.includes(name)) {
@@ -927,9 +955,18 @@ app.post('/api/checkin', async (req, res) => {
     const pendingIn = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'in'
       && !(store.checkins || []).find(o => o.name === name && o.date === today && o.type === 'out'))
     if (pendingIn) return res.json({ ok: false, msg: '当前处于值班中状态，请先签退后再签到下一班次' })
-    // 检查是否在排班时间窗口内
+    // 检查是否在排班时间窗口内（北京时间）
     const slots = getTodaySlots(store, name)
     if (slots.length === 0) return res.json({ ok: false, msg: '当前不在你的值班时间段内（需在班次前后15分钟内），无法打卡' })
+    // 地点围栏校验
+    if (lat != null && lng != null) {
+      const dist = haversineDistance(lat, lng, CHECKIN_LOCATION.lat, CHECKIN_LOCATION.lng)
+      if (dist > CHECKIN_LOCATION.radius) {
+        return res.json({ ok: false, msg: `打卡失败：你不在${CHECKIN_LOCATION.name}附近（距离${Math.round(dist)}米，需在${CHECKIN_LOCATION.radius}米内）` })
+      }
+    } else {
+      return res.json({ ok: false, msg: '无法获取你的位置，请在岭南行政中心附近重新尝试并允许定位' })
+    }
 
     const record = { name, date: today, time: now.toISOString(), type: 'in', slotId: slots[0].slotId, lat: lat || null, lng: lng || null }
     const checkins = store.checkins || []
@@ -957,11 +994,20 @@ app.post('/api/checkout', async (req, res) => {
       if (!hasOut) { checkinRecord = inRec; break; }
     }
     if (!checkinRecord) return res.json({ ok: false, msg: '请先签到' })
-    // 检查是否仍在时间窗口内
+    // 检查是否仍在时间窗口内（北京时间）
     const slotWin = SLOT_WINDOWS[checkinRecord.slotId]
-    const nowHHMM = now.toTimeString().slice(0,5)
+    const nowHHMM = getBeijingTimeHHMM()
     if (slotWin && (nowHHMM < slotWin.start || nowHHMM > slotWin.end)) {
       return res.json({ ok: false, msg: '已超出该班次打卡时间窗口（前后15分钟），无法签退' })
+    }
+    // 地点围栏校验
+    if (lat != null && lng != null) {
+      const dist = haversineDistance(lat, lng, CHECKIN_LOCATION.lat, CHECKIN_LOCATION.lng)
+      if (dist > CHECKIN_LOCATION.radius) {
+        return res.json({ ok: false, msg: `打卡失败：你不在${CHECKIN_LOCATION.name}附近（距离${Math.round(dist)}米，需在${CHECKIN_LOCATION.radius}米内）` })
+      }
+    } else {
+      return res.json({ ok: false, msg: '无法获取你的位置，请在岭南行政中心附近重新尝试并允许定位' })
     }
 
     const record = { name, date: today, time: now.toISOString(), type: 'out', slotId: checkinRecord.slotId, lat: lat || null, lng: lng || null }
