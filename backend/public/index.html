@@ -2504,29 +2504,44 @@ async function loadHomeStats() {
       return;
     }
 
-    // 判断班次是否已完成（班次结束时间 < 当前时间）
-    const completedShifts = confirmedShifts.filter(s => s.periodEndTime && s.periodEndTime < nowTime);
-    const upcomingShifts = confirmedShifts.filter(s => !s.periodEndTime || s.periodEndTime >= nowTime);
-
-    // 统计卡片更新
-    document.getElementById('statTotalShifts').textContent = completedShifts.length;
-
-    // 累计时长（已完成班次 + 补报已批准的）
-    const hoursPerSlot = 2;
-    let totalHours = completedShifts.length * hoursPerSlot;
+    // 统计卡片更新：基于打卡数据
+    let totalShifts = 0;
+    let totalHours = 0;
+    let morningShifts = 0;
+    let afternoonShifts = 0;
     try {
-      const otRes = await fetch(API + '/overtime?name=' + encodeURIComponent(currentUser));
-      const otData = await otRes.json();
-      const approvedOt = (otData.list || []).filter(o => o.status === 'approved');
-      approvedOt.forEach(o => { totalHours += o.hours; });
-    } catch(e) { /* 补报加载失败不影响主流程 */ }
-    document.getElementById('statTotalHours').textContent = totalHours + 'h';
+      const ckRes = await fetch(API + '/my-checkins?name=' + encodeURIComponent(currentUser));
+      const ckData = await ckRes.json();
+      const checkins = (ckData.checkins || []).sort((a, b) => a.time.localeCompare(b.time));
+      const processedDates = new Set();
+      // 每个日期配对 in+out 算一次值班
+      checkins.forEach(c => {
+        if (c.type === 'in' && !processedDates.has(c.date)) {
+          const outRec = checkins.find(o => o.date === c.date && o.type === 'out');
+          if (outRec) {
+            totalShifts++;
+            // 计算时长（分钟），向上取整到0.5h
+            const minutes = (new Date(outRec.time) - new Date(c.time)) / 60000;
+            const hoursRaw = minutes / 60;
+            // 向上取整到0.5h：Math.ceil(x*2)/2
+            const hoursRounded = Math.ceil(hoursRaw * 2) / 2;
+            // 不超过班次时长（默认2h）
+            const slotMaxHours = 2; // 所有班次都是2小时
+            totalHours += Math.min(hoursRounded, slotMaxHours);
+            // 早班/午班统计
+            const slotId = c.slotId || '';
+            if (slotId.startsWith('am')) morningShifts++;
+            else if (slotId.startsWith('pm')) afternoonShifts++;
+          }
+          processedDates.add(c.date);
+        }
+      });
+    } catch(e) { console.error('加载打卡数据失败', e); }
 
-    // 早班/午班次数
-    const morning = completedShifts.filter(s => s.slot && s.slot.startsWith('am')).length;
-    const afternoon = completedShifts.filter(s => s.slot && s.slot.startsWith('pm')).length;
-    document.getElementById('statMorningShifts').textContent = morning;
-    document.getElementById('statAfternoonShifts').textContent = afternoon;
+    document.getElementById('statTotalShifts').textContent = totalShifts || '-';
+    document.getElementById('statTotalHours').textContent = totalHours > 0 ? totalHours + 'h' : '-';
+    document.getElementById('statMorningShifts').textContent = morningShifts || '-';
+    document.getElementById('statAfternoonShifts').textContent = afternoonShifts || '-';
 
     // 更新标签文案
     const totalLabel = document.querySelector('#statTotalShifts').closest('.stat-info').querySelector('.stat-label');
