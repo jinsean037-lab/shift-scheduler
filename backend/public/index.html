@@ -2625,11 +2625,17 @@ async function loadHomeStats() {
       });
     }
     
-    // 2. 处理当前未归档的 schedule（如果有数据且有起止时间）
+    // 2. 处理当前未归档的 schedule（只要有数据就处理，不强制要求起止时间）
     const cur = allData.current || {};
-    if (cur.schedule && Object.keys(cur.schedule).length > 0 && cur.start && cur.end) {
-      const pStart = parseLocalDate(cur.start);
-      const pEnd = parseLocalDate(cur.end, true);
+    if (cur.schedule && Object.keys(cur.schedule).length > 0) {
+      // 如果有起止时间就用，没有则用当月1号~月底作为显示范围
+      let pStart = cur.start ? parseLocalDate(cur.start) : null;
+      let pEnd = cur.end ? parseLocalDate(cur.end, true) : null;
+      if (!pStart || !pEnd) {
+        const y = now.getFullYear(), m = now.getMonth();
+        pStart = new Date(y, m, 1);
+        pEnd = new Date(y, m + 1, 0, 23, 59, 59); // 当月最后一天
+      }
       const pEndTimeMs = pEnd.getTime();
       processScheduleSource(cur.schedule, pStart, pEnd, pEndTimeMs);
     }
