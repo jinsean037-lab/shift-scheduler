@@ -2562,64 +2562,79 @@ async function loadHomeStats() {
     if (hoursLabel) hoursLabel.textContent = '已累计时长';
 
     // ========== 渲染「本周我的排班」+ 月度分布 ==========
+    // 数据源优先级：confirmedPeriods（已归档）> 当前 schedule（未归档但有起止时间）
     // 核心原则：
-    // 1. 左边列表：遍历所有已确认周期，将 day 映射为实际日期，只在 period 范围内的才显示
-    // 2. 右边日历：每个日期格只统计该日期所属 period 的班次，不跨周期混算
+    // 1. 左边列表：遍历所有数据源，将 day 映射为实际日期，只在 period 范围内的才显示
+    // 2. 右边日历：每个日期格只统计该日期所属周期的班次，不跨周期混算
     const dayNameMap = {'周一':1,'周二':2,'周三':3,'周四':4,'周五':5};
+    const realWdNames = ['周日','周一','周二','周三','周四','周五','周六'];
     let displayShifts = [];   // 左边列表用
     const datePeriodMap = {}; // { '2026-05-27': { total, completed } } 日历用
     
+    // 辅助函数：处理一个排班数据源（confirmedPeriod 或 current schedule）
+    function processScheduleSource(schedule, pStart, pEnd, pEndTimeMs) {
+      if (!schedule) return;
+      Object.keys(schedule).forEach(day => {
+        const targetWd = dayNameMap[day];
+        if (targetWd === undefined) return; // 跳过非周一~周五的 key
+        
+        // 将 day 映射到 period 范围内的实际日期
+        let actualDate = null;
+        if (pStart && pEnd) {
+          const startMs = pStart.getTime(), endMs = pEnd.getTime();
+          // 用时间戳遍历避免 setDate 副作用
+          for (let ms = startMs; ms <= endMs; ms += 86400000) {
+            const td = new Date(ms);
+            if (td.getDay() === targetWd) { actualDate = td; break; }
+          }
+        }
+        // 如果该 day 在 period 日期范围内找不到对应实际日期，跳过（无效数据）
+        if (!actualDate) return;
+        
+        const dateStr = actualDate.toISOString().slice(0, 10);
+        // 用实际日期算出真实星期几作为显示标签（而非 schedule key）
+        const realWdLabel = realWdNames[actualDate.getDay()];
+        
+        Object.keys(schedule[day]).forEach(slot => {
+          const names = schedule[day][slot];
+          if (names && names.includes(currentUser)) {
+            // 加入左边列表
+            displayShifts.push({
+              day, slot, slotId: slot,
+              actualDate: dateStr,
+              weekdayLabel: realWdLabel,
+              periodStart: pStart ? pStart.toISOString().slice(0,10) : null,
+              periodEnd: pEnd ? pEnd.toISOString().slice(0,10) : null
+            });
+            
+            // 累加到日历统计（按日期分组）
+            if (!datePeriodMap[dateStr]) datePeriodMap[dateStr] = { total: 0, completed: 0 };
+            datePeriodMap[dateStr].total++;
+            if (pEndTimeMs < nowTime) {
+              datePeriodMap[dateStr].completed++;
+            }
+          }
+        });
+      });
+    }
+    
+    // 1. 遍历已归档的 confirmedPeriods
     if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
       allData.confirmedPeriods.forEach(period => {
-        if (!period.schedule) return;
         const pStart = period.start ? new Date(period.start + 'T00:00:00') : null;
         const pEnd = period.end ? new Date(period.end + 'T23:59:59') : null;
         const pEndTimeMs = period.end ? new Date(period.end).getTime() : Infinity;
-        
-        Object.keys(period.schedule).forEach(day => {
-          const targetWd = dayNameMap[day];
-          if (targetWd === undefined) return; // 跳过非周一~周五的 key
-          
-          // 将 day 映射到 period 范围内的实际日期
-          let actualDate = null;
-          const realWdNames = ['周日','周一','周二','周三','周四','周五','周六'];
-          if (pStart && pEnd) {
-            const startMs = pStart.getTime(), endMs = pEnd.getTime();
-            // 用时间戳遍历避免 setDate 副作用
-            for (let ms = startMs; ms <= endMs; ms += 86400000) {
-              const td = new Date(ms);
-              if (td.getDay() === targetWd) { actualDate = td; break; }
-            }
-          }
-          // 如果该 day 在 period 日期范围内找不到对应实际日期，跳过（无效数据）
-          if (!actualDate) return;
-          
-          const dateStr = actualDate.toISOString().slice(0, 10);
-          // 用实际日期算出真实星期几作为显示标签（而非 schedule key）
-          const realWdLabel = realWdNames[actualDate.getDay()];
-          
-          Object.keys(period.schedule[day]).forEach(slot => {
-            const names = period.schedule[day][slot];
-            if (names && names.includes(currentUser)) {
-              // 加入左边列表
-              displayShifts.push({
-                day, slot, slotId: slot,
-                actualDate: dateStr,
-                weekdayLabel: realWdLabel,
-                periodStart: period.start,
-                periodEnd: period.end
-              });
-              
-              // 累加到日历统计（按日期分组）
-              if (!datePeriodMap[dateStr]) datePeriodMap[dateStr] = { total: 0, completed: 0 };
-              datePeriodMap[dateStr].total++;
-              if (pEndTimeMs < nowTime) {
-                datePeriodMap[dateStr].completed++;
-              }
-            }
-          });
-        });
+        processScheduleSource(period.schedule, pStart, pEnd, pEndTimeMs);
       });
+    }
+    
+    // 2. 处理当前未归档的 schedule（如果有数据且有起止时间）
+    const cur = allData.current || {};
+    if (cur.schedule && Object.keys(cur.schedule).length > 0 && cur.start && cur.end) {
+      const pStart = new Date(cur.start + 'T00:00:00');
+      const pEnd = new Date(cur.end + 'T23:59:59');
+      const pEndTimeMs = pEnd.getTime();
+      processScheduleSource(cur.schedule, pStart, pEnd, pEndTimeMs);
     }
     
     // 按日期排序显示
