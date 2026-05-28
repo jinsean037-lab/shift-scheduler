@@ -2446,6 +2446,13 @@ async function revokeCancel(day, slotId) {
 // ========== 首页统计 ==========
 async function loadHomeStats() {
   if (!currentUser) return;
+  // 安全解析 YYYY-MM-DD 为本地零点 Date（避免时区差异导致 getDay() 算错）
+  function parseLocalDate(yyyymmdd, isEnd) {
+    if (!yyyymmdd) return null;
+    const [y, m, d] = yyyymmdd.split('-').map(Number);
+    if (isEnd) return new Date(y, m - 1, d, 23, 59, 59);
+    return new Date(y, m - 1, d);
+  }
   try {
     // 获取所有排班数据（当前草稿 + 历史归档）
     const res = await fetch(API + '/schedule-all');
@@ -2490,21 +2497,11 @@ async function loadHomeStats() {
       });
     }
 
-    // 如果完全没有已确认的班次数据，显示提示
+    // 若无历史归档班次，标记 isDraft（不阻断后续 current.schedule 处理）
     if (confirmedShifts.length === 0) {
-      document.getElementById('statTotalShifts').textContent = '-';
-      document.getElementById('statTotalHours').textContent = '-';
-      document.getElementById('statMorningShifts').textContent = '-';
-      document.getElementById('statAfternoonShifts').textContent = '-';
       const note = document.getElementById('homeScheduleNote');
       if (note) note.textContent = isDraft ? '排班尚在草稿阶段，确认后统计数据将在此显示' : '暂无排班记录';
-      // 清空日历
-      const calGrid = document.getElementById('calendarGrid');
-      if (calGrid) calGrid.innerHTML = '';
-      // 清空本周我的排班
-      const homeMy = document.getElementById('homeMyShifts');
-      if (homeMy) homeMy.innerHTML = '<p style="color:#999;text-align:center;padding:12px 0;font-size:13px">暂无已确认排班</p>';
-      return;
+      // 不再提前 return，让代码继续执行 processScheduleSource 处理 current.schedule
     }
 
     // 统计卡片更新：基于打卡数据 + 已通过补报
@@ -2621,9 +2618,9 @@ async function loadHomeStats() {
     // 1. 遍历已归档的 confirmedPeriods
     if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
       allData.confirmedPeriods.forEach(period => {
-        const pStart = period.start ? new Date(period.start + 'T00:00:00') : null;
-        const pEnd = period.end ? new Date(period.end + 'T23:59:59') : null;
-        const pEndTimeMs = period.end ? new Date(period.end).getTime() : Infinity;
+        const pStart = period.start ? parseLocalDate(period.start) : null;
+        const pEnd = period.end ? parseLocalDate(period.end, true) : null;
+        const pEndTimeMs = period.end ? parseLocalDate(period.end).getTime() : Infinity;
         processScheduleSource(period.schedule, pStart, pEnd, pEndTimeMs);
       });
     }
@@ -2631,8 +2628,8 @@ async function loadHomeStats() {
     // 2. 处理当前未归档的 schedule（如果有数据且有起止时间）
     const cur = allData.current || {};
     if (cur.schedule && Object.keys(cur.schedule).length > 0 && cur.start && cur.end) {
-      const pStart = new Date(cur.start + 'T00:00:00');
-      const pEnd = new Date(cur.end + 'T23:59:59');
+      const pStart = parseLocalDate(cur.start);
+      const pEnd = parseLocalDate(cur.end, true);
       const pEndTimeMs = pEnd.getTime();
       processScheduleSource(cur.schedule, pStart, pEnd, pEndTimeMs);
     }
