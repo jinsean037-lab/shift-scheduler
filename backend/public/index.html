@@ -2346,8 +2346,9 @@ function renderMyShifts(shifts, forHome) {
     const cls = forHome ? 'shift-card shift-card-sm' : 'shift-card';
     // 用 slotLabel() 转换 slotId 为可读标签
     const displaySlot = (typeof slotLabel === 'function') ? (slotLabel(s.slotId || s.slot)) : (s.slotId || s.slot);
-    // 首页模式：显示 日期（周X）格式
-    const displayDay = (forHome && s.actualDate) ? s.actualDate + ' (' + (s.weekdayLabel || s.day) + ')' : s.day;
+    // 首页模式：显示 日期（周X）格式（actualDate 可能是 Date 对象或字符串）
+    const actualDateStr = (s.actualDate instanceof Date) ? formatLocalDate(s.actualDate) : (s.actualDate || '');
+    const displayDay = (forHome && s.actualDate) ? actualDateStr + ' (' + (s.weekdayLabel || s.day) + ')' : s.day;
     html += '<div class="' + cls + '">';
     html += '<div class="shift-day">' + displayDay + '</div>';
     html += '<div class="shift-slot">' + displaySlot + '</div>';
@@ -2444,15 +2445,25 @@ async function revokeCancel(day, slotId) {
 }
 
 // ========== 首页统计 ==========
+// 全局日期工具函数（避免 toISOString 时区偏移问题）
+function parseLocalDate(dateStr, isEnd) {
+  if (!dateStr) return null;
+  const clean = String(dateStr).slice(0, 10);
+  const [y, m, d] = clean.split('-').map(Number);
+  if (isEnd) return new Date(y, m - 1, d, 23, 59, 59);
+  return new Date(y, m - 1, d);
+}
+function formatLocalDate(date) {
+  if (!date) return '';
+  if (typeof date === 'string') return date.slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+
 async function loadHomeStats() {
   if (!currentUser) return;
-  // 安全解析 YYYY-MM-DD 为本地零点 Date（避免时区差异导致 getDay() 算错）
-  function parseLocalDate(yyyymmdd, isEnd) {
-    if (!yyyymmdd) return null;
-    const [y, m, d] = yyyymmdd.split('-').map(Number);
-    if (isEnd) return new Date(y, m - 1, d, 23, 59, 59);
-    return new Date(y, m - 1, d);
-  }
   try {
     // 获取所有排班数据（当前草稿 + 历史归档）
     const res = await fetch(API + '/schedule-all');
@@ -2588,20 +2599,20 @@ async function loadHomeStats() {
         // 如果该 day 在 period 日期范围内找不到对应实际日期，跳过（无效数据）
         if (!actualDate) return;
         
-        const dateStr = actualDate.toISOString().slice(0, 10);
+        const dateStr = formatLocalDate(actualDate); // ✅ 本地日期字符串，无时区偏移
         // 用实际日期算出真实星期几作为显示标签（而非 schedule key）
         const realWdLabel = realWdNames[actualDate.getDay()];
         
         Object.keys(schedule[day]).forEach(slot => {
           const names = schedule[day][slot];
           if (names && names.includes(currentUser)) {
-            // 加入左边列表
+            // 加入左边列表（actualDate 保持 Date 对象用于排序）
             displayShifts.push({
               day, slot, slotId: slot,
-              actualDate: dateStr,
+              actualDate: actualDate, // ✅ 保持 Date 对象
               weekdayLabel: realWdLabel,
-              periodStart: pStart ? pStart.toISOString().slice(0,10) : null,
-              periodEnd: pEnd ? pEnd.toISOString().slice(0,10) : null
+              periodStart: pStart ? formatLocalDate(pStart) : null,
+              periodEnd: pEnd ? formatLocalDate(pEnd) : null
             });
             
             // 累加到日历统计（按日期分组）
@@ -2640,8 +2651,8 @@ async function loadHomeStats() {
       processScheduleSource(cur.schedule, pStart, pEnd, pEndTimeMs);
     }
     
-    // 按日期排序显示
-    displayShifts.sort((a, b) => (a.actualDate || '').localeCompare(b.actualDate || ''));
+    // 按日期排序显示（actualDate 是 Date 对象，直接比较时间戳）
+    displayShifts.sort((a, b) => a.actualDate - b.actualDate);
     renderMyShifts(displayShifts, true);
 
     // 渲染日历热力图
