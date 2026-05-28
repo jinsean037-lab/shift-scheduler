@@ -2636,19 +2636,24 @@ async function loadHomeStats() {
       });
     }
     
-    // 2. 处理当前未归档的 schedule（只要有数据就处理，不强制要求起止时间）
+    // 2. 处理当前未归档的 schedule（草稿状态才处理，避免与 confirmedPeriods 重复）
     const cur = allData.current || {};
     if (cur.schedule && Object.keys(cur.schedule).length > 0) {
-      // 如果有起止时间就用，没有则用当月1号~月底作为显示范围
-      let pStart = cur.start ? parseLocalDate(cur.start) : null;
-      let pEnd = cur.end ? parseLocalDate(cur.end, true) : null;
-      if (!pStart || !pEnd) {
-        const y = now.getFullYear(), m = now.getMonth();
-        pStart = new Date(y, m, 1);
-        pEnd = new Date(y, m + 1, 0, 23, 59, 59); // 当月最后一天
+      // ✅ 关键修复：已确认（有起止时间）的排班数据已在 confirmedPeriods 中，跳过
+      if (cur.start && cur.end) {
+        console.log('[loadHomeStats] 当前排班已确认，跳过 current.schedule 以避免重复统计');
+      } else {
+        // 草稿状态：使用当月范围或起止时间（若无起止时间则用当月）
+        let pStart = cur.start ? parseLocalDate(cur.start) : null;
+        let pEnd = cur.end ? parseLocalDate(cur.end, true) : null;
+        if (!pStart || !pEnd) {
+          const y = now.getFullYear(), m = now.getMonth();
+          pStart = new Date(y, m, 1);
+          pEnd = new Date(y, m + 1, 0, 23, 59, 59);
+        }
+        const pEndTimeMs = pEnd.getTime();
+        processScheduleSource(cur.schedule, pStart, pEnd, pEndTimeMs);
       }
-      const pEndTimeMs = pEnd.getTime();
-      processScheduleSource(cur.schedule, pStart, pEnd, pEndTimeMs);
     }
     
     // 按日期排序显示（actualDate 是 Date 对象，直接比较时间戳）
