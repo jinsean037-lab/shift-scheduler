@@ -1396,7 +1396,7 @@ body {
         <a class="nav-item" data-page="stats" onclick="switchTab('stats')">
           <span class="nav-icon">📋</span><span>取消与候补申请</span>
         </a>
-        <a class="nav-item" data-page="worktime" onclick="switchTab('worktime')">
+        <a class="nav-item" data-page="worktime" id="navWorktime" onclick="switchTab('worktime')">
           <span class="nav-icon">💼</span><span>工时申报</span>
         </a>
 
@@ -1977,6 +1977,8 @@ async function doLogin() {
       if (currentRole === 'admin') {
         document.getElementById('adminNavGroupTitle').style.display = '';
         document.getElementById('adminNavItem').style.display = '';
+        const wtNav = document.getElementById('navWorktime');
+        if (wtNav) wtNav.style.display = 'none';
       } else {
         document.getElementById('adminNavGroupTitle').style.display = 'none';
         document.getElementById('adminNavItem').style.display = 'none';
@@ -2014,6 +2016,8 @@ async function doAdminLogin() {
       document.getElementById('sidebarRole').textContent = '管理员';
       document.getElementById('adminNavGroupTitle').style.display = '';
       document.getElementById('adminNavItem').style.display = '';
+      const wtNav2 = document.getElementById('navWorktime');
+      if (wtNav2) wtNav2.style.display = 'none';
       document.getElementById('adminLoginModal').classList.remove('show');
       document.getElementById('loginPage').style.display = 'none';
       document.getElementById('mainPage').style.display = 'flex';
@@ -2605,7 +2609,7 @@ async function loadHomeStats() {
     } catch(e) { console.error('加载统计数据失败', e); }
 
     document.getElementById('statTotalShifts').textContent = totalShifts || '-';
-    document.getElementById('statTotalHours').textContent = totalHours > 0 ? totalHours + 'h' : '-';
+    document.getElementById('statTotalHours').textContent = totalHours > 0 ? totalHours.toFixed(1) + 'h' : '-';
     document.getElementById('statMorningShifts').textContent = morningShifts || '-';
     document.getElementById('statAfternoonShifts').textContent = afternoonShifts || '-';
 
@@ -3583,11 +3587,11 @@ async function loadWorkTimeClaim() {
     html += '<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px">';
     html += '<div style="padding:16px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:10px;flex:1;min-width:150px">';
     html += '<div style="font-size:13px;opacity:0.9">月工作时间总计</div>';
-    html += '<div style="font-size:28px;font-weight:700;margin-top:4px">' + (work.totalHours || 0) + ' <span style="font-size:14px;font-weight:400">小时</span></div>';
+    html += '<div style="font-size:28px;font-weight:700;margin-top:4px">' + (work.totalHours || 0).toFixed(1) + ' <span style="font-size:14px;font-weight:400">小时</span></div>';
     html += '</div>';
     html += '<div style="padding:16px 20px;background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff;border-radius:10px;flex:1;min-width:150px">';
     html += '<div style="font-size:13px;opacity:0.9">月劳务报酬总计</div>';
-    html += '<div style="font-size:28px;font-weight:700;margin-top:4px">' + (work.totalPay || 0) + ' <span style="font-size:14px;font-weight:400">元</span></div>';
+    html += '<div style="font-size:28px;font-weight:700;margin-top:4px">' + (work.totalPay || 0).toFixed(1) + ' <span style="font-size:14px;font-weight:400">元</span></div>';
     html += '</div>';
     html += '<div style="padding:16px 20px;background:#f5f5f5;border-radius:10px;flex:1;min-width:150px">';
     html += '<div style="font-size:13px;color:#666">工作天数</div>';
@@ -3678,21 +3682,27 @@ async function loadAdminWorktime() {
     if (allData.ok && allData.submissions && allData.submissions.length > 0) {
       html += '<div style="overflow-x:auto;margin-top:12px">';
       html += '<table style="width:100%;border-collapse:collapse;font-size:14px">';
-      html += '<thead><tr style="background:#f5f5f5">';
+      html += '<thead><tr style="background:#f5f5f0">';
       html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">姓名</th>';
       html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">工时</th>';
       html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">报酬</th>';
       html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">状态</th>';
       html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">提交时间</th>';
+      html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">操作</th>';
       html += '</tr></thead><tbody>';
       
       allData.submissions.forEach(s => {
         html += '<tr>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + s.name + '</td>';
-        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalHours || 0) + ' 小时</td>';
-        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalPay || 0) + ' 元</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalHours || 0).toFixed(1) + ' 小时</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalPay || 0).toFixed(1) + ' 元</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submitted ? '<span style="color:#2e7d32">✅ 已提交</span>' : '<span style="color:#999">⏳ 未提交</span>') + '</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submittedAt ? s.submittedAt.slice(0, 16).replace('T', ' ') : '-') + '</td>';
+        if (s.submitted) {
+          html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0"><button class="quick-btn quick-btn-primary" onclick="exportAttendanceDocx(\'' + s.name + '\')" style="padding:4px 12px;font-size:12px">📄 导出考勤表</button></td>';
+        } else {
+          html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0"><span style="color:#ccc;font-size:12px">-</span></td>';
+        }
         html += '</tr>';
       });
       
@@ -3703,7 +3713,7 @@ async function loadAdminWorktime() {
       const totalHours = allData.submissions.reduce((sum, s) => sum + (s.totalHours || 0), 0);
       const totalPay = allData.submissions.reduce((sum, s) => sum + (s.totalPay || 0), 0);
       html += '<div style="margin-top:12px;padding:12px;background:#fafafa;border-radius:6px;font-size:13px;color:#666">';
-      html += '已提交：' + submittedCount + '/' + allData.submissions.length + ' 人　｜　总工时：' + totalHours.toFixed(1) + ' 小时　｜　总报酬：' + totalPay + ' 元';
+      html += '已提交：' + submittedCount + '/' + allData.submissions.length + ' 人　｜　总工时：' + totalHours.toFixed(1) + ' 小时　｜　总报酬：' + totalPay.toFixed(1) + ' 元';
       html += '</div>';
     } else {
       html += '<p style="color:#999;font-size:13px;margin-top:12px">暂无数据</p>';
@@ -3748,6 +3758,19 @@ async function toggleWorkTimeClaim(isOpen) {
   }
 }
 
+// 导出单个成员的考勤表 .docx
+function exportAttendanceDocx(name) {
+  if (!name) { showToast('缺少成员姓名'); return; }
+  const url = API + '/admin/worktime-claim/export/' + encodeURIComponent(name);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('正在导出 ' + name + ' 的考勤表...');
+}
+
 // ========== 初始化 ==========
 window.addEventListener('DOMContentLoaded', () => {
   // 如果已登录，直接跳转
@@ -3761,6 +3784,9 @@ window.addEventListener('DOMContentLoaded', () => {
     if (currentRole==='admin') {
       document.getElementById('adminNavGroupTitle').style.display = '';
       document.getElementById('adminNavItem').style.display = '';
+      // 管理员隐藏成员端工时申报入口
+      const wtNav = document.getElementById('navWorktime');
+      if (wtNav) wtNav.style.display = 'none';
     }
     switchTab('home');
     loadConfig();
