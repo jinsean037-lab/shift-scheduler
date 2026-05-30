@@ -1712,7 +1712,7 @@ function cell(text, isHeader = false) {
 
 function cellOpts(isHeader = false) {
   return {
-    width: { size: isHeader ? 16 : 16, type: WidthType.PERCENTAGE },
+    width: { size: isHeader ? 16.66 : 16.66, type: WidthType.PERCENTAGE },
     borders: {
       top: { style: BorderStyle.SINGLE, size: 1 },
       bottom: { style: BorderStyle.SINGLE, size: 1 },
@@ -1720,6 +1720,7 @@ function cellOpts(isHeader = false) {
       right: { style: BorderStyle.SINGLE, size: 1 },
     },
     shading: isHeader ? { fill: 'F0F0F0' } : undefined,
+    verticalAlign: 'center',
   }
 }
 
