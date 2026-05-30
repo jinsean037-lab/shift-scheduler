@@ -1338,6 +1338,15 @@ app.get('/api/admin/worktime-claim/all', async (req, res) => {
       }
     }
     
+    // 重新计算每个已提交成员的工时（避免旧数据残留）
+    for (const item of result) {
+      if (item.submitted) {
+        const workData = calculateMemberWorkTime(store, item.name, wtc.year, wtc.month)
+        item.totalHours = workData.totalHours
+        item.totalPay = workData.totalPay
+      }
+    }
+    
     res.json({ ok: true, year: wtc.year, month: wtc.month, isOpen: wtc.isOpen, submissions: result })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
@@ -1405,7 +1414,7 @@ function calculateMemberWorkTime(store, name, year, month) {
     totalHours += rounded
   })
   
-  const totalPay = Math.round(totalHours * 25 * 10) / 10 // 25元/小时，保留一位小数
+  const totalPay = parseFloat((totalHours * 25).toFixed(1)) // 25元/小时，保留一位小数
   
   return { totalHours, totalPay, workByDate, workDays: Object.keys(workByDate).length }
 }
@@ -1714,7 +1723,7 @@ function cellOpts(isHeader = false) {
       left: { style: BorderStyle.SINGLE, size: 1 },
       right: { style: BorderStyle.SINGLE, size: 1 },
     },
-    shading: isHeader ? { type: ShadingType.CLEAR, fill: 'F0F0F0' } : undefined,
+    shading: isHeader ? { fill: 'F0F0F0' } : undefined,
   }
 }
 
