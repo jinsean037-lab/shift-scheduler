@@ -2580,47 +2580,40 @@ async function loadHomeStats() {
     const datePeriodMap = {}; // { '2026-05-27': { total, completed } } 日历用
     
     // 辅助函数：处理一个排班数据源（confirmedPeriod 或 current schedule）
-    function processScheduleSource(schedule, pStart, pEnd, pEndTimeMs) {
+    const globalSeen = new Set();
+    function processScheduleSource(schedule, pStart, pEnd, pEndTimeMs, periodId) {
       if (!schedule) return;
       Object.keys(schedule).forEach(day => {
         const targetWd = dayNameMap[day];
-        if (targetWd === undefined) return; // 跳过非周一~周五的 key
-        
-        // 将 day 映射到 period 范围内的实际日期
+        if (targetWd === undefined) return;
         let actualDate = null;
         if (pStart && pEnd) {
           const startMs = pStart.getTime(), endMs = pEnd.getTime();
-          // 用时间戳遍历避免 setDate 副作用
           for (let ms = startMs; ms <= endMs; ms += 86400000) {
             const td = new Date(ms);
             if (td.getDay() === targetWd) { actualDate = td; break; }
           }
         }
-        // 如果该 day 在 period 日期范围内找不到对应实际日期，跳过（无效数据）
         if (!actualDate) return;
-        
-        const dateStr = formatLocalDate(actualDate); // ✅ 本地日期字符串，无时区偏移
-        // 用实际日期算出真实星期几作为显示标签（而非 schedule key）
+        const dateStr = formatLocalDate(actualDate);
         const realWdLabel = realWdNames[actualDate.getDay()];
-        
         Object.keys(schedule[day]).forEach(slot => {
           const names = schedule[day][slot];
           if (names && names.includes(currentUser)) {
-            // 加入左边列表（actualDate 保持 Date 对象用于排序）
+            // ✅ 去重：同一 periodId+day+slot 只计一次
+            const uniqueKey = (periodId || 'draft') + '|' + day + '|' + slot;
+            if (globalSeen.has(uniqueKey)) return;
+            globalSeen.add(uniqueKey);
             displayShifts.push({
               day, slot, slotId: slot,
-              actualDate: actualDate, // ✅ 保持 Date 对象
+              actualDate: actualDate,
               weekdayLabel: realWdLabel,
               periodStart: pStart ? formatLocalDate(pStart) : null,
               periodEnd: pEnd ? formatLocalDate(pEnd) : null
             });
-            
-            // 累加到日历统计（按日期分组）
             if (!datePeriodMap[dateStr]) datePeriodMap[dateStr] = { total: 0, completed: 0 };
             datePeriodMap[dateStr].total++;
-            if (pEndTimeMs < nowTime) {
-              datePeriodMap[dateStr].completed++;
-            }
+            if (pEndTimeMs < nowTime) datePeriodMap[dateStr].completed++;
           }
         });
       });
@@ -2628,11 +2621,12 @@ async function loadHomeStats() {
     
     // 1. 遍历已归档的 confirmedPeriods
     if (allData.confirmedPeriods && allData.confirmedPeriods.length > 0) {
-      allData.confirmedPeriods.forEach(period => {
+      allData.confirmedPeriods.forEach((period, idx) => {
         const pStart = period.start ? parseLocalDate(period.start) : null;
-        const pEnd = period.end ? parseLocalDate(period.end, true) : null;
+        const pEnd = period.end ? parseLocalDate(period.end) : null;
         const pEndTimeMs = period.end ? parseLocalDate(period.end).getTime() : Infinity;
-        processScheduleSource(period.schedule, pStart, pEnd, pEndTimeMs);
+        const periodId = 'confirmed_' + (period.start || '') + '_' + (period.end || '');
+        processScheduleSource(period.schedule, pStart, pEnd, pEndTimeMs, periodId);
       });
     }
     
@@ -2645,14 +2639,14 @@ async function loadHomeStats() {
       } else {
         // 草稿状态：使用当月范围或起止时间（若无起止时间则用当月）
         let pStart = cur.start ? parseLocalDate(cur.start) : null;
-        let pEnd = cur.end ? parseLocalDate(cur.end, true) : null;
+        let pEnd = cur.end ? parseLocalDate(cur.end) : null;
         if (!pStart || !pEnd) {
           const y = now.getFullYear(), m = now.getMonth();
           pStart = new Date(y, m, 1);
           pEnd = new Date(y, m + 1, 0, 23, 59, 59);
         }
         const pEndTimeMs = pEnd.getTime();
-        processScheduleSource(cur.schedule, pStart, pEnd, pEndTimeMs);
+        processScheduleSource(cur.schedule, pStart, pEnd, pEndTimeMs, 'draft');
       }
     }
     
