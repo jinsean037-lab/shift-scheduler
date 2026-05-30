@@ -1390,10 +1390,10 @@ body {
         <a class="nav-item" data-page="history" onclick="switchTab('history')">
           <span class="nav-icon">📜</span><span>历史排班</span>
         </a>
-        <a class="nav-item" data-page="checkin" onclick="switchTab('checkin')">
+        <a class="nav-item" data-page="checkin" id="navCheckin" onclick="switchTab('checkin')">
           <span class="nav-icon">📍</span><span>值班打卡</span>
         </a>
-        <a class="nav-item" data-page="stats" onclick="switchTab('stats')">
+        <a class="nav-item" data-page="stats" id="navStats" onclick="switchTab('stats')">
           <span class="nav-icon">📋</span><span>取消与候补申请</span>
         </a>
         <a class="nav-item" data-page="worktime" id="navWorktime" onclick="switchTab('worktime')">
@@ -1973,15 +1973,23 @@ async function doLogin() {
       document.getElementById('sidebarName').textContent = currentUser;
       document.getElementById('sidebarRole').textContent = currentRole === 'admin' ? '管理员' : '助理';
       // userName/userRole 已移除（sidebar替代），跳过
-      // 显示/隐藏管理导航
+      // 显示/隐藏导航：管理员隐藏成员功能入口
       if (currentRole === 'admin') {
         document.getElementById('adminNavGroupTitle').style.display = '';
         document.getElementById('adminNavItem').style.display = '';
-        const wtNav = document.getElementById('navWorktime');
-        if (wtNav) wtNav.style.display = 'none';
+        // 管理员：隐藏成员端导航项
+        ['navCheckin','navStats','navWorktime'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
       } else {
         document.getElementById('adminNavGroupTitle').style.display = 'none';
         document.getElementById('adminNavItem').style.display = 'none';
+        // 成员：显示所有成员端导航项
+        ['navCheckin','navStats','navWorktime'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = '';
+        });
       }
       document.getElementById('loginPage').style.display = 'none';
       document.getElementById('mainPage').style.display = 'flex';
@@ -2566,18 +2574,33 @@ async function loadHomeStats() {
     }
 
     // 统计卡片更新：基于打卡数据 + 已通过补报
+    // 与工时申报页逻辑统一：只统计当前排班周期（或当月）的数据
     let totalShifts = 0;
     let totalHours = 0;
     let morningShifts = 0;
     let afternoonShifts = 0;
-    const processedDates = new Set(); // 打卡已处理的日期（避免与补报重复）
+    const processedDates = new Set();
     try {
-      // 1. 打卡数据
+      // 获取当前排班周期范围（与工时申报页一致）
+      const allData = await (await fetch(API + '/schedule')).json();
+      let rangeStart = null, rangeEnd = null;
+      if (allData.scheduleStart && allData.scheduleEnd) {
+        rangeStart = allData.scheduleStart.slice(0, 10);
+        rangeEnd = allData.scheduleEnd.slice(0, 10);
+      } else {
+        // 无排班周期时取当月
+        const now = new Date();
+        rangeStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+        const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+        rangeEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+      }
+      // 1. 打卡数据（按日期范围过滤）
       const ckRes = await fetch(API + '/my-checkins?name=' + encodeURIComponent(currentUser));
       const ckData = await ckRes.json();
       const checkins = (ckData.checkins || []).sort((a, b) => a.time.localeCompare(b.time));
       // 每个日期配对 in+out 算一次值班
       checkins.forEach(c => {
+        if (c.date < rangeStart || c.date > rangeEnd) return; // 超出范围跳过
         if (c.type === 'in' && !processedDates.has(c.date)) {
           const outRec = checkins.find(o => o.date === c.date && o.type === 'out');
           if (outRec) {
@@ -2593,17 +2616,17 @@ async function loadHomeStats() {
           }
         }
       });
-      // 2. 补报数据（只算 approved 且不在打卡日期内的）
+      // 2. 补报数据（按日期范围过滤）
       const otRes = await fetch(API + '/overtime?name=' + encodeURIComponent(currentUser));
       const otData = await otRes.json();
       const overtimes = (otData.list || []).filter(o => o.status === 'approved');
       overtimes.forEach(ot => {
+        if (ot.date < rangeStart || ot.date > rangeEnd) return;
         if (!processedDates.has(ot.date)) {
           totalShifts++;
           processedDates.add(ot.date);
           const otHours = parseFloat(ot.hours) || 0;
-          totalHours += Math.min(otHours, 8); // 补报时长上限8h
-          // 补报无 slotId，不计入早/午班分类
+          totalHours += Math.min(otHours, 8);
         }
       });
     } catch(e) { console.error('加载统计数据失败', e); }
