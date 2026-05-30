@@ -1368,9 +1368,9 @@ function calculateMemberWorkTime(store, name, year, month) {
   const workByDate = {}
   
   // 1. 打卡记录：每次 in/out 配对独立计算
-  const checkins = (store.checkins || []).filter(c => c.name === name && c.date >= monthStartStr && c.date <= monthEndStr)
+  const myCheckins = checkins.filter(c => c.name === name && c.date >= monthStartStr && c.date <= monthEndStr)
   const byDate = {}
-  checkins.forEach(c => {
+  myCheckins.forEach(c => {
     if (!byDate[c.date]) byDate[c.date] = []
     byDate[c.date].push(c)
   })
