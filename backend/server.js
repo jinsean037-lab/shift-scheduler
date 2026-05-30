@@ -44,7 +44,14 @@ function defaultStore() {
     cancelRequests: [],
     checkins: [],
     overtimes: [],
-    confirmedPeriods: []
+    confirmedPeriods: [],
+    // 工时申报
+    workTimeClaim: {
+      year: null,
+      month: null,
+      isOpen: false,
+      submissions: {} // { '王梓豪': { name, bankAccount, department, studentId, dorm, phone, totalHours, totalPay, submittedAt } }
+    }
   }
 }
 
@@ -1193,6 +1200,216 @@ app.post('/api/cancel-waitlist', async (req, res) => {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
 })
+
+// ========== 工时申报 API ==========
+
+// 管理员：开启/关闭本月工时申报
+app.post('/api/admin/worktime-claim/toggle', async (req, res) => {
+  try {
+    const { year, month, isOpen } = req.body
+    const store = await readStore()
+    if (!store.workTimeClaim) store.workTimeClaim = { year: null, month: null, isOpen: false, submissions: {} }
+    
+    if (isOpen) {
+      // 开启新的一轮申报，清空之前的提交
+      store.workTimeClaim = { year, month, isOpen: true, submissions: {} }
+    } else {
+      store.workTimeClaim.isOpen = false
+    }
+    
+    await writeStore({ workTimeClaim: store.workTimeClaim })
+    res.json({ ok: true, workTimeClaim: store.workTimeClaim })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 获取工时申报状态（成员和管理员通用）
+app.get('/api/worktime-claim/status', async (req, res) => {
+  try {
+    const store = await readStore()
+    const wtc = store.workTimeClaim || { year: null, month: null, isOpen: false, submissions: {} }
+    res.json({ ok: true, workTimeClaim: wtc })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：获取自己的工时数据（从打卡+补报计算）
+app.get('/api/worktime-claim/my-data', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.status(400).json({ ok: false, msg: '缺少name参数' })
+    
+    const store = await readStore()
+    const wtc = store.workTimeClaim || { year: null, month: null, isOpen: false, submissions: {} }
+    
+    if (!wtc.isOpen || !wtc.year || !wtc.month) {
+      return res.json({ ok: true, isOpen: false, msg: '当前未开放工时申报' })
+    }
+    
+    // 计算该成员在指定月份的工作时间
+    const year = wtc.year
+    const month = wtc.month
+    const workData = calculateMemberWorkTime(store, name, year, month)
+    
+    // 获取已提交的申报信息（如果有）
+    const submission = wtc.submissions[name] || null
+    
+    res.json({
+      ok: true,
+      isOpen: true,
+      year,
+      month,
+      workData,
+      submission
+    })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：提交工时申报
+app.post('/api/worktime-claim/submit', async (req, res) => {
+  try {
+    const { name, bankAccount, department, studentId, dorm, phone } = req.body
+    if (!name) return res.status(400).json({ ok: false, msg: '缺少name参数' })
+    
+    const store = await readStore()
+    const wtc = store.workTimeClaim || { year: null, month: null, isOpen: false, submissions: {} }
+    
+    if (!wtc.isOpen) {
+      return res.status(400).json({ ok: false, msg: '当前未开放工时申报' })
+    }
+    
+    // 计算工时
+    const workData = calculateMemberWorkTime(store, name, wtc.year, wtc.month)
+    
+    // 保存提交
+    wtc.submissions[name] = {
+      name,
+      bankAccount: bankAccount || '',
+      department: department || '岭南学院',
+      studentId: studentId || '',
+      dorm: dorm || '',
+      phone: phone || '',
+      totalHours: workData.totalHours,
+      totalPay: workData.totalPay,
+      workDays: workData.workDays,
+      submittedAt: new Date().toISOString()
+    }
+    
+    store.workTimeClaim = wtc
+    await writeStore({ workTimeClaim: wtc })
+    
+    res.json({ ok: true, msg: '申报提交成功', submission: wtc.submissions[name] })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：获取所有成员的申报统计
+app.get('/api/admin/worktime-claim/all', async (req, res) => {
+  try {
+    const store = await readStore()
+    const wtc = store.workTimeClaim || { year: null, month: null, isOpen: false, submissions: {} }
+    
+    // 为所有成员计算工时（包括未提交的）
+    const allMembers = store.members || []
+    const result = []
+    
+    for (const name of allMembers) {
+      const submission = wtc.submissions[name]
+      if (submission) {
+        result.push({ ...submission, submitted: true })
+      } else {
+        // 未提交，计算工时供参考
+        const workData = calculateMemberWorkTime(store, name, wtc.year, wtc.month)
+        result.push({
+          name,
+          totalHours: workData.totalHours,
+          totalPay: workData.totalPay,
+          submitted: false
+        })
+      }
+    }
+    
+    res.json({ ok: true, year: wtc.year, month: wtc.month, isOpen: wtc.isOpen, submissions: result })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 辅助函数：计算成员在指定月份的工作时间
+function calculateMemberWorkTime(store, name, year, month) {
+  const checkins = store.checkins || []
+  const overtimes = (store.overtimes || []).filter(ot => ot.status === 'approved')
+  
+  // 月份范围
+  const monthStart = new Date(year, month - 1, 1)
+  const monthEnd = new Date(year, month, 0) // 月末
+  const monthStartStr = monthStart.toISOString().slice(0, 10)
+  const monthEndStr = monthEnd.toISOString().slice(0, 10)
+  
+  // 按日期汇总工时
+  const workByDate = {}
+  
+  // 1. 从打卡记录计算
+  const myCheckins = checkins.filter(c => c.name === name && c.date >= monthStartStr && c.date <= monthEndStr)
+  
+  // 按日期分组，配对签到签退
+  const byDate = {}
+  myCheckins.forEach(c => {
+    if (!byDate[c.date]) byDate[c.date] = []
+    byDate[c.date].push(c)
+  })
+  
+  Object.keys(byDate).forEach(date => {
+    const recs = byDate[date].sort((a, b) => a.time.localeCompare(b.time))
+    let inTime = null
+    recs.forEach(r => {
+      if (r.type === 'in') {
+        inTime = r.time
+      } else if (r.type === 'out' && inTime) {
+        // 计算时长
+        const inMinutes = timeToMinutes(inTime.slice(11, 16))
+        const outMinutes = timeToMinutes(r.time.slice(11, 16))
+        const hours = Math.max(0, (outMinutes - inMinutes) / 60)
+        
+        if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
+        workByDate[date].hours += hours
+        workByDate[date].slots.push({ in: inTime.slice(11, 16), out: r.time.slice(11, 16) })
+        inTime = null
+      }
+    })
+  })
+  
+  // 2. 加上已通过的补报
+  overtimes.filter(ot => ot.name === name && ot.date >= monthStartStr && ot.date <= monthEndStr).forEach(ot => {
+    const date = ot.date
+    if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
+    workByDate[date].hours += ot.hours
+    workByDate[date].slots.push({ overtime: true, hours: ot.hours, content: ot.content })
+  })
+  
+  // 计算总时长（向上取整0.5小时，封顶2小时/天）
+  let totalHours = 0
+  Object.values(workByDate).forEach(d => {
+    const capped = Math.min(d.hours, 2)
+    const rounded = Math.ceil(capped * 2) / 2 // 向上取整到0.5
+    d.finalHours = rounded
+    totalHours += rounded
+  })
+  
+  const totalPay = Math.round(totalHours * 25) // 25元/小时
+  
+  return { totalHours, totalPay, workByDate, workDays: Object.keys(workByDate).length }
+}
+
+function timeToMinutes(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number)
+  return h * 60 + m
+}
 
 async function start() {
   const connected = await connectMongo()
