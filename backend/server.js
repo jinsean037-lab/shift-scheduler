@@ -264,17 +264,20 @@ app.post('/api/admin/schedule-confirm', async (req, res) => {
     const { scheduleStart, scheduleEnd } = req.body
     const store = await readStore()
     
-    // 如果有当前排班数据，先归档到历史（只要有数据就归档，不管之前有没有设置过时间）
-    // 注意：这里用 req.body 里的 scheduleStart/scheduleEnd，而不是 store 里的旧值
-    // 因为 store.scheduleStart 在首次确认时可能是 null
+    // 归档当前排班到历史（去重：相同起止日期不再重复追加）
     if (store.schedule && Object.keys(store.schedule).length > 0) {
+      const effStart = scheduleStart || store.scheduleStart || new Date().toISOString().slice(0, 10)
+      const effEnd   = scheduleEnd   || store.scheduleEnd   || new Date().toISOString().slice(0, 10)
       if (!store.confirmedPeriods) store.confirmedPeriods = []
-      store.confirmedPeriods.push({
-        start: scheduleStart || store.scheduleStart || new Date().toISOString().slice(0, 10),
-        end: scheduleEnd || store.scheduleEnd || new Date().toISOString().slice(0, 10),
-        schedule: JSON.parse(JSON.stringify(store.schedule)),
-        confirmedAt: new Date().toISOString()
-      })
+      const alreadyExists = store.confirmedPeriods.some(p => p.start === effStart && p.end === effEnd)
+      if (!alreadyExists) {
+        store.confirmedPeriods.push({
+          start: effStart,
+          end: effEnd,
+          schedule: JSON.parse(JSON.stringify(store.schedule)),
+          confirmedAt: new Date().toISOString()
+        })
+      }
     }
     
     // 设置新的排班周期
@@ -294,15 +297,20 @@ app.post('/api/admin/schedule-confirm', async (req, res) => {
 app.post('/api/admin/schedule-archive', async (req, res) => {
   try {
     const store = await readStore()
-    // 归档当前排班
+    // 归档当前排班（去重：相同起止日期不再重复追加）
     if (store.schedule && Object.keys(store.schedule).length > 0) {
+      const effStart = store.scheduleStart || new Date().toISOString().slice(0, 10)
+      const effEnd   = store.scheduleEnd   || new Date().toISOString().slice(0, 10)
       if (!store.confirmedPeriods) store.confirmedPeriods = []
-      store.confirmedPeriods.push({
-        start: store.scheduleStart || new Date().toISOString().slice(0, 10),
-        end: store.scheduleEnd || new Date().toISOString().slice(0, 10),
-        schedule: JSON.parse(JSON.stringify(store.schedule)),
-        confirmedAt: new Date().toISOString()
-      })
+      const alreadyExists = store.confirmedPeriods.some(p => p.start === effStart && p.end === effEnd)
+      if (!alreadyExists) {
+        store.confirmedPeriods.push({
+          start: effStart,
+          end: effEnd,
+          schedule: JSON.parse(JSON.stringify(store.schedule)),
+          confirmedAt: new Date().toISOString()
+        })
+      }
     }
     // 清空草稿
     store.schedule = {}
