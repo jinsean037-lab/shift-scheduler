@@ -2604,18 +2604,19 @@ async function loadHomeStats() {
       const ckRes = await fetch(API + '/my-checkins?name=' + encodeURIComponent(currentUser));
       const ckData = await ckRes.json();
       const checkins = (ckData.checkins || []).sort((a, b) => a.time.localeCompare(b.time));
-      // 每个日期配对 in+out 算一次值班
+      // 每个日期可有多组 in/out 配对（与后端 calculateMemberWorkTime 逻辑统一）
+      const pairedDates = new Set();
       checkins.forEach(c => {
-        if (c.date < rangeStart || c.date > rangeEnd) return; // 超出范围跳过
-        if (c.type === 'in' && !processedDates.has(c.date)) {
-          const outRec = checkins.find(o => o.date === c.date && o.type === 'out');
+        if (c.date < rangeStart || c.date > rangeEnd) return;
+        if (c.type === 'in') {
+          const outRec = checkins.find(o => o.date === c.date && o.type === 'out' && o.time > c.time);
           if (outRec) {
             totalShifts++;
-            processedDates.add(c.date);
+            pairedDates.add(c.date);
             const minutes = (new Date(outRec.time) - new Date(c.time)) / 60000;
             const hoursRaw = minutes / 60;
-            const hoursRounded = Math.ceil(hoursRaw * 2) / 2;
-            totalHours += Math.min(hoursRounded, 2);
+            const hoursRounded = Math.ceil(hoursRaw * 2) / 2; // 向上取整到0.5h
+            totalHours += hoursRounded; // 不封顶
             const slotId = c.slotId || '';
             if (slotId.startsWith('am')) morningShifts++;
             else if (slotId.startsWith('pm')) afternoonShifts++;
@@ -2628,12 +2629,10 @@ async function loadHomeStats() {
       const overtimes = (otData.list || []).filter(o => o.status === 'approved');
       overtimes.forEach(ot => {
         if (ot.date < rangeStart || ot.date > rangeEnd) return;
-        if (!processedDates.has(ot.date)) {
-          totalShifts++;
-          processedDates.add(ot.date);
-          const otHours = parseFloat(ot.hours) || 0;
-          totalHours += Math.min(otHours, 8);
-        }
+        totalShifts++;
+        const otHours = parseFloat(ot.hours) || 0;
+        const otRounded = Math.ceil(otHours * 2) / 2; // 向上取整到0.5h
+        totalHours += otRounded; // 不封顶
       });
     } catch(e) { console.error('加载统计数据失败', e); }
 
@@ -3813,9 +3812,11 @@ window.addEventListener('DOMContentLoaded', () => {
     if (currentRole==='admin') {
       document.getElementById('adminNavGroupTitle').style.display = '';
       document.getElementById('adminNavItem').style.display = '';
-      // 管理员隐藏成员端工时申报入口
-      const wtNav = document.getElementById('navWorktime');
-      if (wtNav) wtNav.style.display = 'none';
+      // 管理员隐藏所有成员端导航项
+      ['navSchedule','navCheckin','navStats','navWorktime'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
     }
     switchTab('home');
     loadConfig();
