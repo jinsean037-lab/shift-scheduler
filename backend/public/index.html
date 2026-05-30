@@ -1533,6 +1533,12 @@ body {
           <div id="otError" style="color:#c41230;font-size:12px;margin-top:8px;display:none"></div>
           <div id="otList" style="margin-top:14px"></div>
         </div>
+        <!-- 我的打卡记录 -->
+        <div class="section-card" style="margin-top:16px">
+          <h3>📍 我的打卡记录</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">查看历史签到/签退记录</p>
+          <div id="myCheckinList" style="margin-top:10px"></div>
+        </div>
       </div>
 
       <!-- ===== 排班表视图 ===== -->
@@ -1840,6 +1846,7 @@ function switchTab(tab) {
     const nav = document.querySelector('.nav-item[data-page="home"]');
     if (nav) nav.classList.add('active');
     loadHomeStats();
+    loadMyCheckinHistory();
   } else if (tab === 'schedule') {
     document.getElementById('scheduleView').classList.add('active');
     const nav = document.querySelector('.nav-item[data-page="schedule"]');
@@ -2907,6 +2914,49 @@ function showCheckinError(msg) {
   const el = document.getElementById('checkinError');
   el.textContent = msg;
   el.style.display = 'block';
+}
+
+// ========== 成员打卡历史记录 ==========
+async function loadMyCheckinHistory() {
+  const el = document.getElementById('myCheckinList');
+  if (!el) return;
+  el.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0">加载中...</p>';
+  try {
+    const res = await fetch(API + '/my-checkins?name=' + encodeURIComponent(currentUser));
+    const data = await res.json();
+    const checkins = (data.checkins || []).sort((a, b) => b.time.localeCompare(a.time));
+    if (!checkins.length) {
+      el.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0">暂无打卡记录</p>';
+      return;
+    }
+    // 按日期分组展示
+    const byDate = {};
+    checkins.forEach(c => {
+      if (!byDate[c.date]) byDate[c.date] = [];
+      byDate[c.date].push(c);
+    });
+    let html = '';
+    Object.keys(byDate).sort().reverse().forEach(date => {
+      const recs = byDate[date];
+      const label = date + '（' + ['日','一','二','三','四','五','六'][new Date(date + 'T00:00:00').getDay()] + '）';
+      html += '<div style="margin-bottom:10px;padding:10px 12px;background:#fafafa;border-radius:8px;border-left:3px solid #8B1A1A">';
+      html += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:6px">' + label + '</div>';
+      recs.sort((a, b) => a.time.localeCompare(b.time)).forEach(c => {
+        const timeStr = c.time.slice(11, 16);
+        const typeLabel = c.type === 'in' ? '🟢 签到' : '🔴 签退';
+        const locStr = (c.latitude && c.longitude) ? '📍(' + c.latitude.toFixed(4) + ', ' + c.longitude.toFixed(4) + ')' : '';
+        html += '<div style="font-size:12px;color:#555;padding:2px 0;display:flex;gap:8px;align-items:center">' +
+          '<span style="white-space:nowrap">' + typeLabel + '</span>' +
+          '<span style="font-weight:500">' + timeStr + '</span>' +
+          '<span style="color:#999;font-size:11px">' + locStr + '</span>' +
+          '</div>';
+      });
+      html += '</div>';
+    });
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<p style="color:#c41230;font-size:13px">加载失败</p>';
+  }
 }
 
 function renderCalendarFromDateMap(datePeriodMap, year, month) {
