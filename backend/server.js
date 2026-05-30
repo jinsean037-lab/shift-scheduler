@@ -1,6 +1,10 @@
 const express = require('express')
 const path = require('path')
 const { MongoClient } = require('mongodb')
+const {
+  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+  WidthType, AlignmentType, HeadingLevel, BorderStyle, ShadingType
+} = require('docx')
 
 // ========== MongoDB 连接 ==========
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://1327446407_db_user:<db_password>@ac-1pkoj3t-shard-00-00.mdoh4fq.mongodb.net:27017,ac-1pkoj3t-shard-00-01.mdoh4fq.mongodb.net:27017,ac-1pkoj3t-shard-00-02.mdoh4fq.mongodb.net:27017/?ssl=true&replicaSet=atlas-fvozf6-shard-0&authSource=admin&appName=Cluster0'
@@ -1401,7 +1405,7 @@ function calculateMemberWorkTime(store, name, year, month) {
     totalHours += rounded
   })
   
-  const totalPay = Math.round(totalHours * 25) // 25元/小时
+  const totalPay = Math.round(totalHours * 25 * 10) / 10 // 25元/小时，保留一位小数
   
   return { totalHours, totalPay, workByDate, workDays: Object.keys(workByDate).length }
 }
@@ -1409,6 +1413,309 @@ function calculateMemberWorkTime(store, name, year, month) {
 function timeToMinutes(timeStr) {
   const [h, m] = timeStr.split(':').map(Number)
   return h * 60 + m
+}
+
+// ========== 工时申报导出 .docx ==========
+
+// 管理员：导出单个成员的考勤表 .docx
+app.get('/api/admin/worktime-claim/export/:name', async (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name)
+    const store = await readStore()
+    const wtc = store.workTimeClaim || { year: null, month: null, isOpen: false, submissions: {} }
+    
+    if (!wtc.year || !wtc.month) {
+      return res.status(400).json({ ok: false, msg: '当前没有开放的申报周期' })
+    }
+    
+    const submission = wtc.submissions[name]
+    if (!submission) {
+      return res.status(404).json({ ok: false, msg: '该成员尚未提交申报' })
+    }
+    
+    // 计算工时数据（按日期+时段）
+    const workData = calculateMemberWorkTime(store, name, wtc.year, wtc.month)
+    
+    // 生成 docx
+    const docBuffer = await generateAttendanceDocx(wtc.year, wtc.month, submission, workData, store)
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}_${wtc.year}年${wtc.month}月_勤工助学考勤表.docx`)
+    res.send(docBuffer)
+  } catch (e) {
+    console.error('导出考勤表错误:', e)
+    res.status(500).json({ ok: false, msg: '导出失败: ' + e.message })
+  }
+})
+
+// 管理员：一键导出所有已提交成员的考勤表（zip）
+app.get('/api/admin/worktime-claim/export-all', async (req, res) => {
+  try {
+    const store = await readStore()
+    const wtc = store.workTimeClaim || { year: null, month: null, isOpen: false, submissions: {} }
+    
+    if (!wtc.year || !wtc.month) {
+      return res.status(400).json({ ok: false, msg: '当前没有开放的申报周期' })
+    }
+    
+    const submittedNames = Object.keys(wtc.submissions).filter(k => wtc.submissions[k])
+    if (submittedNames.length === 0) {
+      return res.status(400).json({ ok: false, msg: '暂无已提交的申报' })
+    }
+    
+    // 如果只有一个成员，直接返回单个文件
+    if (submittedNames.length === 1) {
+      const name = submittedNames[0]
+      const submission = wtc.submissions[name]
+      const workData = calculateMemberWorkTime(store, name, wtc.year, wtc.month)
+      const docBuffer = await generateAttendanceDocx(wtc.year, wtc.month, submission, workData, store)
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${wtc.year}年${wtc.month}月_全部考勤表.docx`)
+      return res.send(docBuffer)
+    }
+    
+    // 多个成员：需要 archiver 生成 zip，暂时逐个导出提示
+    // 这里简化为返回第一个的下载链接列表
+    res.json({ 
+      ok: true, 
+      msg: '请点击每个成员的「导出」按钮单独下载',
+      names: submittedNames,
+      exportUrls: submittedNames.map(n => `/api/admin/worktime-claim/export/${encodeURIComponent(n)}`)
+    })
+  } catch (e) {
+    console.error('批量导出错误:', e)
+    res.status(500).json({ ok: false, msg: '导出失败: ' + e.message })
+  }
+})
+
+// 生成勤工助学考勤表 docx
+async function generateAttendanceDocx(year, month, submission, workData, store) {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, 
+          WidthType, AlignmentType, BorderStyle, ShadingType } = require('docx')
+  
+  // 时段映射：将打卡时间归类到上午/下午/晚上
+  function classifySlot(timeStr) {
+    if (!timeStr) return ''
+    const h = parseInt(timeStr.split(':')[0])
+    if (h >= 6 && h < 12) return '上午'
+    if (h >= 12 && h < 18) return '下午'
+    if (h >= 18 && h <= 23) return '晚上'
+    return ''
+  }
+  
+  // 构建日期→时段映射
+  const dateSlots = {}
+  Object.entries(workData.workByDate || {}).forEach(([date, info]) => {
+    dateSlots[date] = { am: '', pm: '', eve: '' }
+    ;(info.slots || []).forEach(s => {
+      if (s.overtime) {
+        // 补报：根据内容或默认填入
+        if (!dateSlots[date].am) dateSlots[date].am = '补报'
+        else if (!dateSlots[date].pm) dateSlots[date].pm = '补报'
+        else if (!dateSlots[date].eve) dateSlots[date].eve = '补报'
+      } else {
+        const period = classifySlot(s.in)
+        const slotStr = s.in + '-' + s.out
+        if (period === '上午' && !dateSlots[date].am) dateSlots[date].am = slotStr
+        else if (period === '下午' && !dateSlots[date].pm) dateSlots[date].pm = slotStr
+        else if (period === '晚上' && !dateSlots[date].eve) dateSlots[date].eve = slotStr
+      }
+    })
+  })
+  
+  // 当月天数
+  const daysInMonth = new Date(year, month, 0).getDate()
+  
+  // ========== 构建 Word 文档内容 ==========
+  const children = []
+  
+  // 标题
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 200 },
+    children: [new TextRun({ text: `（${year}）年（${month}）月勤工助学考勤表`, bold: true, size: 32 })]
+  }))
+  
+  // 空行
+  children.push(new Paragraph({ children: [new TextRun('')] }))
+  
+  // 个人信息表
+  children.push(new Paragraph({
+    spacing: { after: 100 },
+    children: [new TextRun({ text: '个人信息', bold: true, size: 24 })]
+  }))
+  
+  const infoTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: [
+          cell('姓名', true), cell(submission.name || ''),
+          cell('院系', true), cell(submission.department || '岭南学院'),
+        ]
+      }),
+      new TableRow({
+        children: [
+          cell('学号', true), cell(submission.studentId || ''),
+          cell('银行账号', true), cell(submission.bankAccount || ''),
+        ]
+      }),
+      new TableRow({
+        children: [
+          cell('宿舍', true), cell(submission.dorm || ''),
+          cell('联系电话', true), cell(submission.phone || ''),
+        ]
+      }),
+    ]
+  })
+  children.push(infoTable)
+  children.push(new Paragraph({ children: [new TextRun('')] }))
+  
+  // 固定信息表
+  children.push(new Paragraph({
+    spacing: { after: 100 },
+    children: [new TextRun({ text: '工作信息', bold: true, size: 24 })]
+  }))
+  
+  const fixedTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: [
+          cell('工作单位', true), cell('岭南学院'),
+          cell('工作部门', true), cell('学工办'),
+        ]
+      }),
+      new TableRow({
+        children: [
+          cell('工作岗位', true), cell('学生助理'),
+          cell('报酬标准', true), cell('25元/小时'),
+        ]
+      }),
+      new TableRow({
+        children: [
+          cell('工作主要内容', true), 
+          new TableCell({ ...cellOpts(), columnSpan: 3, children: [new Paragraph({ children: [new TextRun('学生助理')] })] }),
+        ]
+      }),
+    ]
+  })
+  children.push(fixedTable)
+  children.push(new Paragraph({ children: [new TextRun('')] }))
+  
+  // 工作时间表（按模板分三列：1-11, 12-22, 23-31）
+  children.push(new Paragraph({
+    spacing: { after: 100 },
+    children: [new TextRun({ text: '工作时间记录', bold: true, size: 24 })]
+  }))
+  
+  // 表头行
+  const headerRow = new TableRow({
+    tableHeader: true,
+    children: [
+      cell('日期', true), cell('上午', true), cell('日期', true), cell('下午', true), cell('日期', true), cell('晚上', true),
+    ]
+  })
+  
+  const dataRows = []
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    const slots = dateSlots[dateStr] || {}
+    
+    if (d <= 11) {
+      // 第一列组：日期 1-11
+      dataRows.push(new TableRow({
+        children: [
+          cell(String(d)), cell(slots.am || ''),
+          cell(''), cell(''),
+          cell(''), cell(''),
+        ]
+      }))
+    } else if (d <= 22) {
+      // 第二列组：日期 12-22
+      dataRows.push(new TableRow({
+        children: [
+          cell(''), cell(''),
+          cell(String(d)), cell(slots.pm || slots.am || ''),
+          cell(''), cell(''),
+        ]
+      }))
+    } else {
+      // 第三列组：日期 23-31
+      dataRows.push(new TableRow({
+        children: [
+          cell(''), cell(''),
+          cell(''), cell(''),
+          cell(String(d)), cell(slots.eve || slots.pm || slots.am || ''),
+        ]
+      }))
+    }
+  }
+  
+  const workTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [headerRow, ...dataRows]
+  })
+  children.push(workTable)
+  children.push(new Paragraph({ children: [new TextRun('')] }))
+  
+  // 汇总
+  children.push(new Paragraph({
+    spacing: { after: 100 },
+    children: [new TextRun({ text: '汇总', bold: true, size: 24 })]
+  }))
+  
+  const summaryTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: [
+          cell('月工作时间总计（小时）', true), 
+          new TableCell({ ...cellOpts(), children: [new Paragraph({ children: [new TextRun((workData.totalHours || 0).toFixed(1))] })] }),
+          cell('月劳动报酬总计（元）', true),
+          new TableCell({ ...cellOpts(), children: [new Paragraph({ children: [new TextRun((workData.totalPay || 0).toFixed(1))] })] }),
+        ]
+      }),
+      new TableRow({
+        children: [
+          cell('所在单位考评意见', true),
+          new TableCell({ ...cellOpts(), columnSpan: 3, children: [new Paragraph({ children: [new TextRun('')] })] }),
+        ]
+      }),
+      new TableRow({
+        children: [
+          cell('备注', true),
+          new TableCell({ ...cellOpts(), columnSpan: 3, children: [new Paragraph({ children: [new TextRun('')] })] }),
+        ]
+      }),
+    ]
+  })
+  children.push(summaryTable)
+  
+  const doc = new Document({ sections: [{ children }] })
+  const buffer = await Packer.toBuffer(doc)
+  return buffer
+}
+
+// 辅助函数：创建表格单元格
+function cell(text, isHeader = false) {
+  return new TableCell({
+    ...cellOpts(isHeader),
+    children: [new Paragraph({ children: [new TextRun({ text: String(text), bold: isHeader, size: isHeader ? 22 : 20 })] })]
+  })
+}
+
+function cellOpts(isHeader = false) {
+  return {
+    width: { size: isHeader ? 16 : 16, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 1 },
+      bottom: { style: BorderStyle.SINGLE, size: 1 },
+      left: { style: BorderStyle.SINGLE, size: 1 },
+      right: { style: BorderStyle.SINGLE, size: 1 },
+    },
+    shading: isHeader ? { type: ShadingType.CLEAR, fill: 'F0F0F0' } : undefined,
+  }
 }
 
 async function start() {
