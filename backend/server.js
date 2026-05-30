@@ -1364,15 +1364,13 @@ function calculateMemberWorkTime(store, name, year, month) {
   const monthStartStr = monthStart.toISOString().slice(0, 10)
   const monthEndStr = monthEnd.toISOString().slice(0, 10)
   
-  // 按日期汇总工时
+  // 按日期汇总工时（每次打卡配对独立向上取整，不封顶2h）
   const workByDate = {}
   
-  // 1. 从打卡记录计算
-  const myCheckins = checkins.filter(c => c.name === name && c.date >= monthStartStr && c.date <= monthEndStr)
-  
-  // 按日期分组，配对签到签退
+  // 1. 打卡记录：每次 in/out 配对独立计算
+  const checkins = (store.checkins || []).filter(c => c.name === name && c.date >= monthStartStr && c.date <= monthEndStr)
   const byDate = {}
-  myCheckins.forEach(c => {
+  checkins.forEach(c => {
     if (!byDate[c.date]) byDate[c.date] = []
     byDate[c.date].push(c)
   })
@@ -1384,37 +1382,35 @@ function calculateMemberWorkTime(store, name, year, month) {
       if (r.type === 'in') {
         inTime = r.time
       } else if (r.type === 'out' && inTime) {
-        // 计算时长
         const inMinutes = timeToMinutes(inTime.slice(11, 16))
         const outMinutes = timeToMinutes(r.time.slice(11, 16))
         const hours = Math.max(0, (outMinutes - inMinutes) / 60)
-        
+        const rounded = Math.ceil(hours * 2) / 2 // 向上取整到0.5h
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
-        workByDate[date].hours += hours
+        workByDate[date].hours += rounded
         workByDate[date].slots.push({ in: inTime.slice(11, 16), out: r.time.slice(11, 16) })
         inTime = null
       }
     })
   })
   
-  // 2. 加上已通过的补报
+  // 2. 已通过补报：按次累加，不限制每日一次
   overtimes.filter(ot => ot.name === name && ot.date >= monthStartStr && ot.date <= monthEndStr).forEach(ot => {
     const date = ot.date
     if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
-    workByDate[date].hours += ot.hours
+    const rounded = Math.ceil((ot.hours || 0) * 2) / 2
+    workByDate[date].hours += rounded
     workByDate[date].slots.push({ overtime: true, hours: ot.hours, content: ot.content })
   })
   
-  // 计算总时长（向上取整0.5小时，封顶2小时/天）
+  // 总时长 = 每日累加（不再封顶2h/天）
   let totalHours = 0
   Object.values(workByDate).forEach(d => {
-    const capped = Math.min(d.hours, 2)
-    const rounded = Math.ceil(capped * 2) / 2 // 向上取整到0.5
-    d.finalHours = rounded
-    totalHours += rounded
+    d.finalHours = d.hours // 已按次向上取整
+    totalHours += d.hours
   })
   
-  const totalPay = parseFloat((totalHours * 25).toFixed(1)) // 25元/小时，保留一位小数
+  const totalPay = parseFloat((totalHours * 25).toFixed(1))
   
   return { totalHours, totalPay, workByDate, workDays: Object.keys(workByDate).length }
 }
@@ -1500,7 +1496,7 @@ app.get('/api/admin/worktime-claim/export-all', async (req, res) => {
 // 生成勤工助学考勤表 docx
 async function generateAttendanceDocx(year, month, submission, workData, store) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, 
-          WidthType, AlignmentType, BorderStyle, ShadingType } = require('docx')
+          WidthType, AlignmentType, BorderStyle } = require('docx')
   
   // 时段映射：将打卡时间归类到上午/下午/晚上
   function classifySlot(timeStr) {
