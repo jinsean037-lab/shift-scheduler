@@ -1396,6 +1396,9 @@ body {
         <a class="nav-item" data-page="stats" onclick="switchTab('stats')">
           <span class="nav-icon">📋</span><span>取消与候补申请</span>
         </a>
+        <a class="nav-item" data-page="worktime" onclick="switchTab('worktime')">
+          <span class="nav-icon">💼</span><span>工时申报</span>
+        </a>
 
         <div class="nav-group-title" id="adminNavGroupTitle" style="display:none">管理功能</div>
         <div class="nav-item nav-admin" id="adminNavItem" style="display:none" onclick="toggleAdminSubmenu()">
@@ -1416,6 +1419,9 @@ body {
           </a>
           <a class="nav-subitem" data-page="admin-overtime" onclick="switchTab('admin-overtime')">
             <span>📝 补报审核</span>
+          </a>
+          <a class="nav-subitem" data-page="admin-worktime" onclick="switchTab('admin-worktime')">
+            <span>💼 工时申报</span>
           </a>
         </div>
       </div>
@@ -1603,6 +1609,17 @@ body {
         </div>
       </div>
 
+      <!-- ===== 工时申报视图 ===== -->
+      <div class="page-view" id="worktimeView">
+        <div class="page-title-row">
+          <h2>💼 工时申报</h2>
+          <p class="page-subtitle" id="worktimeSubtitle">申报本月工作时间</p>
+        </div>
+        <div id="worktimeContent">
+          <p style="color:#999;font-size:13px;padding:20px">加载中...</p>
+        </div>
+      </div>
+
       <!-- ===== 管理视图 ===== -->
       <!-- 管理子页面：排班确认 -->
       <div class="page-view" id="adminScheduleView">
@@ -1758,6 +1775,19 @@ body {
         </div>
       </div>
 
+      <!-- 管理子页面：工时申报管理 -->
+      <div class="page-view" id="adminWorktimeView">
+        <div class="page-title-row">
+          <h2>💼 工时申报管理</h2>
+          <p class="page-subtitle">开启工时申报并查看所有成员的申报情况</p>
+        </div>
+        <div class="admin-section">
+          <div id="adminWorktimeContent">
+            <p style="color:#999;font-size:13px;padding:16px 0;text-align:center">加载中...</p>
+          </div>
+        </div>
+      </div>
+
       <!-- 保留旧 adminView 作为兼容（隐藏不用） -->
       <div class="page-view" id="adminView" style="display:none"></div>
     </main>
@@ -1868,6 +1898,11 @@ function switchTab(tab) {
     const nav = document.querySelector('.nav-item[data-page="stats"]');
     if (nav) nav.classList.add('active');
     loadMyShifts();
+  } else if (tab === 'worktime') {
+    document.getElementById('worktimeView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="worktime"]');
+    if (nav) nav.classList.add('active');
+    loadWorkTimeClaim();
   } else if (tab === 'admin') {
     // 兼容：点击管理中心时展开子菜单并跳到排班确认
     toggleAdminSubmenu(true);
@@ -1899,6 +1934,10 @@ function switchTab(tab) {
     document.getElementById('adminOvertimeView').classList.add('active');
     highlightAdminSub('admin-overtime');
     loadAdminOvertime();
+  } else if (tab === 'admin-worktime') {
+    document.getElementById('adminWorktimeView').classList.add('active');
+    highlightAdminSub('admin-worktime');
+    loadAdminWorktime();
   }
   }
   catch(e) {
@@ -3485,6 +3524,228 @@ function approveOt(id, action) {
     else { showToast(data.msg || '操作失败'); }
   })
   .catch(() => { showToast('网络错误'); });
+}
+
+// ========== 工时申报 ==========
+
+// 成员端：加载工时申报页面
+async function loadWorkTimeClaim() {
+  const content = document.getElementById('worktimeContent');
+  const subtitle = document.getElementById('worktimeSubtitle');
+  
+  try {
+    // 获取申报状态
+    const statusRes = await fetch(API + '/worktime-claim/status');
+    const statusData = await statusRes.json();
+    const wtc = statusData.workTimeClaim || {};
+    
+    if (!wtc.isOpen || !wtc.year || !wtc.month) {
+      subtitle.textContent = '当前未开放工时申报';
+      content.innerHTML = '<div class="section-card"><p style="color:#999;font-size:14px;text-align:center;padding:30px">管理员尚未开启本月工时申报，请等待通知。</p></div>';
+      return;
+    }
+    
+    subtitle.textContent = wtc.year + '年' + wtc.month + '月工时申报';
+    
+    // 获取我的工时数据
+    const myRes = await fetch(API + '/worktime-claim/my-data?name=' + encodeURIComponent(currentUser));
+    const myData = await myRes.json();
+    
+    if (!myData.ok || !myData.isOpen) {
+      content.innerHTML = '<div class="section-card"><p style="color:#999;font-size:14px;text-align:center;padding:30px">无法获取工时数据</p></div>';
+      return;
+    }
+    
+    const work = myData.workData || {};
+    const submission = myData.submission;
+    
+    // 渲染页面
+    let html = '';
+    
+    // 已提交提示
+    if (submission) {
+      html += '<div class="tip-bar" style="background:#e8f5e9;color:#2e7d32;margin-bottom:16px">✅ 你已于 ' + submission.submittedAt.slice(0, 16).replace('T', ' ') + ' 提交申报</div>';
+    }
+    
+    // 个人信息表单
+    html += '<div class="section-card"><h3>📝 个人信息确认</h3>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px">';
+    html += '<div><label style="font-size:13px;color:#666">姓名</label><input type="text" id="wtName" value="' + currentUser + '" readonly style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;background:#f5f5f5;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">银行账号</label><input type="text" id="wtBank" placeholder="请输入银行账号" value="' + (submission?.bankAccount || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">院系</label><input type="text" id="wtDept" value="' + (submission?.department || '岭南学院') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">学号</label><input type="text" id="wtStudentId" placeholder="请输入学号" value="' + (submission?.studentId || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">宿舍</label><input type="text" id="wtDorm" placeholder="请输入宿舍号" value="' + (submission?.dorm || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">联系电话</label><input type="text" id="wtPhone" placeholder="请输入联系电话" value="' + (submission?.phone || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '</div></div>';
+    
+    // 工时统计
+    html += '<div class="section-card" style="margin-top:16px"><h3>📊 工时统计（自动计算）</h3>';
+    html += '<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px">';
+    html += '<div style="padding:16px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:10px;flex:1;min-width:150px">';
+    html += '<div style="font-size:13px;opacity:0.9">月工作时间总计</div>';
+    html += '<div style="font-size:28px;font-weight:700;margin-top:4px">' + (work.totalHours || 0) + ' <span style="font-size:14px;font-weight:400">小时</span></div>';
+    html += '</div>';
+    html += '<div style="padding:16px 20px;background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff;border-radius:10px;flex:1;min-width:150px">';
+    html += '<div style="font-size:13px;opacity:0.9">月劳务报酬总计</div>';
+    html += '<div style="font-size:28px;font-weight:700;margin-top:4px">' + (work.totalPay || 0) + ' <span style="font-size:14px;font-weight:400">元</span></div>';
+    html += '</div>';
+    html += '<div style="padding:16px 20px;background:#f5f5f5;border-radius:10px;flex:1;min-width:150px">';
+    html += '<div style="font-size:13px;color:#666">工作天数</div>';
+    html += '<div style="font-size:28px;font-weight:700;margin-top:4px;color:#333">' + (work.workDays || 0) + ' <span style="font-size:14px;font-weight:400;color:#666">天</span></div>';
+    html += '</div>';
+    html += '</div></div>';
+    
+    // 提交按钮
+    html += '<div style="margin-top:20px;text-align:center">';
+    if (submission) {
+      html += '<button class="quick-btn quick-btn-primary" style="padding:12px 40px;font-size:16px" onclick="submitWorkTimeClaim()">更新申报</button>';
+    } else {
+      html += '<button class="quick-btn quick-btn-primary" style="padding:12px 40px;font-size:16px" onclick="submitWorkTimeClaim()">提交申报</button>';
+    }
+    html += '</div>';
+    
+    content.innerHTML = html;
+  } catch (e) {
+    console.error('loadWorkTimeClaim error:', e);
+    content.innerHTML = '<div class="section-card"><p style="color:#c41230;font-size:14px;text-align:center;padding:30px">加载失败，请刷新重试</p></div>';
+  }
+}
+
+// 成员端：提交工时申报
+async function submitWorkTimeClaim() {
+  const bankAccount = document.getElementById('wtBank').value.trim();
+  const department = document.getElementById('wtDept').value.trim();
+  const studentId = document.getElementById('wtStudentId').value.trim();
+  const dorm = document.getElementById('wtDorm').value.trim();
+  const phone = document.getElementById('wtPhone').value.trim();
+  
+  if (!bankAccount || !studentId || !phone) {
+    showToast('请填写完整信息（银行账号、学号、联系电话为必填）');
+    return;
+  }
+  
+  try {
+    const res = await fetch(API + '/worktime-claim/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, bankAccount, department, studentId, dorm, phone })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('✅ 申报提交成功');
+      loadWorkTimeClaim();
+    } else {
+      showToast(data.msg || '提交失败');
+    }
+  } catch (e) {
+    showToast('网络错误');
+  }
+}
+
+// 管理员端：加载工时申报管理页面
+async function loadAdminWorktime() {
+  const content = document.getElementById('adminWorktimeContent');
+  
+  try {
+    // 获取申报状态
+    const statusRes = await fetch(API + '/worktime-claim/status');
+    const statusData = await statusRes.json();
+    const wtc = statusData.workTimeClaim || {};
+    
+    let html = '';
+    
+    // 开启/关闭申报控制
+    html += '<div class="section-card"><h3>⚙️ 申报设置</h3>';
+    html += '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">';
+    
+    if (wtc.isOpen) {
+      html += '<div style="padding:8px 16px;background:#e8f5e9;color:#2e7d32;border-radius:6px;font-weight:600">当前开放：' + wtc.year + '年' + wtc.month + '月</div>';
+      html += '<button class="quick-btn" style="background:#c41230;color:#fff" onclick="toggleWorkTimeClaim(false)">关闭申报</button>';
+    } else {
+      html += '<span style="color:#999">当前未开放申报</span>';
+      html += '<label style="font-size:13px;margin-left:12px">年份：</label><input type="number" id="wtYear" value="' + (new Date().getFullYear()) + '" style="width:80px;padding:6px;border:1px solid #e2e8f0;border-radius:6px">';
+      html += '<label style="font-size:13px;margin-left:12px">月份：</label><input type="number" id="wtMonth" min="1" max="12" value="' + (new Date().getMonth() + 1) + '" style="width:60px;padding:6px;border:1px solid #e2e8f0;border-radius:6px">';
+      html += '<button class="quick-btn quick-btn-primary" onclick="toggleWorkTimeClaim(true)">开启申报</button>';
+    }
+    html += '</div></div>';
+    
+    // 成员申报统计表
+    html += '<div class="section-card" style="margin-top:16px"><h3>📋 成员申报统计</h3>';
+    
+    const allRes = await fetch(API + '/admin/worktime-claim/all');
+    const allData = await allRes.json();
+    
+    if (allData.ok && allData.submissions && allData.submissions.length > 0) {
+      html += '<div style="overflow-x:auto;margin-top:12px">';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:14px">';
+      html += '<thead><tr style="background:#f5f5f5">';
+      html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">姓名</th>';
+      html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">工时</th>';
+      html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">报酬</th>';
+      html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">状态</th>';
+      html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">提交时间</th>';
+      html += '</tr></thead><tbody>';
+      
+      allData.submissions.forEach(s => {
+        html += '<tr>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + s.name + '</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalHours || 0) + ' 小时</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalPay || 0) + ' 元</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submitted ? '<span style="color:#2e7d32">✅ 已提交</span>' : '<span style="color:#999">⏳ 未提交</span>') + '</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submittedAt ? s.submittedAt.slice(0, 16).replace('T', ' ') : '-') + '</td>';
+        html += '</tr>';
+      });
+      
+      html += '</tbody></table></div>';
+      
+      // 统计汇总
+      const submittedCount = allData.submissions.filter(s => s.submitted).length;
+      const totalHours = allData.submissions.reduce((sum, s) => sum + (s.totalHours || 0), 0);
+      const totalPay = allData.submissions.reduce((sum, s) => sum + (s.totalPay || 0), 0);
+      html += '<div style="margin-top:12px;padding:12px;background:#fafafa;border-radius:6px;font-size:13px;color:#666">';
+      html += '已提交：' + submittedCount + '/' + allData.submissions.length + ' 人　｜　总工时：' + totalHours.toFixed(1) + ' 小时　｜　总报酬：' + totalPay + ' 元';
+      html += '</div>';
+    } else {
+      html += '<p style="color:#999;font-size:13px;margin-top:12px">暂无数据</p>';
+    }
+    
+    html += '</div>';
+    
+    content.innerHTML = html;
+  } catch (e) {
+    console.error('loadAdminWorktime error:', e);
+    content.innerHTML = '<p style="color:#c41230;font-size:14px;text-align:center;padding:30px">加载失败</p>';
+  }
+}
+
+// 管理员端：开启/关闭工时申报
+async function toggleWorkTimeClaim(isOpen) {
+  let year, month;
+  if (isOpen) {
+    year = parseInt(document.getElementById('wtYear').value);
+    month = parseInt(document.getElementById('wtMonth').value);
+    if (!year || !month || month < 1 || month > 12) {
+      showToast('请输入有效的年份和月份');
+      return;
+    }
+  }
+  
+  try {
+    const res = await fetch(API + '/admin/worktime-claim/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year, month, isOpen })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(isOpen ? '✅ 已开启申报' : '已关闭申报');
+      loadAdminWorktime();
+    } else {
+      showToast(data.msg || '操作失败');
+    }
+  } catch (e) {
+    showToast('网络错误');
+  }
 }
 
 // ========== 初始化 ==========
