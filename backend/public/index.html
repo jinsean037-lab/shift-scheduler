@@ -3191,7 +3191,7 @@ async function adminAssign() {
       body: JSON.stringify({name,day,slotId})
     });
     const data = await res.json();
-    if (data.ok) { showToast('分配成功'); loadSchedule(); }
+    if (data.ok) { showToast('分配成功'); loadSchedule(); loadAdminSchedulePreview(); }
     else { showToast(data.msg||'分配失败'); }
   } catch(e) { showToast('网络错误'); }
 }
