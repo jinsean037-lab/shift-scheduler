@@ -748,12 +748,13 @@ app.post('/api/admin/assign', async (req, res) => {
     if (!name || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
     if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
-    const key = `${day}|${slotId}`
-    if (!store.schedule[key]) store.schedule[key] = []
-    const list = store.schedule[key]
+    // 使用嵌套格式（与前端 renderSchedule 一致）
+    if (!store.schedule[day]) store.schedule[day] = {}
+    if (!store.schedule[day][slotId]) store.schedule[day][slotId] = []
+    const list = store.schedule[day][slotId]
     if (list.includes(name)) return res.json({ ok: false, msg: '该成员已在此班次' })
     list.push(name)
-    store.scheduleTime[`${key}|${name}`] = Date.now()
+    store.scheduleTime[`${day}|${slotId}|${name}`] = Date.now()
     await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime })
     res.json({ ok: true, schedule: store.schedule })
   } catch (e) {
@@ -766,12 +767,13 @@ app.post('/api/admin/unassign', async (req, res) => {
   try {
     const { name, day, slotId } = req.body
     const store = await readStore()
-    const key = `${day}|${slotId}`
-    const list = store.schedule[key] || []
+    // 使用嵌套格式（与前端 renderSchedule 一致）
+    if (!store.schedule[day] || !store.schedule[day][slotId]) return res.json({ ok: true })
+    const list = store.schedule[day][slotId]
     const idx = list.indexOf(name)
     if (idx >= 0) {
       list.splice(idx, 1)
-      if (list.length === 0) delete store.schedule[key]
+      if (list.length === 0) delete store.schedule[day][slotId]
     }
     await writeStore({ schedule: store.schedule })
     res.json({ ok: true, schedule: store.schedule })
