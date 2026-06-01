@@ -57,7 +57,9 @@ function defaultStore() {
       submissions: {} // { '王梓豪': { name, bankAccount, department, studentId, dorm, phone, totalHours, totalPay, submittedAt } }
     },
     // 值班搭子留言
-    partnerMessages: []
+    partnerMessages: [],
+  suppCheckouts: [],
+  suppCheckouts: []
   }
 }
 
@@ -1545,6 +1547,72 @@ app.put('/api/partner-message/:id/read', async (req, res) => {
   }
 })
 
+
+
+// ========== 补签退申请 (v4.2) ==========
+app.post('/api/supp-checkout', async (req, res) => {
+  try {
+    const { name, date, time, reason } = req.body
+    if (!name || !date || !time) return res.json({ ok: false, msg: '参数不完整' })
+    const store = await readStore()
+    if (!store.suppCheckouts) store.suppCheckouts = []
+    const dup = store.suppCheckouts.find(c => c.name === name && c.date === date && c.status === 'pending')
+    if (dup) return res.json({ ok: false, msg: '该日期已有待审核的补签退申请' })
+    const record = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      name, date, time, reason: reason || '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      reviewedAt: null,
+      reviewedBy: null,
+      comment: ''
+    }
+    store.suppCheckouts.push(record)
+    await writeStore(store)
+    res.json({ ok: true, msg: '申请已提交' })
+  } catch (e) { res.json({ ok: false, msg: '服务器错误' }) }
+})
+
+// 获取补签退列表（管理员）
+app.get('/api/supp-checkouts', async (req, res) => {
+  try {
+    const store = await readStore()
+    res.json({ ok: true, list: store.suppCheckouts || [] })
+  } catch (e) { res.json({ ok: false, msg: '服务器错误' }) }
+})
+
+// 审核补签退（管理员）
+app.put('/api/supp-checkout/:id/review', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { action, comment } = req.body
+    if (!['approve', 'reject'].includes(action)) return res.json({ ok: false, msg: '无效操作' })
+    const store = await readStore()
+    const item = (store.suppCheckouts || []).find(c => c.id === id)
+    if (!item) return res.json({ ok: false, msg: '记录不存在' })
+    if (item.status !== 'pending') return res.json({ ok: false, msg: '该申请已审核' })
+    item.status = action === 'approve' ? 'approved' : 'rejected'
+    item.reviewedAt = new Date().toISOString()
+    item.reviewedBy = req.body.adminName || 'admin'
+    item.comment = comment || ''
+    if (action === 'approve') {
+      if (!store.checkins) store.checkins = []
+      store.checkins.push({
+        id: 'supp_' + item.id,
+        name: item.name,
+        date: item.date,
+        time: item.time + ':00',
+        type: 'out',
+        isSupp: true,
+        latitude: null,
+        longitude: null,
+        createdAt: new Date().toISOString()
+      })
+    }
+    await writeStore(store)
+    res.json({ ok: true, msg: action === 'approve' ? '已通过' : '已拒绝' })
+  } catch (e) { res.json({ ok: false, msg: '服务器错误' }) }
+})
 // 生成勤工助学考勤表 docx
 async function generateAttendanceDocx(year, month, submission, workData, store) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, 
