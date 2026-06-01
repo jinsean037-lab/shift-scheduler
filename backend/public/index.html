@@ -1480,7 +1480,7 @@ body {
         <!-- 本周排班 + 月度分布（并排） -->
         <div class="home-row">
           <div class="section-card home-section home-half">
-            <h3>📅 本周我的排班</h3>
+            <h3>📅 本月我的排班</h3>
             <div id="homeMyShifts"><p style="color:#999;text-align:center;padding:12px 0;font-size:13px">暂无排班记录</p></div>
           </div>
           <div class="section-card home-section home-half">
@@ -2412,7 +2412,8 @@ function renderMyShifts(shifts, forHome) {
     const displaySlot = (typeof slotLabel === 'function') ? (slotLabel(s.slotId || s.slot)) : (s.slotId || s.slot);
     // 首页模式：显示 日期（周X）格式（actualDate 可能是 Date 对象或字符串）
     const actualDateStr = (s.actualDate instanceof Date) ? formatLocalDate(s.actualDate) : (s.actualDate || '');
-    const displayDay = (forHome && s.actualDate) ? actualDateStr + ' (' + (s.weekdayLabel || s.day) + ')' : s.day;
+    // 首页模式：只显示周次+时段，不显示日期
+    const displayDay = forHome ? (s.weekdayLabel || s.day) : ((s.actualDate) ? actualDateStr + ' (' + (s.weekdayLabel || s.day) + ')' : s.day);
     html += '<div class="' + cls + '">';
     html += '<div class="shift-day">' + displayDay + '</div>';
     html += '<div class="shift-slot">' + displaySlot + '</div>';
@@ -3107,28 +3108,44 @@ function renderPartners(allData, myShifts) {
     html += '  </div>';
     html += '  <div style="font-size:12px;color:#666;line-height:1.8">';
     uniqueShifts.forEach(s => {
-      html += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>' + s.date + ' (' + s.day + ')</span><span style="color:#8B1A1A;font-weight:600">' + s.slotLabel + '</span></div>';
+      html += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>' + s.day + '</span><span style="color:#8B1A1A;font-weight:600">' + s.slotLabel + '</span></div>';
     });
     html += '  </div>';
-    // 留言输入
+  // 快捷留言按钮
+    const quickMsgs = [
+      { text: '怎么还没到', emoji: '😤' },
+      { text: '今天又靠你了', emoji: '🫡' },
+      { text: '爱你爱你', emoji: '❤️' }
+    ];
     html += '  <div style="margin-top:8px;border-top:1px dashed #e8d8d0;padding-top:8px">';
+    html += '    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+    quickMsgs.forEach(q => {
+      html += '<button onclick=\'sendPartnerMessage("' + name + '", "' + q.text + '")\' ';
+      html += 'style="padding:4px 10px;font-size:11px;border:1.5px solid #f0d9d0;background:#fff;border-radius:16px;color:#666;cursor:pointer;white-space:nowrap">' + q.emoji + ' ' + q.text + '</button>';
+    });
+    html += '    </div>';
+    // 自定义留言输入
     html += '    <input type="text" id="msg_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_') + '" placeholder="给 ' + name + ' 留句话..." '; 
     html += 'style="width:100%;padding:6px 10px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:12px;box-sizing:border-box;background:#fff" />';
     html += '    <button onclick=\'sendPartnerMessage("' + name + '")\' ';
     html += 'style="margin-top:6px;width:100%;padding:6px 12px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer">📨 发送</button>';
-    html += '  </div>';
-    html += '</div>';
+    html += '  </div>';    html += '</div>';
   });
   
   container.innerHTML = html;
 }
 
 // 发送搭子留言（存入 store.partnerMessages）
-async function sendPartnerMessage(partnerName) {
-  const inputId = 'msg_' + partnerName.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
-  const input = document.getElementById(inputId);
-  if (!input) return;
-  const msg = input.value.trim();
+async function sendPartnerMessage(partnerName, quickText) {
+  let msg = '';
+  if (quickText) {
+    msg = quickText;
+  } else {
+    const inputId = 'msg_' + partnerName.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    msg = input.value.trim();
+  }
   if (!msg) { showToast('请输入留言内容'); return; }
   try {
     const res = await fetch(API + '/partner-message', {
@@ -3139,7 +3156,7 @@ async function sendPartnerMessage(partnerName) {
     const data = await res.json();
     if (data.ok) {
       showToast('留言已发送给 ' + partnerName);
-      input.value = '';
+      if (!quickText && input) input.value = '';
     } else {
       showToast(data.msg || '发送失败');
     }
