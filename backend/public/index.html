@@ -1484,10 +1484,8 @@ body {
             <div id="homeMyShifts"><p style="color:#999;text-align:center;padding:12px 0;font-size:13px">暂无排班记录</p></div>
           </div>
           <div class="section-card home-section home-half">
-            <h3>📊 本月值班分布</h3>
-            <div id="homeCalendar" style="padding:6px 0">
-              <div class="calendar-grid" id="calendarGrid"></div>
-            </div>
+            <h3>🤝 本月值班搭子</h3>
+            <div id="homePartners" style="padding:4px 0"><p style="color:#999;text-align:center;padding:16px 0;font-size:13px">加载中...</p></div>
           </div>
         </div>
 
@@ -2734,9 +2732,8 @@ async function loadHomeStats() {
     displayShifts.sort((a, b) => a.actualDate - b.actualDate);
     renderMyShifts(displayShifts, true);
 
-    // 渲染日历热力图
-    const y = now.getFullYear(), m = now.getMonth();
-    renderCalendarFromDateMap(datePeriodMap, y, m);
+    // 渲染值班搭子卡片
+    renderPartners(allData, displayShifts);
   } catch(e) { console.error('加载首页统计失败', e); }
 }
 
@@ -3030,6 +3027,123 @@ async function loadMyCheckinHistory() {
   } catch(e) {
     el.innerHTML = '<p style="color:#c41230;font-size:13px">加载失败</p>';
   }
+}
+
+// ========== 值班搭子卡片（替代月度日历） ==========
+function renderPartners(allData, myShifts) {
+  const container = document.getElementById('homePartners');
+  if (!container) return;
+  
+  // 收集本月所有排班数据，找出和当前用户同班次的人
+  const dayNameMap = {'周一':1,'周二':2,'周三':3,'周四':4,'周五':5};
+  const partnerMap = {}; // { '张三': [{day, slot, date, slotLabel}] }
+  
+  function scanSchedule(schedule, pStart, pEnd) {
+    if (!schedule) return;
+    Object.keys(schedule).forEach(day => {
+      Object.keys(schedule[day]).forEach(slot => {
+        const names = schedule[day][slot];
+        if (!names || !names.includes(currentUser)) return;
+        // 找到同班次的其他人
+        names.forEach(n => {
+          if (n === currentUser) return;
+          if (!partnerMap[n]) partnerMap[n] = [];
+          let actualDate = null;
+          if (pStart && pEnd) {
+            const targetWd = dayNameMap[day];
+            if (targetWd !== undefined) {
+              for (let ms = pStart.getTime(); ms <= pEnd.getTime(); ms += 86400000) {
+                const td = new Date(ms);
+                if (td.getDay() === targetWd) { actualDate = td; break; }
+              }
+            }
+          }
+          partnerMap[n].push({
+            day, slot, slotId: slot,
+            date: actualDate ? formatLocalDate(actualDate) : day,
+            slotLabel: SLOT_LABELS[slot] || slot
+          });
+        });
+      });
+    });
+  }
+  
+  // 扫描已归档 + 当前排班
+  if (allData.confirmedPeriods) {
+    allData.confirmedPeriods.forEach(period => {
+      const ps = period.start ? parseLocalDate(period.start) : null;
+      const pe = period.end ? parseLocalDate(period.end) : null;
+      scanSchedule(period.schedule, ps, pe);
+    });
+  }
+  const cur = allData.current || {};
+  if (cur.schedule) {
+    const ps = cur.start ? parseLocalDate(cur.start) : null;
+    const pe = cur.end ? parseLocalDate(cur.end) : null;
+    scanSchedule(cur.schedule, ps, pe);
+  }
+  
+  const partners = Object.keys(partnerMap);
+  if (partners.length === 0) {
+    container.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0;font-size:13px">本月暂无值班搭子</p>';
+    return;
+  }
+  
+  let html = '';
+  partners.forEach(name => {
+    const shifts = partnerMap[name];
+    const uniqueShifts = [];
+    const seen = new Set();
+    shifts.forEach(s => {
+      const key = s.day + '|' + s.slot;
+      if (!seen.has(key)) { seen.add(key); uniqueShifts.push(s); }
+    });
+    
+    html += '<div style="background:linear-gradient(135deg,#fef7f0,#fff5f5);border:1.5px solid #f0d9d0;border-radius:12px;padding:14px;margin-bottom:10px">';
+    html += '  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+    html += '    <span style="font-size:22px">👥</span>';
+    html += '    <span style="font-weight:700;font-size:15px;color:#8B1A1A">' + name + '</span>';
+    html += '    <span style="font-size:11px;color:#999;background:#f5f5f5;padding:2px 8px;border-radius:10px">共 ' + uniqueShifts.length + ' 班</span>';
+    html += '  </div>';
+    html += '  <div style="font-size:12px;color:#666;line-height:1.8">';
+    uniqueShifts.forEach(s => {
+      html += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>' + s.date + ' (' + s.day + ')</span><span style="color:#8B1A1A;font-weight:600">' + s.slotLabel + '</span></div>';
+    });
+    html += '  </div>';
+    // 留言输入
+    html += '  <div style="margin-top:8px;border-top:1px dashed #e8d8d0;padding-top:8px">';
+    html += '    <input type="text" id="msg_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_') + '" placeholder="给 ' + name + ' 留句话..." '; 
+    html += 'style="width:100%;padding:6px 10px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:12px;box-sizing:border-box;background:#fff" />';
+    html += '    <button onclick=\'sendPartnerMessage("' + name + '")\' ';
+    html += 'style="margin-top:6px;width:100%;padding:6px 12px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer">📨 发送</button>';
+    html += '  </div>';
+    html += '</div>';
+  });
+  
+  container.innerHTML = html;
+}
+
+// 发送搭子留言（存入 store.partnerMessages）
+async function sendPartnerMessage(partnerName) {
+  const inputId = 'msg_' + partnerName.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const msg = input.value.trim();
+  if (!msg) { showToast('请输入留言内容'); return; }
+  try {
+    const res = await fetch(API + '/partner-message', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ from: currentUser, to: partnerName, message: msg })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('留言已发送给 ' + partnerName);
+      input.value = '';
+    } else {
+      showToast(data.msg || '发送失败');
+    }
+  } catch(e) { showToast('网络错误'); }
 }
 
 function renderCalendarFromDateMap(datePeriodMap, year, month) {
