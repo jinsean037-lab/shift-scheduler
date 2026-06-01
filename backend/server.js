@@ -443,7 +443,7 @@ function autoFillFromWaitlist(store, day, slotId) {
   if (!list) return null
   const pending = store.waitlist
     .filter(w => w.day === day && w.slotId === slotId && (!w.status || w.status === 'pending'))
-    .sort((a, b) => new Date(a.time) - new Date(b.time))
+    .sort((a, b) => (a.time||'').localeCompare(b.time||''))
   if (pending.length > 0 && !list.includes(pending[0].name)) {
     list.push(pending[0].name)
     const key = `${day}|${slotId}`
@@ -1017,7 +1017,7 @@ app.post('/api/checkout', async (req, res) => {
     const allIns = (store.checkins || []).filter(c => c.name === name && c.date === today && c.type === 'in').sort((a,b)=>b.time.localeCompare(a.time))
     let checkinRecord = null
     for (const inRec of allIns) {
-      const hasOut = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'out' && new Date(c.time) > new Date(inRec.time))
+      const hasOut = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'out' && timeStrToMinutes(c.time) > timeStrToMinutes(inRec.time))
       if (!hasOut) { checkinRecord = inRec; break; }
     }
     if (!checkinRecord) return res.json({ ok: false, msg: '请先签到' })
@@ -1059,7 +1059,10 @@ app.post('/api/checkout/revoke', async (req, res) => {
     const outs = checkins.filter(c => c.name === name && c.date === today && c.type === 'out').sort((a,b)=>b.time.localeCompare(a.time))
     if (outs.length === 0) return res.json({ ok: false, msg: '没有可撤回的签退记录' })
     const lastOut = outs[0]
-    const diffMs = Date.now() - new Date(lastOut.time).getTime()
+    const let lastOutMs;
+            if (lastOut.time && lastOut.time.includes('T')) { lastOutMs = new Date(lastOut.time).getTime(); }
+            else { const lm = (lastOut.time||'').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/); lastOutMs = lm ? (new Date()).setHours(parseInt(lm[1]),parseInt(lm[2]),0,0) : Date.now(); }
+            diffMs = Date.now() - lastOutMs
     if (diffMs > 180000) return res.json({ ok: false, msg: '超过3分钟，无法撤回' })
     // 删除这条签退记录
     const idx = checkins.indexOf(lastOut)
@@ -1139,7 +1142,9 @@ app.get('/api/my-checkins', async (req, res) => {
       if (c.type === 'in' && !processed.has(c.date)) {
         const outRec = checkins.find(o => o.date === c.date && o.type === 'out')
         if (outRec) {
-          totalMinutes += (new Date(outRec.time) - new Date(c.time)) / 60000
+          // 安全解析纯时间字符串为分钟数
+            const toM = (t) => { const m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/); return m ? parseInt(m[1])*60 + parseInt(m[2]) : 0; };
+            totalMinutes += toM(outRec.time) - toM(c.time)
           completedDays++
         }
         processed.add(c.date)
