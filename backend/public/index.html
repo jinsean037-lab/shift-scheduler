@@ -2693,8 +2693,11 @@ async function loadHomeStats() {
           const outRec = checkins.find(o => o.date === c.date && o.type === 'out' && o.time > c.time);
           if (outRec) {
             // 有完整 in+out 配对：精确计算时长
-            const minutes = (new Date(outRec.time) - new Date(c.time)) / 60000;
-            const hoursRaw = minutes / 60;
+            // 安全解析时间：支持纯时间 "HH:mm:ss" 和 ISO 时间戳
+            const inMin = timeStrToMinutes(c.time);
+            const outMin = timeStrToMinutes(outRec.time);
+            const minutes = outMin - inMin;
+            const hoursRaw = Math.max(0, minutes) / 60;
             const hoursRounded = Math.ceil(hoursRaw * 2) / 2;
             totalHours += hoursRounded;
           } else {
@@ -3010,7 +3013,8 @@ function loadCheckinStatus() {
       // 判断当前状态：是否有未签退的签到
       let activeIn = null;
       for (const ti of todayIns) {
-        const hasOut = todayOuts.find(o => new Date(o.time) > new Date(ti.time));
+        const tiMin = timeStrToMinutes(ti.time);
+        const hasOut = todayOuts.some(o => timeStrToMinutes(o.time) > tiMin);
         if (!hasOut) { activeIn = ti; break; }
       }
       // 最近一次签退（用于撤回按钮）
@@ -3032,7 +3036,8 @@ function loadCheckinStatus() {
         document.getElementById('btnCheckout').disabled = true;
         document.getElementById('btnCheckout').style.opacity = '0.5';
         // 撤回按钮：3分钟内显示
-        const diffMs = Date.now() - new Date(lastOut.time).getTime();
+        const lastOutMs = lastOut.time && lastOut.time.includes('T') ? new Date(lastOut.time).getTime() : (new Date().setHours(0,0,0,0) + timeStrToMinutes(lastOut.time)*60000);
+      const diffMs = Date.now() - lastOutMs;
         if (diffMs <= 180000) {
           revokeBtn.style.display = '';
           revokeBtn.textContent = '↩️ 撤回签退（' + Math.ceil((180000 - diffMs)/1000) + 's）';
@@ -3081,6 +3086,16 @@ function formatTime(isoStr) {
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(isoStr)) return isoStr.slice(0, 5);
   try { var d = new Date(isoStr); if (isNaN(d.getTime())) return isoStr.slice(0, 5); return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); }
   catch { return isoStr.slice(0, 5); }
+}
+
+// 将时间字符串转为分钟数（兼容纯时间和ISO格式）
+function timeStrToMinutes(t) {
+  if (!t) return 0;
+  const m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return parseInt(m[1])*60 + parseInt(m[2]);
+  try { const d = new Date(t); if (!isNaN(d)) return d.getHours()*60 + d.getMinutes(); }
+  catch(e) {}
+  return 0;
 }
 
 function doCheckin() {
