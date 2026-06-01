@@ -1393,13 +1393,13 @@ function calculateMemberWorkTime(store, name, year, month) {
       if (r.type === 'in') {
         inTime = r.time
       } else if (r.type === 'out' && inTime) {
-        const inMinutes = timeToMinutes(inTime.slice(11, 16))
-        const outMinutes = timeToMinutes(r.time.slice(11, 16))
+        const inMinutes = timeToMinutes(inTime)
+        const outMinutes = timeToMinutes(r.time)
         const hours = Math.max(0, (outMinutes - inMinutes) / 60)
         const rounded = Math.ceil(hours * 2) / 2 // 向上取整到0.5h
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
         workByDate[date].hours += rounded
-        workByDate[date].slots.push({ in: inTime.slice(11, 16), out: r.time.slice(11, 16) })
+        workByDate[date].slots.push({ in: inTime, out: r.time })
         inTime = null
       }
     })
