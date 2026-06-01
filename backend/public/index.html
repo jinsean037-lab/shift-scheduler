@@ -3013,7 +3013,7 @@ async function loadMyCheckinHistory() {
       html += '<div style="margin-bottom:10px;padding:10px 12px;background:#fafafa;border-radius:8px;border-left:3px solid #8B1A1A">';
       html += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:6px">' + label + '</div>';
       recs.sort((a, b) => a.time.localeCompare(b.time)).forEach(c => {
-        const timeStr = c.time.slice(11, 16);
+        const timeStr = formatTime(c.time);
         const typeLabel = c.type === 'in' ? '🟢 签到' : '🔴 签退';
         const locStr = (c.latitude && c.longitude) ? '📍(' + c.latitude.toFixed(4) + ', ' + c.longitude.toFixed(4) + ')' : '';
         html += '<div style="font-size:12px;color:#555;padding:2px 0;display:flex;gap:8px;align-items:center">' +
