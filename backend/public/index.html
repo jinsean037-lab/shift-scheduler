@@ -3333,7 +3333,7 @@ async function loadMyCheckinHistory() {
       html += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:6px">' + label + '</div>';
       recs.sort((a, b) => a.time.localeCompare(b.time)).forEach(c => {
         const timeStr = formatTime(c.time);
-        const typeLabel = c.type === 'in' ? '🟢 签到' : '🔴 签退';
+        const typeLabel = c.type === 'in' ? '🟢 签到' : (c.isSupp ? '🟡 补签退' : '🔴 签退');
         const locStr = (c.latitude && c.longitude) ? '📍(' + c.latitude.toFixed(4) + ', ' + c.longitude.toFixed(4) + ')' : '';
         html += '<div style="font-size:12px;color:#555;padding:2px 0;display:flex;gap:8px;align-items:center">' +
           '<span style="white-space:nowrap">' + typeLabel + '</span>' +
@@ -3942,7 +3942,7 @@ function loadAdminCheckins(mode) {
         html += '<div style="margin-bottom:12px;padding:10px;background:#fafafa;border-radius:8px">';
         html += '<div style="font-weight:600;font-size:14px;margin-bottom:6px">👤 ' + name + '</div>';
         records.forEach(c => {
-          const icon = c.type === 'in' ? '🟢 签到' : '🔴 签退';
+          const icon = c.type === 'in' ? '🟢 签到' : (c.isSupp ? '🟡 补签退' : '🔴 签退');
           const loc = c.lat ? ' 📍' + c.lat.toFixed(4) + ',' + c.lng.toFixed(4) : '';
           html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:#555">' +
             '<span>' + icon + '</span>' +
@@ -3950,7 +3950,7 @@ function loadAdminCheckins(mode) {
         });
         // 计算当日工时
         const ins = records.filter(c => c.type === 'in');
-        const outs = records.filter(c => c.type === 'out').sort((a,b) => timeStrToMinutes(a.time) - timeStrToMinutes(b.time));
+        const outs = records.filter(c => c.type === 'out' && !c.isSupp).sort((a,b) => timeStrToMinutes(a.time) - timeStrToMinutes(b.time)); // 过滤补签退记录，避免错误配对
         const usedOuts = new Set();
         ins.forEach((iRec) => {
           const iMin = timeStrToMinutes(iRec.time);
@@ -3967,7 +3967,13 @@ function loadAdminCheckins(mode) {
             const hh = Math.floor(mins / 60);
             const mm = Math.round(mins % 60);
             html += '<div style="font-size:11px;color:#888;text-align:right">工时：' + hh + 'h' + (mm > 0 ? mm + 'm' : '') + '</div>';
-          }
+          
+        // 如果有补签退的 out，单独显示
+        const suppOuts = records.filter(c => c.type === 'out' && c.isSupp);
+        if (suppOuts.length) {
+          html += '<div style="font-size:11px;color:#aaa;text-align:right">⚠️ 补签退记录已计入，但未参与工时计算</div>';
+        }
+        }
         });
         html += '</div>';
       });
