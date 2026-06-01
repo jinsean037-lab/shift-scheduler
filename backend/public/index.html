@@ -2089,14 +2089,16 @@ async function loadSchedule() {
     const hasHistory = allScheduleData.confirmedPeriods && allScheduleData.confirmedPeriods.length > 0;
     const hasScheduleData = currentSchedule && Object.keys(currentSchedule).length > 0;
     
-    // 选班页面始终渲染排班表（空 schedule 显示空白格子供选择，不再拦截）
+    // 判断当前排班是否已确认（有 start+end 且 schedule 非空）
+    const curStart = allScheduleData.current ? allScheduleData.current.start : null;
+    const curEnd = allScheduleData.current ? allScheduleData.current.end : null;
+    const isConfirmed = !!(curStart && curEnd && hasScheduleData);
     
-    // 选班页面始终以可编辑模式渲染（confirmed 只用于历史排班只读展示）
     renderSchedule({ 
       schedule: currentSchedule,
-      scheduleStart: allScheduleData.current ? allScheduleData.current.start : null,
-      scheduleEnd: allScheduleData.current ? allScheduleData.current.end : null,
-      confirmed: false
+      scheduleStart: curStart,
+      scheduleEnd: curEnd,
+      confirmed: isConfirmed
     });
   } catch(e) { console.error('加载排班表失败', e); }
 }
