@@ -1134,29 +1134,65 @@ app.get('/api/my-checkins', async (req, res) => {
     if (!name) return res.json({ checkins: [], stats: {} })
     const store = await readStore()
     const checkins = (store.checkins || []).filter(c => c.name === name).sort((a, b) => a.time.localeCompare(b.time))
-    // 统计：配对的签到-签退算一次完整值班，计算时长
-    let totalMinutes = 0
-    let completedDays = 0
-    const processed = new Set()
+
+    // 统计：使用与 calculateMemberWorkTime 相同的精确配对逻辑
+    const byDate = {}
     checkins.forEach(c => {
-      if (c.type === 'in' && !processed.has(c.date)) {
-        const outRec = checkins.find(o => o.date === c.date && o.type === 'out')
-        if (outRec) {
-          // 安全解析纯时间字符串为分钟数
-            const toM = (t) => { const m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/); return m ? parseInt(m[1])*60 + parseInt(m[2]) : 0; };
-            totalMinutes += toM(outRec.time) - toM(c.time)
-          completedDays++
-        }
-        processed.add(c.date)
-      }
+      if (!byDate[c.date]) byDate[c.date] = []
+      byDate[c.date].push(c)
     })
+
+    let totalMinutes = 0
+    let completedShifts = 0  // 每次签到=1次值班
+
+    Object.keys(byDate).forEach(date => {
+      const recs = byDate[date].sort((a, b) => a.time.localeCompare(b.time))
+      const ins = recs.filter(r => r.type === 'in')
+      const outs = recs.filter(r => r.type === 'out' && !r.isSupp)  // 过滤补签退
+      const usedOuts = new Set()
+
+      ins.forEach(iRec => {
+        completedShifts++  // 每次签到计入一次值班
+        const iMin = timeToMinutes(iRec.time)
+
+        // 找时间最近的未使用签退
+        let bestOut = null
+        for (const o of outs) {
+          if (usedOuts.has(o.id || o.time)) continue
+          const oMin = timeToMinutes(o.time)
+          if (oMin >= iMin) {
+            if (!bestOut || oMin < timeToMinutes(bestOut.time)) bestOut = o
+          }
+        }
+        // 跨天情况（如凌晨签退）
+        if (!bestOut) {
+          for (const o of outs) {
+            if (usedOuts.has(o.id || o.time)) continue
+            const oMin = timeToMinutes(o.time)
+            if (oMin < iMin) {
+              if (!bestOut || oMin > timeToMinutes(bestOut.time)) bestOut = o
+            }
+          }
+        }
+
+        if (bestOut) {
+          usedOuts.add(bestOut.id || bestOut.time)
+          let diffMinutes = timeToMinutes(bestOut.time) - iMin
+          if (diffMinutes < 0) diffMinutes += 24 * 60
+          totalMinutes += diffMinutes
+        }
+      })
+    })
+
+    const totalHours = Math.round(totalMinutes / 60 * 10) / 10
+
     res.json({
       checkins,
       stats: {
         totalCheckins: checkins.filter(c => c.type === 'in').length,
         totalCheckouts: checkins.filter(c => c.type === 'out').length,
-        completedDays,
-        totalHours: Math.round(totalMinutes / 60 * 10) / 10
+        completedDays: completedShifts,
+        totalHours: totalHours
       }
     })
   } catch (e) {
@@ -1389,18 +1425,34 @@ function calculateMemberWorkTime(store, name, year, month) {
   Object.keys(byDate).forEach(date => {
     const recs = byDate[date].sort((a, b) => a.time.localeCompare(b.time))
     let inTime = null
-    recs.forEach(r => {
-      if (r.type === 'in') {
-        inTime = r.time
-      } else if (r.type === 'out' && inTime) {
-        const inMinutes = timeToMinutes(inTime)
-        const outMinutes = timeToMinutes(r.time)
-        const hours = Math.max(0, (outMinutes - inMinutes) / 60)
-        const rounded = Math.ceil(hours * 2) / 2 // 向上取整到0.5h
+    // 使用精确配对算法
+    const ins = recs.filter(r => r.type === 'in')
+    const outs = recs.filter(r => r.type === 'out' && !r.isSupp)
+    const usedOuts = new Set()
+    
+    ins.forEach(iRec => {
+      const iMin = timeToMinutes(iRec.time)
+      let bestOut = null
+      for (const o of outs) {
+        if (usedOuts.has(o.id || o.time)) continue
+        const oMin = timeToMinutes(o.time)
+        if (oMin >= iMin && (!bestOut || oMin < timeToMinutes(bestOut.time))) bestOut = o
+      }
+      if (!bestOut) { // 跨天情况
+        for (const o of outs) {
+          if (usedOuts.has(o.id || o.time)) continue
+          const oMin = timeToMinutes(o.time)
+          if (oMin < iMin && (!bestOut || oMin > timeToMinutes(bestOut.time))) bestOut = o
+        }
+      }
+      if (bestOut) {
+        usedOuts.add(bestOut.id || bestOut.time)
+        const diffMinutes = timeToMinutes(bestOut.time) - timeToMinutes(iRec.time)
+        const hours = Math.max(0, (diffMinutes < 0 ? diffMinutes + 24*60 : diffMinutes) / 60)
+        const rounded = Math.ceil(hours * 2) / 2
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
         workByDate[date].hours += rounded
-        workByDate[date].slots.push({ in: inTime, out: r.time })
-        inTime = null
+        workByDate[date].slots.push({ in: iRec.time, out: bestOut.time })
       }
     })
   })
