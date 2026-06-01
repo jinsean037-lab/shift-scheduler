@@ -2675,30 +2675,61 @@ async function loadHomeStats() {
         const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
         rangeEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
       }
-      // 1. 打卡数据（按日期范围过滤）
+            // 1. 打卡数据（按日期范围过滤）
+      // 值班次数：每次签到（in）计1次，不要求必须有签退
+      // 时长：in+out 配对计算；仅有 in 时按班次时段估算时长
       const ckRes = await fetch(API + '/my-checkins?name=' + encodeURIComponent(currentUser));
       const ckData = await ckRes.json();
       const checkins = (ckData.checkins || []).sort((a, b) => a.time.localeCompare(b.time));
-      // 每个日期可有多组 in/out 配对（与后端 calculateMemberWorkTime 逻辑统一）
-      const pairedDates = new Set();
+      
+      const pairedDates = new Set(); // 用于避免同日期 in+out 重复计天数
       checkins.forEach(c => {
         if (c.date < rangeStart || c.date > rangeEnd) return;
         if (c.type === 'in') {
+          // 每次签到计1次值班
+          totalShifts++;
+          pairedDates.add(c.date);
+          // 尝试找对应的签退来计算时长
           const outRec = checkins.find(o => o.date === c.date && o.type === 'out' && o.time > c.time);
           if (outRec) {
-            totalShifts++;
-            pairedDates.add(c.date);
+            // 有完整 in+out 配对：精确计算时长
             const minutes = (new Date(outRec.time) - new Date(c.time)) / 60000;
             const hoursRaw = minutes / 60;
-            const hoursRounded = Math.ceil(hoursRaw * 2) / 2; // 向上取整到0.5h
-            totalHours += hoursRounded; // 不封顶
-            const slotId = c.slotId || '';
-            if (slotId.startsWith('am')) morningShifts++;
-            else if (slotId.startsWith('pm')) afternoonShifts++;
+            const hoursRounded = Math.ceil(hoursRaw * 2) / 2;
+            totalHours += hoursRounded;
+          } else {
+            // 仅有签到无签退（可能是忘了签退）：按班次时段估算
+            // 检查这一天是否有其他 in（多次值班）
+            const allInSameDay = checkins.filter(x => x.date === c.date && x.type === 'in');
+            if (allInSameDay.length === 1) {
+              // 只有这一次签到，按标准时段长度估算（取前后两个班次的中间值，约2h）
+              totalHours += 2;
+            }
+          }
+          const slotId = c.slotId || '';
+          if (slotId.startsWith('am')) morningShifts++;
+          else if (slotId.startsWith('pm')) afternoonShifts++;
+        }
+        // 有 in 无 out：只计1次值班（上面的 in 分支已处理），不再重复计
+        // 补签退（supp out approved）通过 overtime 路由获取，不在这里处理
+      });
+      
+      // 2. 补签退 + 补报数据（按日期范围过滤）
+      // 补签退记录（approved supp-checkout）作为 type='out' 存在于 checkins 中
+      // 但为避免与上面的 in 配对逻辑冲突，单独处理 supp out（isSupp=true）
+      // 每个 approved supp-out（有对应 in）已在上方 in 分支计入1次值班
+      // 没有对应 in 的孤立的 supp-out（特殊情况下）：再计1次
+      checkins.forEach(c => {
+        if (c.date < rangeStart || c.date > rangeEnd) return;
+        if (c.type === 'out' && c.isSupp) {
+          // 补签退：有对应 in → 那次 in 已计1次；无对应 in → 再计1次
+          const hasIn = checkins.some(x => x.date === c.date && x.type === 'in');
+          if (!hasIn) {
+            totalShifts++;
+            totalHours += 2; // 估算2h
           }
         }
-      });
-      // 2. 补报数据（按日期范围过滤）
+      });// 2. 补报数据（按日期范围过滤）
       const otRes = await fetch(API + '/overtime?name=' + encodeURIComponent(currentUser));
       const otData = await otRes.json();
       const overtimes = (otData.list || []).filter(o => o.status === 'approved');
