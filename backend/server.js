@@ -55,7 +55,9 @@ function defaultStore() {
       month: null,
       isOpen: false,
       submissions: {} // { '王梓豪': { name, bankAccount, department, studentId, dorm, phone, totalHours, totalPay, submittedAt } }
-    }
+    },
+    // 值班搭子留言
+    partnerMessages: []
   }
 }
 
@@ -1492,6 +1494,54 @@ app.get('/api/admin/worktime-claim/export-all', async (req, res) => {
   } catch (e) {
     console.error('批量导出错误:', e)
     res.status(500).json({ ok: false, msg: '导出失败: ' + e.message })
+  }
+})
+
+// ========== 值班搭子留言 ==========
+
+app.post('/api/partner-message', async (req, res) => {
+  try {
+    const store = await readStore()
+    const { from, to, message } = req.body
+    if (!from || !to || !message) return res.status(400).json({ ok: false, msg: '参数不完整' })
+    if (message.length > 200) return res.status(400).json({ ok: false, msg: '留言不能超过200字' })
+    const msg = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      from, to, message,
+      createdAt: new Date().toISOString(),
+      read: false
+    }
+    if (!store.partnerMessages) store.partnerMessages = []
+    store.partnerMessages.push(msg)
+    await writeStore({ partnerMessages: store.partnerMessages })
+    res.json({ ok: true, msg: '留言发送成功' })
+  } catch (e) {
+    console.error('留言保存失败:', e)
+    res.status(500).json({ ok: false, msg: '保存失败' })
+  }
+})
+
+app.get('/api/partner-messages', async (req, res) => {
+  const store = await readStore()
+  const name = req.query.name
+  if (!name) return res.status(400).json({ ok: false, msg: '缺少name参数' })
+  // 返回发给该用户和该用户发出的所有留言（按时间倒序）
+  const msgs = (store.partnerMessages || []).filter(m => m.to === name || m.from === name)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  res.json({ ok: true, messages: msgs })
+})
+
+app.put('/api/partner-message/:id/read', async (req, res) => {
+  try {
+    const store = await readStore()
+    const id = req.params.id
+    const msg = (store.partnerMessages || []).find(m => m.id === id)
+    if (!msg) return res.status(404).json({ ok: false, msg: '留言不存在' })
+    msg.read = true
+    await writeStore({ partnerMessages: store.partnerMessages })
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '操作失败' })
   }
 })
 
