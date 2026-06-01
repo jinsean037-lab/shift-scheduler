@@ -1403,6 +1403,10 @@ body {
           <span class="nav-icon">💼</span><span>工时申报</span>
         </a>
 
+
+        <a class="nav-item" data-page="messages" id="navMessages" onclick="switchTab('messages')">
+          <span class="nav-icon">💬</span><span>搭子消息</span><span class="unread-badge" id="msgUnreadBadge" style="display:none"></span>
+        </a>
         <div class="nav-group-title" id="adminNavGroupTitle" style="display:none">管理功能</div>
         <div class="nav-item nav-admin" id="adminNavItem" style="display:none" onclick="toggleAdminSubmenu()">
           <span class="nav-icon">⚙️</span><span>管理中心</span><span class="nav-arrow" id="adminArrow">▸</span>
@@ -1500,6 +1504,26 @@ body {
         </div>
       </div>
 
+
+      <!-- ===== 搭子消息视图 ===== -->
+      <div class="page-view" id="messagesView">
+        <div class="page-title-row">
+          <h2>💬 搭子消息</h2>
+          <p class="page-subtitle">收到的留言和回复</p>
+        </div>
+        <div id="messagesContent">
+          <p style="color:#999;font-size:13px;text-align:center;padding:30px">加载中...</p>
+        </div>
+        <div id="messageThreadView" style="display:none;margin-top:16px">
+          <button onclick="showMessagesList()" style="padding:8px 16px;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;margin-bottom:12px">← 返回消息列表</button>
+          <div id="threadPartnerName" style="font-size:16px;font-weight:700;color:#8B1A1A;margin-bottom:12px"></div>
+          <div id="threadMessages" style="max-height:60vh;overflow-y:auto"></div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <input type="text" id="replyMessageInput" placeholder="回复留言..." style="flex:1;padding:10px 14px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;background:#fff">
+            <button onclick="sendReply()" style="padding:10px 20px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;white-space:nowrap">发送</button>
+          </div>
+        </div>
+      </div>
       <!-- ===== 值班打卡视图 ===== -->
       <div class="page-view" id="checkinView">
         <div class="page-title-row">
@@ -1894,7 +1918,12 @@ function switchTab(tab) {
     const nav = document.querySelector('.nav-item[data-page="checkin"]');
     if (nav) nav.classList.add('active');
     loadCheckinStatus();
-  } else if (tab === 'stats') {
+  } else if (tab === 'messages') {
+    document.getElementById('messagesView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="messages"]');
+    if (nav) nav.classList.add('active');
+    loadMessages();
+    } else if (tab === 'stats') {
     document.getElementById('statsView').classList.add('active');
     const nav = document.querySelector('.nav-item[data-page="stats"]');
     if (nav) nav.classList.add('active');
@@ -2026,7 +2055,7 @@ async function doAdminLogin() {
       document.getElementById('adminNavGroupTitle').style.display = '';
       document.getElementById('adminNavItem').style.display = '';
       // 管理员：隐藏所有成员端导航项
-      ['navSchedule','navCheckin','navStats','navWorktime'].forEach(id => {
+      ['navSchedule','navCheckin','navStats','navWorktime','navMessages'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
       });
@@ -2738,6 +2767,149 @@ async function loadHomeStats() {
   } catch(e) { console.error('加载首页统计失败', e); }
 }
 
+
+// Helper to escape a string for single-quoted JS literal
+function jsStr(s) {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+async function loadMessages() {
+  if (!currentUser) return;
+  const content = document.getElementById('messagesContent');
+  const threadView = document.getElementById('messageThreadView');
+  if (!content) return;
+  content.style.display = '';
+  if (threadView) threadView.style.display = 'none';
+  _currentThreadPartner = null;
+  try {
+    const res = await fetch(API + '/partner-messages?name=' + encodeURIComponent(currentUser));
+    const data = await res.json();
+    const msgs = data.messages || [];
+    const unread = msgs.filter(m => !m.read && m.to === currentUser).length;
+    const badge = document.getElementById('msgUnreadBadge');
+    if (badge) {
+      if (unread > 0) { badge.textContent = unread > 9 ? '9+' : String(unread); badge.style.display = 'inline-block'; }
+      else { badge.style.display = 'none'; }
+    }
+    const convMap = {};
+    msgs.forEach(m => {
+      const key = m.from === currentUser ? m.to : m.from;
+      if (!convMap[key]) convMap[key] = [];
+      convMap[key].push(m);
+    });
+    if (Object.keys(convMap).length === 0) {
+      content.innerHTML = '<div style="text-align:center;padding:40px 0"><div style="font-size:48px;margin-bottom:12px">💬</div><p style="color:#999;font-size:14px">暂无搭子消息</p><p style="color:#aaa;font-size:12px;margin-top:6px">在首页搭子卡片给同学留言，对方就能在这里看到</p></div>';
+      return;
+    }
+    let html = '<div style="display:flex;flex-direction:column;gap:10px">';
+    Object.keys(convMap).sort().forEach(partner => {
+      const convMsgs = convMap[partner].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const lastMsg = convMsgs[convMsgs.length - 1];
+      const unreadCount = convMsgs.filter(m => !m.read && m.to === currentUser).length;
+      const timeStr = formatMsgTime(lastMsg.createdAt);
+      const isTo = lastMsg.from === currentUser;
+      const safePartner = partner.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const msgEsc = lastMsg.message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      html += '<div onclick="showThread(\'' + jsStr(partner) + '\')" style="cursor:pointer;padding:14px 16px;background:linear-gradient(135deg,#fef7f0,#fff5f5);border:1.5px solid #f0d9d0;border-radius:12px">';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
+      html += '<span style="font-size:18px">👥</span>';
+      html += '<span style="font-weight:700;font-size:15px;color:#8B1A1A">' + safePartner + '</span>';
+      if (unreadCount > 0) html += '<span style="background:#c41230;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700">' + unreadCount + ' 未读</span>';
+      html += '<span style="margin-left:auto;font-size:11px;color:#aaa;white-space:nowrap">' + timeStr + '</span></div>';
+      html += '<div style="font-size:13px;color:' + (unreadCount > 0 ? '#c41230;font-weight:600' : '#666') + '">' + (isTo ? '我：' : '') + msgEsc + '</div></div>';
+    });
+    html += '</div>';
+    content.innerHTML = html;
+  } catch(e) {
+    content.innerHTML = '<p style="color:#c41230;text-align:center;padding:30px">加载失败，请刷新重试</p>';
+  }
+}
+
+function formatMsgTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const msgDateStr = d.toISOString().slice(0, 10);
+  if (msgDateStr === todayStr) return d.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays <= 6) return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+  return d.toLocaleDateString('zh-CN', {month:'numeric', day:'numeric'});
+}
+
+async function showThread(partner) {
+  _currentThreadPartner = partner;
+  const content = document.getElementById('messagesContent');
+  const threadView = document.getElementById('messageThreadView');
+  const partnerNameEl = document.getElementById('threadPartnerName');
+  const threadMsgsEl = document.getElementById('threadMessages');
+  if (!content || !threadView) return;
+  if (partnerNameEl) partnerNameEl.textContent = '与 ' + partner + ' 的对话';
+  try {
+    const res = await fetch(API + '/partner-messages?name=' + encodeURIComponent(currentUser));
+    const data = await res.json();
+    const allMsgs = data.messages || [];
+    const thread = allMsgs.filter(m => (m.from === partner && m.to === currentUser) || (m.from === currentUser && m.to === partner));
+    thread.filter(m => !m.read && m.to === currentUser).forEach(m => { fetch(API + '/partner-message/' + m.id + '/read', {method:'PUT'}).catch(function(){}); });
+    if (thread.length === 0) { threadMsgsEl.innerHTML = '<p style="color:#999;text-align:center;padding:20px">暂无消息记录</p>'; }
+    else {
+      let html = '<div style="display:flex;flex-direction:column;gap:10px;padding-bottom:8px">';
+      thread.sort(function(a,b){return a.createdAt.localeCompare(b.createdAt);}).forEach(function(m) {
+        var isMe = m.from === currentUser;
+        var bgColor = isMe ? '#fff5f5' : '#f0f7ff';
+        var align = isMe ? 'flex-end' : 'flex-start';
+        var labelColor = isMe ? '#8B1A1A' : '#1a6bc4';
+        var msgEsc = m.message.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+        html += '<div style="display:flex;flex-direction:column;align-items:' + align + '">';
+        html += '<div style="max-width:75%;padding:10px 14px;border-radius:12px;background:' + bgColor + ';border:1px solid ' + (isMe ? '#f0d9d0' : '#d0e0f0') + ';font-size:13px;line-height:1.6;word-break:break-all">';
+        html += '<div style="font-size:11px;color:' + labelColor + ';font-weight:600;margin-bottom:2px">' + (isMe ? '我' : m.from) + '</div>';
+        html += msgEsc + '</div>';
+        html += '<div style="font-size:11px;color:#aaa;margin-top:3px">' + formatMsgTime(m.createdAt) + (m.read && isMe ? ' ✓已读' : '') + '</div></div>';
+      });
+      html += '</div>';
+      threadMsgsEl.innerHTML = html;
+      threadMsgsEl.scrollTop = threadMsgsEl.scrollHeight;
+    }
+    content.style.display = 'none';
+    threadView.style.display = '';
+    setTimeout(function(){ loadMessages(); }, 500);
+  } catch(e) { showToast('加载失败'); }
+}
+
+function showMessagesList() {
+  _currentThreadPartner = null;
+  var content = document.getElementById('messagesContent');
+  var threadView = document.getElementById('messageThreadView');
+  if (content) content.style.display = '';
+  if (threadView) threadView.style.display = 'none';
+  loadMessages();
+}
+
+async function sendReply() {
+  var input = document.getElementById('replyMessageInput');
+  if (!input || !_currentThreadPartner) return;
+  var msg = input.value.trim();
+  if (!msg) { showToast('请输入留言内容'); return; }
+  try {
+    var res = await fetch(API + '/partner-message', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({from: currentUser, to: _currentThreadPartner, message: msg}) });
+    var data = await res.json();
+    if (data.ok) { input.value = ''; showThread(_currentThreadPartner); }
+    else { showToast(data.msg || '发送失败'); }
+  } catch(e) { showToast('网络错误'); }
+}
+
+// Reply input Enter key
+var _origDOMReady = window.DOMContentLoaded;
+window.addEventListener('DOMContentLoaded', function() {
+  var replyInput = document.getElementById('replyMessageInput');
+  if (replyInput) {
+    replyInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') sendReply();
+    });
+  }
+  // call original if any
+  if (typeof _origDOMReady === 'function') _origDOMReady();
+});
 // ========== 打卡功能 (v4.1) ==========
 
 function loadCheckinStatus() {
