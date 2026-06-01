@@ -922,8 +922,8 @@ const SLOT_WINDOWS = {
 // 打卡地点围栏（中山大学南校园岭南行政中心）
 const CHECKIN_LOCATION = {
   name: '岭南行政中心（中山大学南校园）',
-  lat: 23.11,
-  lng: 113.31,
+  lat: 23.1036,
+  lng: 113.2936,
   radius: 200 // 米
 }
 
