@@ -1059,7 +1059,7 @@ app.post('/api/checkout/revoke', async (req, res) => {
     const outs = checkins.filter(c => c.name === name && c.date === today && c.type === 'out').sort((a,b)=>b.time.localeCompare(a.time))
     if (outs.length === 0) return res.json({ ok: false, msg: '没有可撤回的签退记录' })
     const lastOut = outs[0]
-    const let lastOutMs;
+    let lastOutMs;
             if (lastOut.time && lastOut.time.includes('T')) { lastOutMs = new Date(lastOut.time).getTime(); }
             else { const lm = (lastOut.time||'').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/); lastOutMs = lm ? (new Date()).setHours(parseInt(lm[1]),parseInt(lm[2]),0,0) : Date.now(); }
             diffMs = Date.now() - lastOutMs
