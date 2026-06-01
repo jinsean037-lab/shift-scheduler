@@ -3950,14 +3950,23 @@ function loadAdminCheckins(mode) {
         });
         // 计算当日工时
         const ins = records.filter(c => c.type === 'in');
-        const outs = records.filter(c => c.type === 'out');
-        ins.forEach((iRec, idx) => {
-          const oRec = outs[idx];
-          if (oRec) {
-            const mins = timeStrToMinutes(oRec.time) - timeStrToMinutes(iRec.time);
-            const h = Math.floor(mins / 60);
-            const m = Math.round(mins % 60);
-            html += '<div style="font-size:11px;color:#888;text-align:right">工时：' + h + 'h' + (m > 0 ? m + 'm' : '') + '</div>';
+        const outs = records.filter(c => c.type === 'out').sort((a,b) => timeStrToMinutes(a.time) - timeStrToMinutes(b.time));
+        const usedOuts = new Set();
+        ins.forEach((iRec) => {
+          const iMin = timeStrToMinutes(iRec.time);
+          let bestOut = null;
+          for (const o of outs) {
+            if (usedOuts.has(o.id || JSON.stringify(o))) continue;
+            if (timeStrToMinutes(o.time) >= iMin) { bestOut = o; break; }
+          }
+          if (!bestOut) { for (const o of outs) { if (!usedOuts.has(o.id || JSON.stringify(o))) { bestOut = o; break; } } }
+          if (bestOut) {
+            usedOuts.add(bestOut.id || JSON.stringify(bestOut));
+            let mins = timeStrToMinutes(bestOut.time) - timeStrToMinutes(iRec.time);
+            if (mins < 0) mins += 24 * 60;
+            const hh = Math.floor(mins / 60);
+            const mm = Math.round(mins % 60);
+            html += '<div style="font-size:11px;color:#888;text-align:right">工时：' + hh + 'h' + (mm > 0 ? mm + 'm' : '') + '</div>';
           }
         });
         html += '</div>';
