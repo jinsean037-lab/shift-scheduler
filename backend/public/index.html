@@ -3125,39 +3125,37 @@ function sendCheckout(lat, lng) {
 
 
 
+
+
 // ========== 补签退申请 (v4.2) ==========
 function showSuppCheckoutDialog() {
   if (!currentUser) return;
   var overlay = document.getElementById('suppCheckoutOverlay');
   if (!overlay) {
-    // Create dialog if not exists
     overlay = document.createElement('div');
     overlay.id = 'suppCheckoutOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
-    overlay.innerHTML = '<div style="background:#fff;border-radius:16px;padding:24px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(139,26,26,0.15)">' +
-      '<h3 style="color:#8B1A1A;font-size:18px;margin-bottom:16px;text-align:center">📝 申请补签退</h3>' +
-      '<div style="margin-bottom:14px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">签到日期</label><input type="date" id="suppDate" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;box-sizing:border-box"></div>' +
-      '<div style="margin-bottom:14px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">补签退时间</label><input type="time" id="suppTime" value="17:30" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;box-sizing:border-box"></div>' +
-      '<div style="margin-bottom:18px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">备注说明</label><textarea id="suppReason" placeholder="如：忘记打卡、系统故障等..." rows="2" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;resize:none;box-sizing:border-box"></textarea></div>' +
-      '<div style="display:flex;gap:10px"><button id="suppSubmitBtn" style="flex:1;padding:11px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">提交申请</button><button onclick="document.getElementById('suppCheckoutOverlay').style.display='none'" style="flex:1;padding:11px;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer">取消</button></div></div>';
+    overlay.innerHTML = [
+      '<div style="background:#fff;border-radius:16px;padding:24px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(139,26,26,0.15)">',
+      '<h3 style="color:#8B1A1A;font-size:18px;margin-bottom:16px;text-align:center">📝 申请补签退</h3>',
+      '<div style="margin-bottom:14px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">签到日期</label><input type="date" id="suppDate" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;box-sizing:border-box"></div>',
+      '<div style="margin-bottom:14px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">补签退时间</label><input type="time" id="suppTime" value="17:30" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;box-sizing:border-box"></div>',
+      '<div style="margin-bottom:18px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">备注说明</label><textarea id="suppReason" placeholder="如：忘记打卡、系统故障等..." rows="2" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;resize:none;box-sizing:border-box"></textarea></div>',
+      '<div style="display:flex;gap:10px"><button id="suppSubmitBtn" style="flex:1;padding:11px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">提交申请</button><button id="suppCancelBtn" style="flex:1;padding:11px;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer">取消</button></div>',
+    ].join('');
     document.body.appendChild(overlay);
-    // Set default date to today
     var today = new Date().toISOString().slice(0, 10);
     document.getElementById('suppDate').value = today;
-    // Bind submit
     document.getElementById('suppSubmitBtn').addEventListener('click', submitSuppCheckout);
+    document.getElementById('suppCancelBtn').addEventListener('click', function() { overlay.style.display = 'none'; });
   }
   overlay.style.display = 'flex';
 }
 
 async function submitSuppCheckout() {
-  var dateInput = document.getElementById('suppDate');
-  var timeInput = document.getElementById('suppTime');
-  var reasonInput = document.getElementById('suppReason');
-  if (!dateInput || !timeInput || !reasonInput) return;
-  var dateVal = dateInput.value.trim();
-  var timeVal = timeInput.value.trim();
-  var reason = reasonInput.value.trim();
+  var dateVal = (document.getElementById('suppDate') || {}).value || '';
+  var timeVal = (document.getElementById('suppTime') || {}).value || '';
+  var reason = (document.getElementById('suppReason') || {}).value || '';
   if (!dateVal) { showToast('请选择日期'); return; }
   if (!timeVal) { showToast('请选择时间'); return; }
   try {
@@ -3169,13 +3167,15 @@ async function submitSuppCheckout() {
     var data = await res.json();
     if (data.ok) {
       showToast('✅ 补签退申请已提交，等待管理员审核');
-      document.getElementById('suppCheckoutOverlay').style.display = 'none';
+      var overlay = document.getElementById('suppCheckoutOverlay');
+      if (overlay) overlay.style.display = 'none';
       loadCheckinStatus();
     } else {
       showToast(data.msg || '提交失败');
     }
   } catch(e) { showToast('网络错误'); }
 }
+
 // 撤回签退（3分钟内）
 function doRevokeCheckout() {
   fetch(API + '/checkout/revoke', {
