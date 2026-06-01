@@ -3954,7 +3954,7 @@ function loadAdminCheckins(mode) {
         ins.forEach((iRec, idx) => {
           const oRec = outs[idx];
           if (oRec) {
-            const mins = (new Date(oRec.time) - new Date(iRec.time)) / 60000;
+            const mins = timeStrToMinutes(oRec.time) - timeStrToMinutes(iRec.time);
             const h = Math.floor(mins / 60);
             const m = Math.round(mins % 60);
             html += '<div style="font-size:11px;color:#888;text-align:right">工时：' + h + 'h' + (m > 0 ? m + 'm' : '') + '</div>';
