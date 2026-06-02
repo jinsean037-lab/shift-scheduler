@@ -1128,6 +1128,31 @@ app.post('/api/admin/overtime/approve', async (req, res) => {
 })
 
 // GET /api/my-checkins?name=xxx — 获取个人打卡记录
+
+// 调试：查看打卡数据格式（临时）
+app.get('/api/debug-checkins', async (req, res) => {
+  try {
+    const name = req.query.name || '周子曦'
+    const store = await readStore()
+    const allCheckins = store.checkins || []
+    const userCheckins = allCheckins.filter(c => c.name === name)
+    res.json({
+      totalCheckinsInStore: allCheckins.length,
+      userCheckinsCount: userCheckins.length,
+      sample: userCheckins.slice(0, 10).map(c => ({
+        date: c.date,
+        time: c.time,
+        type: c.type,
+        isSupp: c.isSupp,
+        timeType: typeof c.time,
+        timeLength: c.time ? c.time.length : null
+      }))
+    })
+  } catch (e) {
+    res.json({ error: e.message })
+  }
+})
+
 app.get('/api/my-checkins', async (req, res) => {
   try {
     const name = req.query.name
@@ -1414,7 +1439,7 @@ function calculateMemberWorkTime(store, name, year, month) {
   // 按日期汇总工时（每次打卡配对独立向上取整，不封顶2h）
   const workByDate = {}
   
-  // 1. 打卡记录：每次 in/out 配对独立计算
+  // 1. 打卡记录：每次 in/out 配对独立计算，连续班次自动合并
   const myCheckins = checkins.filter(c => c.name === name && c.date >= monthStartStr && c.date <= monthEndStr)
   const byDate = {}
   myCheckins.forEach(c => {
@@ -1424,12 +1449,12 @@ function calculateMemberWorkTime(store, name, year, month) {
   
   Object.keys(byDate).forEach(date => {
     const recs = byDate[date].sort((a, b) => a.time.localeCompare(b.time))
-    let inTime = null
-    // 使用精确配对算法
     const ins = recs.filter(r => r.type === 'in')
     const outs = recs.filter(r => r.type === 'out' && !r.isSupp)
     const usedOuts = new Set()
     
+    // Step 1: 为每个 in 找最近 out 配对
+    const rawPairs = []
     ins.forEach(iRec => {
       const iMin = timeToMinutes(iRec.time)
       let bestOut = null
@@ -1438,7 +1463,7 @@ function calculateMemberWorkTime(store, name, year, month) {
         const oMin = timeToMinutes(o.time)
         if (oMin >= iMin && (!bestOut || oMin < timeToMinutes(bestOut.time))) bestOut = o
       }
-      if (!bestOut) { // 跨天情况
+      if (!bestOut) { // 跨天
         for (const o of outs) {
           if (usedOuts.has(o.id || o.time)) continue
           const oMin = timeToMinutes(o.time)
@@ -1447,12 +1472,57 @@ function calculateMemberWorkTime(store, name, year, month) {
       }
       if (bestOut) {
         usedOuts.add(bestOut.id || bestOut.time)
-        const diffMinutes = timeToMinutes(bestOut.time) - timeToMinutes(iRec.time)
-        const hours = Math.max(0, (diffMinutes < 0 ? diffMinutes + 24*60 : diffMinutes) / 60)
+        rawPairs.push({ in: iRec, out: bestOut })
+      } else {
+        rawPairs.push({ in: iRec, out: null })
+      }
+    })
+    
+    // Step 2: 连续班次合并（午休 11:30-15:00 或 gap<=180min 视为连续）
+    const mergedPairs = []
+    let currentMerge = null
+    for (let pi = 0; pi < rawPairs.length; pi++) {
+      if (!currentMerge) {
+        currentMerge = { firstIn: rawPairs[pi].in, lastOut: rawPairs[pi].out, slots: [rawPairs[pi].in] }
+      } else {
+        const prevOutMin = currentMerge.lastOut ? timeToMinutes(currentMerge.lastOut.time) : -9999
+        const curInMin = timeToMinutes(rawPairs[pi].in.time)
+        const gap = curInMin - prevOutMin
+        const isLunchBreak = (prevOutMin >= 11*60+30 && prevOutMin <= 13*60) && (curInMin >= 14*60 && curInMin <= 15*60)
+        if ((gap >= 0 && gap <= 180) || isLunchBreak) {
+          currentMerge.lastOut = rawPairs[pi].out
+          currentMerge.slots.push(rawPairs[pi].in)
+        } else {
+          mergedPairs.push(currentMerge)
+          currentMerge = { firstIn: rawPairs[pi].in, lastOut: rawPairs[pi].out, slots: [rawPairs[pi].in] }
+        }
+      }
+    }
+    if (currentMerge) mergedPairs.push(currentMerge)
+    
+    // Step 3: 计算每个合并组的工时
+    mergedPairs.forEach(mp => {
+      if (mp.lastOut) {
+        const inMin = timeToMinutes(mp.firstIn.time)
+        const outMin = timeToMinutes(mp.lastOut.time)
+        let diffMinutes = outMin - inMin
+        if (diffMinutes < 0) diffMinutes += 24 * 60
+        const hours = Math.max(0, diffMinutes / 60)
         const rounded = Math.ceil(hours * 2) / 2
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
         workByDate[date].hours += rounded
-        workByDate[date].slots.push({ in: iRec.time, out: bestOut.time })
+        workByDate[date].slots.push({ 
+          merged: true, 
+          slotCount: mp.slots.length,
+          in: mp.firstIn.time, 
+          out: mp.lastOut.time 
+        })
+      } else {
+        // 无签退：按班次数 * 2h 估算
+        const estHours = mp.slots.length * 2
+        if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
+        workByDate[date].hours += estHours
+        workByDate[date].slots.push({ estimated: true, slotCount: mp.slots.length, hours: estHours })
       }
     })
   })
