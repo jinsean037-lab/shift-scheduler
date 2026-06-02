@@ -2677,44 +2677,110 @@ async function loadHomeStats() {
       }
             // 1. 打卡数据（按日期范围过滤）
       // 值班次数：每次签到（in）计1次，不要求必须有签退
-      // 时长：in+out 配对计算；仅有 in 时按班次时段估算时长
+      // 时长：in+out 配对计算；连续班次自动合并为一次长时段
+      // 连续班次定义：am1→am2、am2→pm1（跨午休）、pm1→pm2
       const ckRes = await fetch(API + '/my-checkins?name=' + encodeURIComponent(currentUser));
       const ckData = await ckRes.json();
       const checkins = (ckData.checkins || []).sort((a, b) => a.time.localeCompare(b.time));
       
-      const pairedDates = new Set(); // 用于避免同日期 in+out 重复计天数
+      // 按日期分组，对每天做连续班次合并
+      const dayGroups = {};
       checkins.forEach(c => {
         if (c.date < rangeStart || c.date > rangeEnd) return;
-        if (c.type === 'in') {
-          // 每次签到计1次值班
-          totalShifts++;
-          pairedDates.add(c.date);
-          // 尝试找对应的签退来计算时长
-          const outRec = checkins.find(o => o.date === c.date && o.type === 'out' && o.time > c.time);
-          if (outRec) {
-            // 有完整 in+out 配对：精确计算时长
-            // 安全解析时间：支持纯时间 "HH:mm:ss" 和 ISO 时间戳
-            const inMin = timeStrToMinutes(c.time);
-            const outMin = timeStrToMinutes(outRec.time);
-            const minutes = outMin - inMin;
+        if (!dayGroups[c.date]) dayGroups[c.date] = [];
+        dayGroups[c.date].push(c);
+      });
+      
+      Object.keys(dayGroups).forEach(date => {
+        const recs = dayGroups[date].sort((a, b) => a.time.localeCompare(b.time));
+        const ins = recs.filter(r => r.type === 'in');
+        const outs = recs.filter(r => r.type === 'out' && !r.isSupp);
+        
+        // 为每个 in 找最近的 out 配对
+        const usedOuts = new Set();
+        const pairs = [];
+        ins.forEach(iRec => {
+          const iMin = timeStrToMinutes(iRec.time);
+          let bestOut = null;
+          for (const o of outs) {
+            if (usedOuts.has(o.id || o.time)) continue;
+            const oMin = timeStrToMinutes(o.time);
+            if (oMin >= iMin && (!bestOut || oMin < timeToMinutes(bestOut.time))) bestOut = o;
+          }
+          // 跨天：找最早的未使用 out
+          if (!bestOut) {
+            for (const o of outs) {
+              if (usedOuts.has(o.id || o.time)) continue;
+              if (!bestOut || timeStrToMinutes(o.time) < timeStrToMinutes(bestOut.time)) bestOut = o;
+            }
+          }
+          if (bestOut) {
+            usedOuts.add(bestOut.id || bestOut.time);
+            pairs.push({ in: iRec, out: bestOut });
+          } else {
+            pairs.push({ in: iRec, out: null }); // 无配对签退
+          }
+        });
+        
+        // 连续班次合并：如果多个配对的 out-in 间隔 <= 180分钟（午休例外：12:00-14:30=150min也算连续）
+        // 合并策略：将相邻的短间隔配对合并为一个长时段
+        const mergedPairs = [];
+        let currentMerge = null;
+        for (let p = 0; p < pairs.length; p++) {
+          if (!currentMerge) {
+            currentMerge = { firstIn: pairs[p].in, lastOut: pairs[p].out, slots: [pairs[p].in] };
+          } else {
+            const prevOutMin = currentMerge.lastOut ? timeStrToMinutes(currentMerge.lastOut.time) : -9999;
+            const curInMin = timeStrToMinutes(pairs[p].in.time);
+            const gap = curInMin - prevOutMin;
+            // 午休特殊处理：11:30-14:00 之间的大间隙算连续（am2→pm1）
+            // 其他情况：gap <= 180min 视为连续（如 pm1→pm2 无缝衔接 gap≈0）
+            const isLunchBreak = (prevOutMin >= 11*60+30 && prevOutMin <= 13*60) && (curInMin >= 14*60 && curInMin <= 15*60);
+            if ((gap >= 0 && gap <= 180) || isLunchBreak) {
+              // 合并：更新最后签退
+              currentMerge.lastOut = pairs[p].out;
+              currentMerge.slots.push(pairs[p].in);
+            } else {
+              // 不连续，保存当前合并组，开始新组
+              mergedPairs.push(currentMerge);
+              currentMerge = { firstIn: pairs[p].in, lastOut: pairs[p].out, slots: [pairs[p].in] };
+            }
+          }
+        }
+        if (currentMerge) mergedPairs.push(currentMerge);
+        
+        // 计算每个合并组的工时和值班次数
+        mergedPairs.forEach(mp => {
+          mp.slots.forEach(s => {
+            totalShifts++; // 每个 in 计一次值班
+            const sid = s.slotId || '';
+            if (sid.startsWith('am')) morningShifts++;
+            else if (sid.startsWith('pm')) afternoonShifts++;
+          });
+          
+          if (mp.lastOut) {
+            // 有完整签到-签退：用首次签到到最后签退的总时长
+            const inMin = timeStrToMinutes(mp.firstIn.time);
+            const outMin = timeStrToMinutes(mp.lastOut.time);
+            let minutes = outMin - inMin;
+            if (minutes < 0) minutes += 24 * 60; // 跨天
             const hoursRaw = Math.max(0, minutes) / 60;
             const hoursRounded = Math.ceil(hoursRaw * 2) / 2;
             totalHours += hoursRounded;
           } else {
-            // 仅有签到无签退（可能是忘了签退）：按班次时段估算
-            // 检查这一天是否有其他 in（多次值班）
-            const allInSameDay = checkins.filter(x => x.date === c.date && x.type === 'in');
-            if (allInSameDay.length === 1) {
-              // 只有这一次签到，按标准时段长度估算（取前后两个班次的中间值，约2h）
-              totalHours += 2;
-            }
+            // 只有签到无签退：按班次数 * 2h 估算
+            totalHours += mp.slots.length * 2;
           }
-          const slotId = c.slotId || '';
-          if (slotId.startsWith('am')) morningShifts++;
-          else if (slotId.startsWith('pm')) afternoonShifts++;
+        });
+      });
+      
+      // 补签退单独处理（isSupp=true 的 out）
+      checkins.forEach(c => {
+        if (c.date < rangeStart || c.date > rangeEnd) return;
+        if (c.type === 'out' && c.isSupp) {
+          const hasIn = checkins.some(x => x.date === c.date && x.type === 'in');
+          if (!hasIn) { totalShifts++; totalHours += 2; }
         }
-        // 有 in 无 out：只计1次值班（上面的 in 分支已处理），不再重复计
-        // 补签退（supp out approved）通过 overtime 路由获取，不在这里处理
       });
       
       // 2. 补签退 + 补报数据（按日期范围过滤）
@@ -3979,7 +4045,7 @@ function loadAdminCheckins(mode) {
       });
       listEl.innerHTML = html;
     })
-    .catch(() => { listEl.innerHTML = '<p style="color:#c41230;font-size:13px">加载失败</p>'; });
+    .catch((e) => { console.error('loadAdminOvertime error:', e); listEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:16px 0;text-align:center">⚠️ 加载失败: ' + (e.message || '网络错误') + '</p>'; });
 }
 
 // ========== 管理员补报审核 (v4.1) ==========
@@ -3991,7 +4057,7 @@ function loadAdminOvertime() {
     .then(data => {
       const list = (data.list || []).filter(o => o.status === 'pending');
       if (list.length === 0) {
-        listEl.innerHTML = '<p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无待审核的补报申请</p>';
+        listEl.innerHTML = '<div style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:12px">📋</div><p style="color:#999;font-size:14px;margin-bottom:6px">暂无待审核的补报申请</p><p style="color:#bbb;font-size:12px">当成员提交补签退申请后，会在此处显示</p></div>';
         return;
       }
       let html = '';
@@ -4144,10 +4210,14 @@ async function submitWorkTimeClaim() {
 // 管理员端：加载工时申报管理页面
 async function loadAdminWorktime() {
   const content = document.getElementById('adminWorktimeContent');
+  if (!content) { console.warn('adminWorktimeContent not found'); return; }
   
   try {
-    // 获取申报状态
-    const statusRes = await fetch(API + '/worktime-claim/status');
+    content.innerHTML = '<div style="text-align:center;padding:30px;color:#999"><span style="display:inline-block;width:20px;height:20px;border:2px solid #ddd;border-top-color:#8B1A1A;border-radius:50%;animation:spin 0.8s linear infinite;margin-right:8px;vertical-align:middle"></span>正在加载...</div>';
+    const statusRes = await Promise.race([
+      fetch(API + '/worktime-claim/status'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), 10000))
+    ]);
     const statusData = await statusRes.json();
     const wtc = statusData.workTimeClaim || {};
     
@@ -4211,7 +4281,7 @@ async function loadAdminWorktime() {
       html += '已提交：' + submittedCount + '/' + allData.submissions.length + ' 人　｜　总工时：' + totalHours.toFixed(1) + ' 小时　｜　总报酬：' + totalPay.toFixed(1) + ' 元';
       html += '</div>';
     } else {
-      html += '<p style="color:#999;font-size:13px;margin-top:12px">暂无数据</p>';
+      html += '<div style="text-align:center;padding:30px"><div style="font-size:40px;margin-bottom:10px">📊</div><p style="color:#999;font-size:14px">暂无成员数据</p><p style="color:#bbb;font-size:12px;margin-top:4px">请先开启工时申报并通知成员提交</p></div>';
     }
     
     html += '</div>';
@@ -4219,7 +4289,7 @@ async function loadAdminWorktime() {
     content.innerHTML = html;
   } catch (e) {
     console.error('loadAdminWorktime error:', e);
-    content.innerHTML = '<p style="color:#c41230;font-size:14px;text-align:center;padding:30px">加载失败</p>';
+    content.innerHTML = '<div style="text-align:center;padding:30px"><p style="color:#c41230;font-size:14px;margin-bottom:8px">⚠️ 加载失败</p><p style="color:#999;font-size:12px">' + (e.message || '未知错误') + '</p><button class="quick-btn quick-btn-primary" style="margin-top:12px" onclick="loadAdminWorktime()">重试</button></div>';
   }
 }
 
