@@ -2494,7 +2494,7 @@ function renderMyShifts(shifts, forHome) {
     // 用 slotLabel() 转换 slotId 为可读标签
     const displaySlot = (typeof slotLabel === 'function') ? (slotLabel(s.slotId || s.slot)) : (s.slotId || s.slot);
     // 首页模式：显示 日期（周X）格式（actualDate 可能是 Date 对象或字符串）
-    const actualDateStr = (s.actualDate instanceof Date) ? formatLocalDate(s.actualDate) : (s.actualDate || '');
+    const actualDateStr = (s.actualDate instanceof Date) ? formatLocalDate(s.actualDate) : (s.actualDate || s.date || '');
     // 首页模式：只显示周次+时段，不显示日期
     const displayDay = forHome ? (s.weekdayLabel || s.day) : ((s.actualDate) ? actualDateStr + ' (' + (s.weekdayLabel || s.day) + ')' : s.day);
     html += '<div class="' + cls + '">';
@@ -2586,11 +2586,29 @@ async function getSwapData() {
     const data = await res.json();
     return {
       members: (data.members || []).filter(function(m) { return m !== currentUser; }),
-      schedule: data.schedule || {}
+      schedule: data.schedule || {},
+      scheduleStart: data.scheduleStart || null,
+      scheduleEnd: data.scheduleEnd || null
     };
   } catch(e) {
-    return { members: [], schedule: {} };
+    return { members: [], schedule: {}, scheduleStart: null, scheduleEnd: null };
   }
+}
+function weekdayOfDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00+08:00');
+  return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+}
+function datesForWeekday(start, end, weekday) {
+  const dates = [];
+  if (!start || !end) return dates;
+  const cur = new Date(start.slice(0,10) + 'T12:00:00+08:00');
+  const last = new Date(end.slice(0,10) + 'T12:00:00+08:00');
+  while (cur <= last) {
+    const dateStr = cur.toISOString().slice(0, 10);
+    if (weekdayOfDate(dateStr) === weekday) dates.push(dateStr);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
 }
 function getMemberScheduledShifts(schedule, name) {
   const shifts = [];
@@ -2620,19 +2638,27 @@ async function openShiftSwapDialog(day, slot) {
     overlay.className = 'modal-overlay';
     document.body.appendChild(overlay);
   }
-  overlay.style.display = 'flex';
+  const myDates = datesForWeekday(swapData.scheduleStart, swapData.scheduleEnd, day);
+  if (!myDates.length) { showToast('当前生效周期内没有这个周几的日期'); return; }
+  overlay.style.cssText = 'display:flex;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
   overlay.innerHTML = [
-    '<div class="modal" style="max-width:420px">',
+    '<div class="modal" style="max-width:460px;width:100%;background:#fff;color:#222;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,.28);padding:24px;box-sizing:border-box">',
     '<h3 style="color:var(--primary);font-size:18px;margin-bottom:12px;text-align:center">申请换班</h3>',
     '<p style="font-size:13px;color:#666;margin-bottom:12px;text-align:center">你的班次：' + escapeText(day) + ' ' + escapeText(slotLabel(slot)) + '</p>',
+    '<label style="display:block;font-size:13px;color:#333;margin-bottom:6px;font-weight:600">选择你的具体日期</label>',
+    '<select id="swapFromDateSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px;color:#222">',
+    myDates.map(function(dateStr) { return '<option value="' + escapeText(dateStr) + '">' + escapeText(dateStr + ' ' + day) + '</option>'; }).join(''),
+    '</select>',
     '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">互换成员</label>',
-    '<select id="swapTargetSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px">',
+    '<select id="swapTargetSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px;color:#222">',
     members.map(function(m) { return '<option value="' + escapeText(m) + '">' + escapeText(m) + '</option>'; }).join(''),
     '</select>',
     '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">对方用于互换的班次</label>',
-    '<select id="swapTargetShiftSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px"></select>',
+    '<select id="swapTargetShiftSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px;color:#222"></select>',
+    '<label style="display:block;font-size:13px;color:#333;margin-bottom:6px;font-weight:600">选择对方具体日期</label>',
+    '<select id="swapToDateSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px;color:#222"></select>',
     '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">说明（可选）</label>',
-    '<textarea id="swapReasonInput" rows="3" maxlength="200" placeholder="例如：想把这两个具体班次互换，已和对方沟通" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;resize:vertical;margin-bottom:14px"></textarea>',
+    '<textarea id="swapReasonInput" rows="3" maxlength="200" placeholder="例如：想把这两个具体日期的班次互换，已和对方沟通" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;resize:vertical;margin-bottom:14px;color:#222;background:#fff"></textarea>',
     '<div style="display:flex;gap:10px">',
     '<button id="swapSubmitBtn" style="flex:1;padding:11px;background:#4F46E5;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">发送申请</button>',
     '<button id="swapCancelBtn" style="flex:1;padding:11px;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer">取消</button>',
@@ -2649,10 +2675,22 @@ async function openShiftSwapDialog(day, slot) {
       const value = s.day + '|' + s.slotId;
       return '<option value="' + escapeText(value) + '">' + escapeText(s.day + ' ' + slotLabel(s.slotId)) + '</option>';
     }).join('');
+    refreshTargetDates();
     document.getElementById('swapSubmitBtn').disabled = shifts.length === 0;
     document.getElementById('swapSubmitBtn').style.opacity = shifts.length === 0 ? '0.5' : '1';
   }
+  function refreshTargetDates() {
+    const targetShift = document.getElementById('swapTargetShiftSelect').value;
+    const toDateSelect = document.getElementById('swapToDateSelect');
+    if (!targetShift) { toDateSelect.innerHTML = ''; return; }
+    const parts = targetShift.split('|');
+    const dates = datesForWeekday(swapData.scheduleStart, swapData.scheduleEnd, parts[0]);
+    toDateSelect.innerHTML = dates.map(function(dateStr) {
+      return '<option value="' + escapeText(dateStr) + '">' + escapeText(dateStr + ' ' + parts[0]) + '</option>';
+    }).join('');
+  }
   document.getElementById('swapTargetSelect').onchange = refreshTargetShifts;
+  document.getElementById('swapTargetShiftSelect').onchange = refreshTargetDates;
   refreshTargetShifts();
   document.getElementById('swapSubmitBtn').onclick = function() { submitShiftSwap(day, slot); };
   document.getElementById('swapCancelBtn').onclick = function() { overlay.style.display = 'none'; };
@@ -2662,6 +2700,9 @@ async function submitShiftSwap(day, slot) {
   const targetShift = document.getElementById('swapTargetShiftSelect').value;
   if (!targetShift) { showToast('请选择对方要互换的班次'); return; }
   const parts = targetShift.split('|');
+  const fromDate = document.getElementById('swapFromDateSelect').value;
+  const toDate = document.getElementById('swapToDateSelect').value;
+  if (!fromDate || !toDate) { showToast('请选择双方换班日期'); return; }
   const reason = document.getElementById('swapReasonInput').value.trim();
   try {
     const res = await fetch(API + '/shift-swap/request', {
@@ -2670,8 +2711,10 @@ async function submitShiftSwap(day, slot) {
       body: JSON.stringify({
         from: currentUser,
         to: target,
+        fromDate: fromDate,
         fromDay: day,
         fromSlotId: slot,
+        toDate: toDate,
         toDay: parts[0],
         toSlotId: parts[1],
         reason: reason
@@ -2705,8 +2748,10 @@ function renderShiftSwapRequests(reqs) {
     const fromSlotId = r.fromSlotId || r.slotId;
     const toDay = r.toDay || r.day;
     const toSlotId = r.toSlotId || r.slotId;
+    const fromDate = r.fromDate || '';
+    const toDate = r.toDate || '';
     const direction = r.from === currentUser ? ('你 与 ' + r.to + ' 互换') : (r.from + ' 想与你互换');
-    const swapText = fromDay + ' ' + slotLabel(fromSlotId) + ' ↔ ' + toDay + ' ' + slotLabel(toSlotId);
+    const swapText = (fromDate ? fromDate + ' ' : '') + fromDay + ' ' + slotLabel(fromSlotId) + ' ↔ ' + (toDate ? toDate + ' ' : '') + toDay + ' ' + slotLabel(toSlotId);
     html += '<div class="shift-card" style="border-left:4px solid ' + statusColor + '">';
     html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
     html += '<div class="shift-day">' + escapeText(fromDay) + '</div>';
