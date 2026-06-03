@@ -1430,6 +1430,9 @@ body {
           <a class="nav-subitem" data-page="admin-worktime" onclick="switchTab('admin-worktime')">
             <span>💼 工时申报</span>
           </a>
+          <a class="nav-subitem" data-page="admin-monthly" onclick="switchTab('admin-monthly')">
+            <span>📊 本月值班</span>
+          </a>
         </div>
       </div>
 
@@ -1827,6 +1830,44 @@ body {
         </div>
       </div>
 
+      <!-- 管理子页面：本月各成员值班情况 -->
+      <div class="page-view" id="adminMonthlyView">
+        <div class="page-title-row">
+          <h2>📊 本月值班情况</h2>
+          <p class="page-subtitle">查看本月（或指定月份）各成员值班安排与打卡状态</p>
+        </div>
+        <div class="admin-section">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="admin-btn" onclick="loadAdminMonthly(-1)" title="上一月">◀ 上一月</button>
+            <span id="adminMonthlyLabel" style="font-size:16px;font-weight:700;color:var(--primary);min-width:120px;text-align:center">加载中…</span>
+            <button class="admin-btn" onclick="loadAdminMonthly(1)" title="下一月">下一月 ▶</button>
+            <button class="admin-btn primary" onclick="loadAdminMonthly()">🔄 刷新</button>
+            <span id="adminMonthlyPeriod" style="font-size:12px;color:#888;margin-left:auto"></span>
+          </div>
+        </div>
+        <div class="admin-section">
+          <h3>📈 总体概览</h3>
+          <div id="adminMonthlyTotals" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px">
+            <p style="color:#999;font-size:13px;padding:8px 0">加载中...</p>
+          </div>
+        </div>
+        <div class="admin-section">
+          <h3>👥 各成员值班明细</h3>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+            <span style="font-size:13px;color:#666">图例：</span>
+            <span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:8px;font-size:12px">✓ 已完成</span>
+            <span style="background:#cce5ff;color:#004085;padding:2px 8px;border-radius:8px;font-size:12px">⏱ 进行中</span>
+            <span style="background:#fff3cd;color:#856404;padding:2px 8px;border-radius:8px;font-size:12px">📅 今日</span>
+            <span style="background:#e2e3e5;color:#383d41;padding:2px 8px;border-radius:8px;font-size:12px">⌛ 未到</span>
+            <span style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:8px;font-size:12px">✗ 缺勤</span>
+            <span style="background:#fff0d6;color:#8a5a00;padding:2px 8px;border-radius:8px;font-size:12px">📝 补签</span>
+          </div>
+          <div id="adminMonthlyTable" style="overflow-x:auto">
+            <p style="color:#999;font-size:13px;padding:16px 0;text-align:center">加载中...</p>
+          </div>
+        </div>
+      </div>
+
       <!-- 保留旧 adminView 作为兼容（隐藏不用） -->
       <div class="page-view" id="adminView" style="display:none"></div>
     </main>
@@ -2019,6 +2060,10 @@ function switchTab(tab) {
     document.getElementById('adminWorktimeView').classList.add('active');
     highlightAdminSub('admin-worktime');
     loadAdminWorktime();
+  } else if (tab === 'admin-monthly') {
+    document.getElementById('adminMonthlyView').classList.add('active');
+    highlightAdminSub('admin-monthly');
+    loadAdminMonthly();
   }
   }
   catch(e) {
@@ -4571,6 +4616,143 @@ function exportAttendanceDocx(name) {
   a.click();
   document.body.removeChild(a);
   showToast('正在导出 ' + name + ' 的考勤表...');
+}
+
+// ========== 管理员：本月各成员值班情况 ==========
+let _adminMonthlyState = { year: null, month: null };
+
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+// 状态映射（颜色 + 文字）
+const SHIFT_STATUS_META = {
+  completed:      { color: '#d4edda', text: '#155724', label: '✓ 已完成' },
+  in_progress:    { color: '#cce5ff', text: '#004085', label: '⏱ 进行中' },
+  supp_completed: { color: '#fff0d6', text: '#8a5a00', label: '📝 补签'   },
+  today:          { color: '#fff3cd', text: '#856404', label: '📅 今日'   },
+  missed:         { color: '#f8d7da', text: '#721c24', label: '✗ 缺勤'   },
+  pending:        { color: '#e2e3e5', text: '#383d41', label: '⌛ 未到'   }
+};
+
+async function loadAdminMonthly(monthDelta) {
+  // 首次进入：取服务器时间（避免本地时间错位），后续可前后翻月
+  try {
+    let year, month;
+    if (monthDelta && _adminMonthlyState.year) {
+      const d = new Date(_adminMonthlyState.year, _adminMonthlyState.month - 1 + monthDelta, 1);
+      year = d.getFullYear();
+      month = d.getMonth() + 1;
+    } else {
+      // 用当前显示月份的 URL 参数请求；不带参数时后端默认本月
+    }
+
+    const params = new URLSearchParams();
+    if (year)  params.set('year',  year);
+    if (month) params.set('month', month);
+
+    const url = API + '/admin/monthly-shifts' + (params.toString() ? '?' + params.toString() : '');
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.ok) { showToast(data.msg || '加载失败'); return; }
+
+    _adminMonthlyState.year  = data.year;
+    _adminMonthlyState.month = data.month;
+    renderAdminMonthly(data);
+  } catch (e) {
+    console.error('loadAdminMonthly error:', e);
+    const table = document.getElementById('adminMonthlyTable');
+    if (table) table.innerHTML = '<p style="color:#c41230;font-size:13px;padding:16px 0;text-align:center">⚠️ 加载失败：' + (e.message || '网络错误') + '</p>';
+  }
+}
+
+function renderAdminMonthly(data) {
+  // 顶部月份标签
+  const label = document.getElementById('adminMonthlyLabel');
+  if (label) label.textContent = data.year + '年' + data.month + '月';
+
+  // 期间提示
+  const period = document.getElementById('adminMonthlyPeriod');
+  if (period) {
+    if (data.scheduleInfo.isConfirmed) {
+      const s = data.scheduleInfo.scheduleStart || '?';
+      const e = data.scheduleInfo.scheduleEnd   || '?';
+      const sourceText = data.period.source === 'schedule' ? '已与排班周期取交集' : '按自然月';
+      period.innerHTML = '排班周期：' + s + ' ~ ' + e + '（' + sourceText + '）';
+    } else {
+      period.innerHTML = '⚠️ 当前没有已确认的排班周期，按自然月统计';
+    }
+  }
+
+  // 概览卡片
+  const totals = data.totals || {};
+  const totalsEl = document.getElementById('adminMonthlyTotals');
+  if (totalsEl) {
+    const cards = [
+      { label: '本月排班总数', value: totals.total,      bg: 'linear-gradient(135deg,#667eea,#764ba2)' },
+      { label: '已完成',        value: totals.completed,  bg: 'linear-gradient(135deg,#11998e,#38ef7d)' },
+      { label: '进行中',        value: totals.inProgress, bg: 'linear-gradient(135deg,#2193b0,#6dd5ed)' },
+      { label: '缺勤',          value: totals.missed,     bg: 'linear-gradient(135deg,#cb2d3e,#ef473a)' },
+      { label: '未到 / 今日',  value: totals.pending,    bg: 'linear-gradient(135deg,#e0e0e0,#bdbdbd)', dark: true }
+    ];
+    let html = '';
+    cards.forEach(c => {
+      const color = c.dark ? '#333' : '#fff';
+      const subColor = c.dark ? '#666' : 'rgba(255,255,255,0.85)';
+      html += '<div style="padding:14px 18px;background:' + c.bg + ';color:' + color + ';border-radius:10px">';
+      html += '<div style="font-size:13px;opacity:0.9">' + c.label + '</div>';
+      html += '<div style="font-size:26px;font-weight:700;margin-top:4px">' + (c.value || 0) + '</div>';
+      html += '</div>';
+    });
+    totalsEl.innerHTML = html;
+  }
+
+  // 明细表
+  const tableEl = document.getElementById('adminMonthlyTable');
+  if (!tableEl) return;
+  const members = data.members || [];
+  if (members.length === 0 || totals.total === 0) {
+    tableEl.innerHTML = '<div style="text-align:center;padding:40px 20px">'
+      + '<div style="font-size:48px;margin-bottom:12px">📅</div>'
+      + '<p style="color:#999;font-size:14px;margin-bottom:6px">' + data.year + '年' + data.month + '月暂无排班数据</p>'
+      + '<p style="color:#bbb;font-size:12px">请确认排班表已设置或选择其他月份</p>'
+      + '</div>';
+    return;
+  }
+
+  // 表头
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:760px">';
+  html += '<thead><tr style="background:#f5f5f0">';
+  html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0;width:90px">成员</th>';
+  html += '<th style="padding:10px;text-align:center;border-bottom:2px solid #e2e8f0;width:60px">排班</th>';
+  html += '<th style="padding:10px;text-align:center;border-bottom:2px solid #e2e8f0;width:60px">完成</th>';
+  html += '<th style="padding:10px;text-align:center;border-bottom:2px solid #e2e8f0;width:60px">缺勤</th>';
+  html += '<th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0">详细排班（按日期排序）</th>';
+  html += '</tr></thead><tbody>';
+
+  members.forEach(m => {
+    html += '<tr>';
+    html += '<td style="padding:10px;border-bottom:1px solid #eef0f3;font-weight:600;color:#8B1A1A">' + m.name + '</td>';
+    html += '<td style="padding:10px;border-bottom:1px solid #eef0f3;text-align:center">' + m.stats.total + '</td>';
+    html += '<td style="padding:10px;border-bottom:1px solid #eef0f3;text-align:center;color:#2e7d32">' + m.stats.completed + '</td>';
+    html += '<td style="padding:10px;border-bottom:1px solid #eef0f3;text-align:center;color:' + (m.stats.missed > 0 ? '#c41230' : '#999') + '">' + m.stats.missed + '</td>';
+    // 详细班次标签
+    html += '<td style="padding:10px;border-bottom:1px solid #eef0f3">';
+    if (!m.shifts || m.shifts.length === 0) {
+      html += '<span style="color:#bbb;font-size:12px">无</span>';
+    } else {
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      m.shifts.forEach(s => {
+        const meta = SHIFT_STATUS_META[s.status] || SHIFT_STATUS_META.pending;
+        const dateShort = s.date.slice(5); // MM-DD
+        html += '<span title="' + s.date + ' ' + s.weekday + ' ' + s.slotLabel + ' · ' + meta.label + '" '
+              + 'style="background:' + meta.color + ';color:' + meta.text + ';padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;cursor:default">'
+              + dateShort + ' ' + s.weekday + ' ' + s.slotLabel + '</span>';
+      });
+      html += '</div>';
+    }
+    html += '</td></tr>';
+  });
+  html += '</tbody></table>';
+  tableEl.innerHTML = html;
 }
 
 // ========== 初始化 ==========
