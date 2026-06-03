@@ -1587,18 +1587,27 @@ app.get('/api/admin/monthly-shifts', async (req, res) => {
             if (!effectiveMembers.includes(name)) continue
 
             // 打卡状态
-            const dayCheckins = checkins.filter(c => c.name === name && c.date === date && c.slotId === slotId)
-            const hasIn       = dayCheckins.some(c => c.type === 'in')
-            const hasOut      = dayCheckins.some(c => c.type === 'out' && !c.isSupp)
-            const hasSuppOut  = dayCheckins.some(c => c.type === 'out' &&  c.isSupp)
+            // 补签退记录没有 slotId（成员只填了姓名/日期/时间），需要按 SLOT_WINDOWS 时间窗反查所属 slot
+            const sameDay = checkins.filter(c => c.name === name && c.date === date)
+            const hasIn   = sameDay.some(c => c.type === 'in' && c.slotId === slotId)
+            const hasOut  = sameDay.some(c => c.type === 'out' && c.slotId === slotId && !c.isSupp)
+            const win = SLOT_WINDOWS[slotId]
+            const suppMatchesSlot = sameDay.some(c => {
+              if (c.type !== 'out' || !c.isSupp) return false
+              // 已经有 slotId 的补签退：直接比对；没有 slotId 的：按时间窗匹配
+              if (c.slotId) return c.slotId === slotId
+              if (!win || !c.time) return false
+              return c.time.slice(0, 5) >= win.start && c.time.slice(0, 5) <= win.end
+            })
 
             let status
-            if (hasIn && hasOut)        status = 'completed'
-            else if (hasIn && !hasOut)  status = 'in_progress'
-            else if (hasSuppOut)        status = 'supp_completed'
-            else if (date < today)      status = 'missed'
-            else if (date === today)    status = 'today'
-            else                        status = 'pending'
+            if (hasIn && hasOut)             status = 'completed'
+            else if (hasIn && suppMatchesSlot) status = 'supp_completed'
+            else if (hasIn)                  status = 'in_progress'
+            else if (suppMatchesSlot)         status = 'supp_completed'  // 只有补签退无签到的边界
+            else if (date < today)            status = 'missed'
+            else if (date === today)          status = 'today'
+            else                              status = 'pending'
 
             const sInfo = slotInfo.find(t => t.id === slotId)
             shifts.push({
@@ -1621,6 +1630,12 @@ app.get('/api/admin/monthly-shifts', async (req, res) => {
         pending:     shifts.filter(s => s.status === 'pending' || s.status === 'today').length
       }
 
+      // 该成员本月工时（包含打卡 + 已批准的补报；补签退也参与配对）
+      const work = calculateMemberWorkTime(store, name, year, month)
+      stats.totalHours = work.totalHours
+      stats.totalPay   = work.totalPay
+      stats.workDays   = work.workDays
+
       result.push({ name, shifts, stats })
     }
 
@@ -1629,13 +1644,17 @@ app.get('/api/admin/monthly-shifts', async (req, res) => {
 
     // 总体统计
     const totals = result.reduce((acc, m) => {
-      acc.total      += m.stats.total
-      acc.completed  += m.stats.completed
-      acc.inProgress += m.stats.inProgress
-      acc.missed     += m.stats.missed
-      acc.pending    += m.stats.pending
+      acc.total       += m.stats.total
+      acc.completed   += m.stats.completed
+      acc.inProgress  += m.stats.inProgress
+      acc.missed      += m.stats.missed
+      acc.pending     += m.stats.pending
+      acc.totalHours  += (m.stats.totalHours || 0)
+      acc.totalPay    += (m.stats.totalPay   || 0)
       return acc
-    }, { total: 0, completed: 0, inProgress: 0, missed: 0, pending: 0 })
+    }, { total: 0, completed: 0, inProgress: 0, missed: 0, pending: 0, totalHours: 0, totalPay: 0 })
+    totals.totalHours = Math.round(totals.totalHours * 10) / 10
+    totals.totalPay   = Math.round(totals.totalPay   * 10) / 10
 
     res.json({
       ok: true,
@@ -1867,31 +1886,40 @@ function calculateMemberWorkTime(store, name, year, month) {
   Object.keys(byDate).forEach(date => {
     const recs = byDate[date].sort((a, b) => a.time.localeCompare(b.time))
     const ins = recs.filter(r => r.type === 'in')
-    const outs = recs.filter(r => r.type === 'out' && !r.isSupp)
+    // 拆成两个池：先配正常签退，没有时回退到补签退
+    const normalOuts = recs.filter(r => r.type === 'out' && !r.isSupp)
+    const suppOuts   = recs.filter(r => r.type === 'out' &&  r.isSupp)
     const usedOuts = new Set()
-    
-    // Step 1: 为每个 in 找最近 out 配对
+
+    // 在指定池中找最近的 out（含跨天回退）
+    function findBestOutInPool(pool, iMin) {
+      let best = null
+      for (const o of pool) {
+        if (usedOuts.has(o.id || o.time)) continue
+        const oMin = timeToMinutes(o.time)
+        if (oMin >= iMin && (!best || oMin < timeToMinutes(best.time))) best = o
+      }
+      if (!best) { // 跨天
+        for (const o of pool) {
+          if (usedOuts.has(o.id || o.time)) continue
+          const oMin = timeToMinutes(o.time)
+          if (oMin < iMin && (!best || oMin > timeToMinutes(best.time))) best = o
+        }
+      }
+      return best
+    }
+
+    // Step 1: 为每个 in 找最近 out 配对（先正常签退，再回退到补签退）
     const rawPairs = []
     ins.forEach(iRec => {
       const iMin = timeToMinutes(iRec.time)
-      let bestOut = null
-      for (const o of outs) {
-        if (usedOuts.has(o.id || o.time)) continue
-        const oMin = timeToMinutes(o.time)
-        if (oMin >= iMin && (!bestOut || oMin < timeToMinutes(bestOut.time))) bestOut = o
-      }
-      if (!bestOut) { // 跨天
-        for (const o of outs) {
-          if (usedOuts.has(o.id || o.time)) continue
-          const oMin = timeToMinutes(o.time)
-          if (oMin < iMin && (!bestOut || oMin > timeToMinutes(bestOut.time))) bestOut = o
-        }
-      }
+      let bestOut = findBestOutInPool(normalOuts, iMin)
+      if (!bestOut) bestOut = findBestOutInPool(suppOuts, iMin)
       if (bestOut) {
         usedOuts.add(bestOut.id || bestOut.time)
-        rawPairs.push({ in: iRec, out: bestOut })
+        rawPairs.push({ in: iRec, out: bestOut, isSupp: !!bestOut.isSupp })
       } else {
-        rawPairs.push({ in: iRec, out: null })
+        rawPairs.push({ in: iRec, out: null, isSupp: false })
       }
     })
     
@@ -1900,7 +1928,7 @@ function calculateMemberWorkTime(store, name, year, month) {
     let currentMerge = null
     for (let pi = 0; pi < rawPairs.length; pi++) {
       if (!currentMerge) {
-        currentMerge = { firstIn: rawPairs[pi].in, lastOut: rawPairs[pi].out, slots: [rawPairs[pi].in] }
+        currentMerge = { firstIn: rawPairs[pi].in, lastOut: rawPairs[pi].out, hasSupp: !!rawPairs[pi].isSupp, slots: [rawPairs[pi].in] }
       } else {
         const prevOutMin = currentMerge.lastOut ? timeToMinutes(currentMerge.lastOut.time) : -9999
         const curInMin = timeToMinutes(rawPairs[pi].in.time)
@@ -1908,10 +1936,11 @@ function calculateMemberWorkTime(store, name, year, month) {
         const isLunchBreak = (prevOutMin >= 11*60+30 && prevOutMin <= 13*60) && (curInMin >= 14*60 && curInMin <= 15*60)
         if ((gap >= 0 && gap <= 180) || isLunchBreak) {
           currentMerge.lastOut = rawPairs[pi].out
+          if (rawPairs[pi].isSupp) currentMerge.hasSupp = true
           currentMerge.slots.push(rawPairs[pi].in)
         } else {
           mergedPairs.push(currentMerge)
-          currentMerge = { firstIn: rawPairs[pi].in, lastOut: rawPairs[pi].out, slots: [rawPairs[pi].in] }
+          currentMerge = { firstIn: rawPairs[pi].in, lastOut: rawPairs[pi].out, hasSupp: !!rawPairs[pi].isSupp, slots: [rawPairs[pi].in] }
         }
       }
     }
@@ -1928,11 +1957,12 @@ function calculateMemberWorkTime(store, name, year, month) {
         const rounded = Math.ceil(hours * 2) / 2
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
         workByDate[date].hours += rounded
-        workByDate[date].slots.push({ 
-          merged: true, 
+        workByDate[date].slots.push({
+          merged: true,
           slotCount: mp.slots.length,
-          in: mp.firstIn.time, 
-          out: mp.lastOut.time 
+          in: mp.firstIn.time,
+          out: mp.lastOut.time,
+          supp: !!mp.hasSupp
         })
       } else {
         // 无签退：按班次数 * 2h 估算
