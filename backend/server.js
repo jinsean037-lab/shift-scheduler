@@ -1208,6 +1208,15 @@ const SLOT_WINDOWS = {
   pm2: { start: '15:45', end: '17:45' }
 }
 
+// 补签退时间窗：slot 实际时段 + 60 分钟加班容忍
+// 补签退可能晚于 slot 结束时间（成员实际下班时间），所以单独定义一个更宽的窗口
+const SUPP_WINDOWS = {
+  am1: { start: '08:00', end: '11:00' },  // 10:00 + 60
+  am2: { start: '10:00', end: '13:00' },  // 12:00 + 60
+  pm1: { start: '14:30', end: '17:00' },  // 16:00 + 60
+  pm2: { start: '16:00', end: '18:30' }   // 17:30 + 60
+}
+
 // 打卡地点围栏（中山大学南校园岭南行政中心）
 const CHECKIN_LOCATION = {
   name: '岭南行政中心（中山大学南校园）',
@@ -1591,13 +1600,15 @@ app.get('/api/admin/monthly-shifts', async (req, res) => {
             const sameDay = checkins.filter(c => c.name === name && c.date === date)
             const hasIn   = sameDay.some(c => c.type === 'in' && c.slotId === slotId)
             const hasOut  = sameDay.some(c => c.type === 'out' && c.slotId === slotId && !c.isSupp)
-            const win = SLOT_WINDOWS[slotId]
+            const suppWin = SUPP_WINDOWS[slotId]
             const suppMatchesSlot = sameDay.some(c => {
               if (c.type !== 'out' || !c.isSupp) return false
-              // 已经有 slotId 的补签退：直接比对；没有 slotId 的：按时间窗匹配
+              // 已经有 slotId 的补签退：直接比对；没有 slotId 的：按 supp 时间窗匹配
+              // supp 窗口比签到窗口更宽（允许 slot 结束后 60min 内补签）
               if (c.slotId) return c.slotId === slotId
-              if (!win || !c.time) return false
-              return c.time.slice(0, 5) >= win.start && c.time.slice(0, 5) <= win.end
+              if (!suppWin || !c.time) return false
+              const t = String(c.time).slice(0, 5)
+              return t >= suppWin.start && t <= suppWin.end
             })
 
             let status
