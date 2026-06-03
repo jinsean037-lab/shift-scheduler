@@ -1527,6 +1527,136 @@ app.get('/api/admin/checkins', async (req, res) => {
   }
 })
 
+// 管理员：查看本月（或指定月份）各成员值班情况
+// 优先使用排班周期（scheduleStart/scheduleEnd）与查询月份的交集；
+// 若没有排班周期，则按自然月统计。
+// 每条班次附带打卡状态：completed(已签到+签退) / in_progress(签到未签退) /
+//   missed(过去未打卡) / supp_completed(补签退) / today(今天未打卡) / pending(未来)
+app.get('/api/admin/monthly-shifts', async (req, res) => {
+  try {
+    const store = await readStore()
+    // 默认本月（北京时间）
+    const beijingMs = Date.now() + 8 * 3600 * 1000
+    const beijingNow = new Date(beijingMs)
+    const year  = parseInt(req.query.year)  || beijingNow.getFullYear()
+    const month = parseInt(req.query.month) || (beijingNow.getMonth() + 1)
+    if (!year || !month || month < 1 || month > 12) {
+      return res.status(400).json({ ok: false, msg: '年份或月份无效' })
+    }
+
+    // 本月自然范围（按北京时间字符串，避免服务器时区错位）
+    const p2 = n => (n < 10 ? '0' + n : '' + n)
+    const monthStartStr = `${year}-${p2(month)}-01`
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const monthEndStr   = `${year}-${p2(month)}-${p2(daysInMonth)}`
+
+    // 与排班周期取交集
+    const schedStart = store.scheduleStart ? String(store.scheduleStart).slice(0, 10) : null
+    const schedEnd   = store.scheduleEnd   ? String(store.scheduleEnd).slice(0, 10)   : null
+    let effStart = monthStartStr
+    let effEnd   = monthEndStr
+    let periodSource = 'month'
+    if (schedStart && schedEnd) {
+      effStart = monthStartStr > schedStart ? monthStartStr : schedStart
+      effEnd   = monthEndStr   < schedEnd   ? monthEndStr   : schedEnd
+      periodSource = 'schedule'
+    }
+
+    const today = getBeijingDateString()
+    const days = ['周一','周二','周三','周四','周五']
+    const slotIds = ['am1','am2','pm1','pm2']
+    const slotInfo = store.timeSlots || defaultStore().timeSlots
+    const checkins = store.checkins || []
+    const members = store.members || []
+    const schedule = store.schedule || {}
+
+    const result = []
+    for (const name of members) {
+      const shifts = []
+      for (const day of days) {
+        const dayData = schedule[day]
+        if (!dayData || typeof dayData !== 'object') continue
+        // 本月内本星期对应的所有日期
+        const dates = listDatesForWeekday(effStart, effEnd, day)
+        for (const date of dates) {
+          for (const slotId of slotIds) {
+            const list = dayData[slotId]
+            if (!Array.isArray(list) || !list.includes(name)) continue
+            // 应用换班覆盖（如果该成员当日因换班不在该班次，则跳过）
+            const effectiveMembers = getEffectiveSlotMembers(store, date, day, slotId)
+            if (!effectiveMembers.includes(name)) continue
+
+            // 打卡状态
+            const dayCheckins = checkins.filter(c => c.name === name && c.date === date && c.slotId === slotId)
+            const hasIn       = dayCheckins.some(c => c.type === 'in')
+            const hasOut      = dayCheckins.some(c => c.type === 'out' && !c.isSupp)
+            const hasSuppOut  = dayCheckins.some(c => c.type === 'out' &&  c.isSupp)
+
+            let status
+            if (hasIn && hasOut)        status = 'completed'
+            else if (hasIn && !hasOut)  status = 'in_progress'
+            else if (hasSuppOut)        status = 'supp_completed'
+            else if (date < today)      status = 'missed'
+            else if (date === today)    status = 'today'
+            else                        status = 'pending'
+
+            const sInfo = slotInfo.find(t => t.id === slotId)
+            shifts.push({
+              date,
+              weekday: day,
+              slotId,
+              slotLabel: sInfo ? sInfo.label : slotId,
+              status
+            })
+          }
+        }
+      }
+      shifts.sort((a, b) => (a.date + a.slotId).localeCompare(b.date + b.slotId))
+
+      const stats = {
+        total:       shifts.length,
+        completed:   shifts.filter(s => s.status === 'completed' || s.status === 'supp_completed').length,
+        inProgress:  shifts.filter(s => s.status === 'in_progress').length,
+        missed:      shifts.filter(s => s.status === 'missed').length,
+        pending:     shifts.filter(s => s.status === 'pending' || s.status === 'today').length
+      }
+
+      result.push({ name, shifts, stats })
+    }
+
+    // 按值班次数降序，再按姓名
+    result.sort((a, b) => (b.stats.total - a.stats.total) || a.name.localeCompare(b.name, 'zh'))
+
+    // 总体统计
+    const totals = result.reduce((acc, m) => {
+      acc.total      += m.stats.total
+      acc.completed  += m.stats.completed
+      acc.inProgress += m.stats.inProgress
+      acc.missed     += m.stats.missed
+      acc.pending    += m.stats.pending
+      return acc
+    }, { total: 0, completed: 0, inProgress: 0, missed: 0, pending: 0 })
+
+    res.json({
+      ok: true,
+      year,
+      month,
+      period: { start: effStart, end: effEnd, source: periodSource },
+      scheduleInfo: {
+        scheduleStart: schedStart,
+        scheduleEnd:   schedEnd,
+        isConfirmed:   !!(schedStart && schedEnd)
+      },
+      today,
+      totals,
+      members: result
+    })
+  } catch (e) {
+    console.error('monthly-shifts error:', e)
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 // 兼容: POST /api/cancel（直接取消）
 app.post('/api/cancel', async (req, res) => {
   try {
