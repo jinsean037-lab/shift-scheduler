@@ -46,6 +46,7 @@ function defaultStore() {
     scheduleTime: {},
     waitlist: [],
     cancelRequests: [],
+    shiftSwapRequests: [],
     checkins: [],
     overtimes: [],
     confirmedPeriods: [],
@@ -332,6 +333,7 @@ app.post('/api/admin/schedule-archive', async (req, res) => {
     store.scheduleTime = {}
     store.waitlist = []
     store.cancelRequests = []
+    store.shiftSwapRequests = []
     store.scheduleStart = null
     store.scheduleEnd = null
     await writeStore(store)
@@ -453,6 +455,149 @@ function autoFillFromWaitlist(store, day, slotId) {
   }
   return null
 }
+
+function isScheduleActive(store) {
+  if (!store.scheduleStart || !store.scheduleEnd) return false
+  const now = Date.now()
+  const start = new Date(store.scheduleStart).getTime()
+  const end = new Date(store.scheduleEnd).getTime()
+  return Number.isFinite(start) && Number.isFinite(end) && now >= start && now <= end
+}
+
+function getScheduleList(store, day, slotId) {
+  if (!store.schedule) store.schedule = {}
+  if (store.schedule[day] && Array.isArray(store.schedule[day][slotId])) {
+    return store.schedule[day][slotId]
+  }
+  const flatKey = `${day}|${slotId}`
+  if (Array.isArray(store.schedule[flatKey])) {
+    return store.schedule[flatKey]
+  }
+  return null
+}
+
+function getShiftSwapList(store) {
+  if (!Array.isArray(store.shiftSwapRequests)) store.shiftSwapRequests = []
+  return store.shiftSwapRequests
+}
+
+function publicShiftSwap(item) {
+  return {
+    id: item.id,
+    from: item.from,
+    to: item.to,
+    day: item.day,
+    slotId: item.slotId,
+    status: item.status,
+    reason: item.reason || '',
+    createdAt: item.createdAt,
+    reviewedAt: item.reviewedAt || null
+  }
+}
+
+// 成员：发起换班申请。仅允许在已确认排班的生效期内，将自己的班次转给其他成员。
+app.post('/api/shift-swap/request', async (req, res) => {
+  try {
+    const { from, to, day, slotId, reason } = req.body
+    if (!from || !to || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
+    if (from === to) return res.json({ ok: false, msg: '不能和自己换班' })
+    const store = await readStore()
+    if (!isScheduleActive(store)) return res.json({ ok: false, msg: '当前不在排班表生效期间，暂不能换班' })
+    if (!store.members.includes(from) || !store.members.includes(to)) return res.json({ ok: false, msg: '成员不存在' })
+    const list = getScheduleList(store, day, slotId)
+    if (!list || !list.includes(from)) return res.json({ ok: false, msg: '你不在该班次中，无法发起换班' })
+    if (list.includes(to)) return res.json({ ok: false, msg: '对方已在该班次中，无需换班' })
+    const swaps = getShiftSwapList(store)
+    const duplicate = swaps.find(s => s.from === from && s.to === to && s.day === day && s.slotId === slotId && s.status === 'pending')
+    if (duplicate) return res.json({ ok: false, msg: '该换班申请已提交，等待对方确认' })
+    const record = {
+      id: `swap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      from,
+      to,
+      day,
+      slotId,
+      reason: (reason || '').slice(0, 200),
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    }
+    swaps.push(record)
+    await writeStore({ shiftSwapRequests: swaps })
+    res.json({ ok: true, msg: '换班申请已发送，等待对方确认', request: publicShiftSwap(record) })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：查看与自己相关的换班申请
+app.get('/api/shift-swaps', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: true, requests: [] })
+    const store = await readStore()
+    const requests = getShiftSwapList(store)
+      .filter(s => s.from === name || s.to === name)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .map(publicShiftSwap)
+    res.json({ ok: true, requests })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：同意或拒绝别人发给自己的换班申请。同意后立即替换排班名单，打卡按新名单生效。
+app.post('/api/shift-swap/review', async (req, res) => {
+  try {
+    const { id, reviewer, action } = req.body
+    if (!id || !reviewer || !action) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const swaps = getShiftSwapList(store)
+    const item = swaps.find(s => s.id === id)
+    if (!item) return res.json({ ok: false, msg: '申请不存在' })
+    if (item.to !== reviewer) return res.json({ ok: false, msg: '只有被换班成员可以处理该申请' })
+    if (item.status !== 'pending') return res.json({ ok: false, msg: '该申请已处理' })
+    if (action !== 'approve' && action !== 'reject') return res.json({ ok: false, msg: '操作无效' })
+    if (action === 'reject') {
+      item.status = 'rejected'
+      item.reviewedAt = new Date().toISOString()
+      await writeStore({ shiftSwapRequests: swaps })
+      return res.json({ ok: true, msg: '已拒绝换班申请', request: publicShiftSwap(item) })
+    }
+    if (!isScheduleActive(store)) return res.json({ ok: false, msg: '当前不在排班表生效期间，无法确认换班' })
+    const list = getScheduleList(store, item.day, item.slotId)
+    if (!list || !list.includes(item.from)) return res.json({ ok: false, msg: '原班次已变化，无法确认换班' })
+    if (list.includes(item.to)) return res.json({ ok: false, msg: '你已在该班次中，无需换班' })
+    const idx = list.indexOf(item.from)
+    list[idx] = item.to
+    delete store.scheduleTime[`${item.day}|${item.slotId}|${item.from}`]
+    store.scheduleTime[`${item.day}|${item.slotId}|${item.to}`] = Date.now()
+    item.status = 'approved'
+    item.reviewedAt = new Date().toISOString()
+    await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, shiftSwapRequests: swaps })
+    res.json({ ok: true, msg: '换班成功，新的排班已生效', schedule: store.schedule, request: publicShiftSwap(item) })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：撤回自己发出的待确认换班申请
+app.post('/api/shift-swap/revoke', async (req, res) => {
+  try {
+    const { id, name } = req.body
+    if (!id || !name) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const swaps = getShiftSwapList(store)
+    const item = swaps.find(s => s.id === id)
+    if (!item) return res.json({ ok: false, msg: '申请不存在' })
+    if (item.from !== name) return res.json({ ok: false, msg: '只能撤回自己发起的申请' })
+    if (item.status !== 'pending') return res.json({ ok: false, msg: '该申请已处理，无法撤回' })
+    item.status = 'revoked'
+    item.reviewedAt = new Date().toISOString()
+    await writeStore({ shiftSwapRequests: swaps })
+    res.json({ ok: true, msg: '已撤回换班申请', request: publicShiftSwap(item) })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
 
 // 检查是否可3分钟内直接取消（不需要原因）
 app.post('/api/check-cancel-time', async (req, res) => {
@@ -646,6 +791,7 @@ app.post('/api/admin/reset', async (req, res) => {
     store.scheduleTime = {}
     store.waitlist = []
     store.cancelRequests = []
+    store.shiftSwapRequests = []
     store.confirmedPeriods = []
     store.scheduleStart = null
     store.scheduleEnd = null
@@ -907,7 +1053,11 @@ app.get('/api/my-shifts', async (req, res) => {
     }
     const wl = (store.waitlist || []).filter(w => w.name === name)
     const cr = (store.cancelRequests || []).filter(r => r.name === name)
-    res.json({ shifts, waitlist: wl, cancelRequests: cr })
+    const sr = getShiftSwapList(store)
+      .filter(r => r.from === name || r.to === name)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .map(publicShiftSwap)
+    res.json({ shifts, waitlist: wl, cancelRequests: cr, shiftSwapRequests: sr })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
