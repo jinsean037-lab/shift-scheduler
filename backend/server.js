@@ -47,6 +47,7 @@ function defaultStore() {
     waitlist: [],
     cancelRequests: [],
     shiftSwapRequests: [],
+    shiftSwapOverrides: [],
     checkins: [],
     overtimes: [],
     confirmedPeriods: [],
@@ -334,6 +335,7 @@ app.post('/api/admin/schedule-archive', async (req, res) => {
     store.waitlist = []
     store.cancelRequests = []
     store.shiftSwapRequests = []
+    store.shiftSwapOverrides = []
     store.scheduleStart = null
     store.scheduleEnd = null
     await writeStore(store)
@@ -394,6 +396,8 @@ app.get('/api/schedule', async (req, res) => {
       members: store.members,
       waitlist: store.waitlist || [],
       cancelRequests: store.cancelRequests || [],
+      scheduleStart: store.scheduleStart,
+      scheduleEnd: store.scheduleEnd,
       startTime: store.startTime
     })
   } catch (e) {
@@ -481,11 +485,91 @@ function getShiftSwapList(store) {
   return store.shiftSwapRequests
 }
 
+function getShiftSwapOverrides(store) {
+  if (!Array.isArray(store.shiftSwapOverrides)) store.shiftSwapOverrides = []
+  return store.shiftSwapOverrides
+}
+
+function dateToWeekday(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00+08:00`)
+  return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]
+}
+
+function getBeijingDateString() {
+  const now = new Date()
+  const beijingMs = now.getTime() + 8 * 3600 * 1000
+  return new Date(beijingMs).toISOString().slice(0, 10)
+}
+
+function isDateInSchedulePeriod(store, dateStr) {
+  if (!store.scheduleStart || !store.scheduleEnd || !dateStr) return false
+  const start = String(store.scheduleStart).slice(0, 10)
+  const end = String(store.scheduleEnd).slice(0, 10)
+  return dateStr >= start && dateStr <= end
+}
+
+function cloneScheduleList(store, day, slotId) {
+  const list = getScheduleList(store, day, slotId)
+  return Array.isArray(list) ? [...list] : []
+}
+
+function getEffectiveSlotMembers(store, dateStr, day, slotId) {
+  let members = cloneScheduleList(store, day, slotId)
+  const overrides = getShiftSwapOverrides(store).filter(o => o.status === 'approved')
+  for (const item of overrides) {
+    if (item.fromDate === dateStr && item.fromDay === day && item.fromSlotId === slotId) {
+      members = members.map(n => n === item.from ? item.to : n)
+    }
+    if (item.toDate === dateStr && item.toDay === day && item.toSlotId === slotId) {
+      members = members.map(n => n === item.to ? item.from : n)
+    }
+  }
+  return members
+}
+
+function listDatesForWeekday(startDate, endDate, weekday) {
+  const result = []
+  if (!startDate || !endDate || !weekday) return result
+  let current = new Date(`${startDate}T12:00:00+08:00`)
+  const end = new Date(`${endDate}T12:00:00+08:00`)
+  while (current <= end) {
+    const dateStr = current.toISOString().slice(0, 10)
+    if (dateToWeekday(dateStr) === weekday) result.push(dateStr)
+    current.setDate(current.getDate() + 1)
+  }
+  return result
+}
+
+function getEffectiveShiftsForMember(store, name) {
+  const shifts = []
+  const start = store.scheduleStart ? String(store.scheduleStart).slice(0, 10) : null
+  const end = store.scheduleEnd ? String(store.scheduleEnd).slice(0, 10) : null
+  const sched = store.schedule || {}
+  if (!start || !end) return shifts
+  for (const day of ['周一','周二','周三','周四','周五']) {
+    const dayData = sched[day]
+    if (!dayData || typeof dayData !== 'object') continue
+    for (const date of listDatesForWeekday(start, end, day)) {
+      for (const slotId of Object.keys(dayData)) {
+        const members = getEffectiveSlotMembers(store, date, day, slotId)
+        if (members.includes(name)) {
+          const slotInfo = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
+          shifts.push({ day, date, slot: slotId, slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
+        }
+      }
+    }
+  }
+  shifts.sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot))
+  return shifts
+}
+
 function publicShiftSwap(item) {
   return {
     id: item.id,
     from: item.from,
     to: item.to,
+    fromDate: item.fromDate || null,
+    toDate: item.toDate || null,
     fromDay: item.fromDay || item.day,
     fromSlotId: item.fromSlotId || item.slotId,
     toDay: item.toDay || item.day,
@@ -503,16 +587,20 @@ app.post('/api/shift-swap/request', async (req, res) => {
     const { from, to, reason } = req.body
     const fromDay = req.body.fromDay || req.body.day
     const fromSlotId = req.body.fromSlotId || req.body.slotId
+    const fromDate = req.body.fromDate
     const toDay = req.body.toDay
     const toSlotId = req.body.toSlotId
-    if (!from || !to || !fromDay || !fromSlotId || !toDay || !toSlotId) return res.json({ ok: false, msg: '参数缺失' })
+    const toDate = req.body.toDate
+    if (!from || !to || !fromDay || !fromSlotId || !fromDate || !toDay || !toSlotId || !toDate) return res.json({ ok: false, msg: '参数缺失' })
     if (from === to) return res.json({ ok: false, msg: '不能和自己换班' })
-    if (fromDay === toDay && fromSlotId === toSlotId) return res.json({ ok: false, msg: '不能选择同一个班次互换' })
+    if (fromDate === toDate && fromDay === toDay && fromSlotId === toSlotId) return res.json({ ok: false, msg: '不能选择同一个班次互换' })
     const store = await readStore()
     if (!isScheduleActive(store)) return res.json({ ok: false, msg: '当前不在排班表生效期间，暂不能换班' })
+    if (!isDateInSchedulePeriod(store, fromDate) || !isDateInSchedulePeriod(store, toDate)) return res.json({ ok: false, msg: '换班日期不在当前排班生效周期内' })
+    if (dateToWeekday(fromDate) !== fromDay || dateToWeekday(toDate) !== toDay) return res.json({ ok: false, msg: '换班日期与周几不匹配' })
     if (!store.members.includes(from) || !store.members.includes(to)) return res.json({ ok: false, msg: '成员不存在' })
-    const fromList = getScheduleList(store, fromDay, fromSlotId)
-    const toList = getScheduleList(store, toDay, toSlotId)
+    const fromList = getEffectiveSlotMembers(store, fromDate, fromDay, fromSlotId)
+    const toList = getEffectiveSlotMembers(store, toDate, toDay, toSlotId)
     if (!fromList || !fromList.includes(from)) return res.json({ ok: false, msg: '你不在原班次中，无法发起换班' })
     if (!toList || !toList.includes(to)) return res.json({ ok: false, msg: '对方不在要互换的班次中' })
     if (fromList.includes(to) || toList.includes(from)) return res.json({ ok: false, msg: '双方已同时出现在相关班次中，无需互换' })
@@ -520,8 +608,10 @@ app.post('/api/shift-swap/request', async (req, res) => {
     const duplicate = swaps.find(s =>
       s.from === from &&
       s.to === to &&
+      s.fromDate === fromDate &&
       (s.fromDay || s.day) === fromDay &&
       (s.fromSlotId || s.slotId) === fromSlotId &&
+      s.toDate === toDate &&
       (s.toDay || s.day) === toDay &&
       (s.toSlotId || s.slotId) === toSlotId &&
       s.status === 'pending'
@@ -531,8 +621,10 @@ app.post('/api/shift-swap/request', async (req, res) => {
       id: `swap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       from,
       to,
+      fromDate,
       fromDay,
       fromSlotId,
+      toDate,
       toDay,
       toSlotId,
       reason: (reason || '').slice(0, 200),
@@ -582,25 +674,38 @@ app.post('/api/shift-swap/review', async (req, res) => {
       return res.json({ ok: true, msg: '已拒绝换班申请', request: publicShiftSwap(item) })
     }
     if (!isScheduleActive(store)) return res.json({ ok: false, msg: '当前不在排班表生效期间，无法确认换班' })
+    const fromDate = item.fromDate
     const fromDay = item.fromDay || item.day
     const fromSlotId = item.fromSlotId || item.slotId
+    const toDate = item.toDate
     const toDay = item.toDay || item.day
     const toSlotId = item.toSlotId || item.slotId
-    const fromList = getScheduleList(store, fromDay, fromSlotId)
-    const toList = getScheduleList(store, toDay, toSlotId)
+    if (!fromDate || !toDate) return res.json({ ok: false, msg: '该申请缺少具体日期，请重新发起换班' })
+    if (!isDateInSchedulePeriod(store, fromDate) || !isDateInSchedulePeriod(store, toDate)) return res.json({ ok: false, msg: '换班日期已不在当前排班生效周期内' })
+    const fromList = getEffectiveSlotMembers(store, fromDate, fromDay, fromSlotId)
+    const toList = getEffectiveSlotMembers(store, toDate, toDay, toSlotId)
     if (!fromList || !fromList.includes(item.from)) return res.json({ ok: false, msg: '发起人的原班次已变化，无法确认换班' })
     if (!toList || !toList.includes(item.to)) return res.json({ ok: false, msg: '你的原班次已变化，无法确认换班' })
     if (fromList.includes(item.to) || toList.includes(item.from)) return res.json({ ok: false, msg: '双方已同时出现在相关班次中，无需互换' })
-    fromList[fromList.indexOf(item.from)] = item.to
-    toList[toList.indexOf(item.to)] = item.from
-    delete store.scheduleTime[`${fromDay}|${fromSlotId}|${item.from}`]
-    delete store.scheduleTime[`${toDay}|${toSlotId}|${item.to}`]
-    store.scheduleTime[`${fromDay}|${fromSlotId}|${item.to}`] = Date.now()
-    store.scheduleTime[`${toDay}|${toSlotId}|${item.from}`] = Date.now()
     item.status = 'approved'
     item.reviewedAt = new Date().toISOString()
-    await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, shiftSwapRequests: swaps })
-    res.json({ ok: true, msg: '换班成功，新的排班已生效', schedule: store.schedule, request: publicShiftSwap(item) })
+    const overrides = getShiftSwapOverrides(store)
+    overrides.push({
+      id: item.id,
+      from: item.from,
+      to: item.to,
+      fromDate,
+      fromDay,
+      fromSlotId,
+      toDate,
+      toDay,
+      toSlotId,
+      status: 'approved',
+      createdAt: item.createdAt,
+      approvedAt: item.reviewedAt
+    })
+    await writeStore({ shiftSwapRequests: swaps, shiftSwapOverrides: overrides })
+    res.json({ ok: true, msg: '换班成功，仅对所选日期生效', request: publicShiftSwap(item) })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -819,6 +924,7 @@ app.post('/api/admin/reset', async (req, res) => {
     store.waitlist = []
     store.cancelRequests = []
     store.shiftSwapRequests = []
+    store.shiftSwapOverrides = []
     store.confirmedPeriods = []
     store.scheduleStart = null
     store.scheduleEnd = null
@@ -1053,28 +1159,30 @@ app.get('/api/my-shifts', async (req, res) => {
     const name = req.query.name
     if (!name) return res.json({ shifts: [], waitlist: [] })
     const store = await readStore()
-    const shifts = []
+    const shifts = getEffectiveShiftsForMember(store, name)
     // 优先嵌套格式: { '周一':{am1:[...],am2:[...]}, ... }
     const sched = store.schedule || {}
-    for (const day of ['周一','周二','周三','周四','周五']) {
-      const dayData = sched[day]
-      if (dayData && typeof dayData === 'object') {
-        for (const slotId of ['am1','am2','pm1','pm2']) {
-          if (Array.isArray(dayData[slotId]) && dayData[slotId].includes(name)) {
-            const slotInfo = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
-            shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
+    if (shifts.length === 0) {
+      for (const day of ['周一','周二','周三','周四','周五']) {
+        const dayData = sched[day]
+        if (dayData && typeof dayData === 'object') {
+          for (const slotId of ['am1','am2','pm1','pm2']) {
+            if (Array.isArray(dayData[slotId]) && dayData[slotId].includes(name)) {
+              const slotInfo = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
+              shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
+            }
           }
         }
       }
-    }
-    // 兼容扁平格式: { '周一|am1':[...] }
-    for (const key of Object.keys(sched)) {
-      if (key.includes('|')) {
-        const [day, slotId] = key.split('|')
-        const names = sched[key]
-        if (Array.isArray(names) && names.includes(name) && !shifts.find(s => s.day === day && s.slot === slotId)) {
-          const slotInfo = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
-          shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
+      // 兼容扁平格式: { '周一|am1':[...] }
+      for (const key of Object.keys(sched)) {
+        if (key.includes('|')) {
+          const [day, slotId] = key.split('|')
+          const names = sched[key]
+          if (Array.isArray(names) && names.includes(name) && !shifts.find(s => s.day === day && s.slot === slotId)) {
+            const slotInfo = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
+            shifts.push({ day, slot: slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
+          }
         }
       }
     }
@@ -1131,16 +1239,18 @@ function getBeijingTimeHHMM() {
 // 获取用户今天所有可打卡班次（在时间窗口内的）
 function getTodaySlots(store, name) {
   const schedule = store.schedule || {}
-  const todayWeekday = ['周日','周一','周二','周三','周四','周五','周六'][new Date().getDay()]
+  const today = getBeijingDateString()
+  const todayWeekday = dateToWeekday(today)
   const daySchedule = schedule[todayWeekday]
   if (!daySchedule) return []
   const nowHHMM = getBeijingTimeHHMM()
   const result = []
-  for (const [slotId, members] of Object.entries(daySchedule)) {
+  for (const slotId of Object.keys(daySchedule)) {
+    const members = getEffectiveSlotMembers(store, today, todayWeekday, slotId)
     if (Array.isArray(members) && members.includes(name)) {
       const win = SLOT_WINDOWS[slotId]
       if (win && nowHHMM >= win.start && nowHHMM <= win.end) {
-        result.push({ slotId, ...win })
+        result.push({ slotId, date: today, ...win })
       }
     }
   }
@@ -1154,7 +1264,7 @@ app.post('/api/checkin', async (req, res) => {
     if (!name) return res.json({ ok: false, msg: '参数缺失' })
     const store = await readStore()
     const now = new Date()
-    const today = now.toISOString().slice(0, 10)
+    const today = getBeijingDateString()
     // 检查今天是否已有未签退的签到
     const pendingIn = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'in'
       && !(store.checkins || []).find(o => o.name === name && o.date === today && o.type === 'out'))
