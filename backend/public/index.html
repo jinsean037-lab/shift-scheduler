@@ -1636,7 +1636,7 @@ body {
         <!-- 换班申请 -->
         <div class="section-card" id="mySwapSection" style="display:none">
           <h3 style="color:var(--primary)">🔁 换班申请</h3>
-          <p style="color:#999;font-size:13px;margin-bottom:12px">排班表生效期间，可把自己的班次转给同意接班的成员。</p>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">排班表生效期间，可和其他成员互换两个具体班次。</p>
           <div id="mySwapRequests"></div>
         </div>
       </div>
@@ -2580,18 +2580,39 @@ function escapeText(str) {
     return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
   });
 }
-async function getSwapMembers() {
+async function getSwapData() {
   try {
     const res = await fetch(API + '/schedule');
     const data = await res.json();
-    return (data.members || []).filter(function(m) { return m !== currentUser; });
+    return {
+      members: (data.members || []).filter(function(m) { return m !== currentUser; }),
+      schedule: data.schedule || {}
+    };
   } catch(e) {
-    return [];
+    return { members: [], schedule: {} };
   }
 }
+function getMemberScheduledShifts(schedule, name) {
+  const shifts = [];
+  Object.keys(schedule || {}).forEach(function(day) {
+    const dayData = schedule[day] || {};
+    Object.keys(dayData).forEach(function(slotId) {
+      const names = dayData[slotId] || [];
+      if (Array.isArray(names) && names.includes(name)) {
+        shifts.push({ day: day, slotId: slotId });
+      }
+    });
+  });
+  return shifts;
+}
 async function openShiftSwapDialog(day, slot) {
-  const members = await getSwapMembers();
-  if (!members.length) { showToast('暂无可换班成员'); return; }
+  const swapData = await getSwapData();
+  const members = swapData.members.filter(function(m) {
+    return getMemberScheduledShifts(swapData.schedule, m).some(function(s) {
+      return !(s.day === day && s.slotId === slot);
+    });
+  });
+  if (!members.length) { showToast('暂无可互换班次的成员'); return; }
   let overlay = document.getElementById('shiftSwapOverlay');
   if (!overlay) {
     overlay = document.createElement('div');
@@ -2603,30 +2624,58 @@ async function openShiftSwapDialog(day, slot) {
   overlay.innerHTML = [
     '<div class="modal" style="max-width:420px">',
     '<h3 style="color:var(--primary);font-size:18px;margin-bottom:12px;text-align:center">申请换班</h3>',
-    '<p style="font-size:13px;color:#666;margin-bottom:12px;text-align:center">' + escapeText(day) + ' ' + escapeText(slotLabel(slot)) + '</p>',
-    '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">接班成员</label>',
+    '<p style="font-size:13px;color:#666;margin-bottom:12px;text-align:center">你的班次：' + escapeText(day) + ' ' + escapeText(slotLabel(slot)) + '</p>',
+    '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">互换成员</label>',
     '<select id="swapTargetSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px">',
     members.map(function(m) { return '<option value="' + escapeText(m) + '">' + escapeText(m) + '</option>'; }).join(''),
     '</select>',
+    '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">对方用于互换的班次</label>',
+    '<select id="swapTargetShiftSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px"></select>',
     '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">说明（可选）</label>',
-    '<textarea id="swapReasonInput" rows="3" maxlength="200" placeholder="例如：当天有课/临时事务，已和对方沟通" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;resize:vertical;margin-bottom:14px"></textarea>',
+    '<textarea id="swapReasonInput" rows="3" maxlength="200" placeholder="例如：想把这两个具体班次互换，已和对方沟通" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;resize:vertical;margin-bottom:14px"></textarea>',
     '<div style="display:flex;gap:10px">',
     '<button id="swapSubmitBtn" style="flex:1;padding:11px;background:#4F46E5;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">发送申请</button>',
     '<button id="swapCancelBtn" style="flex:1;padding:11px;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer">取消</button>',
     '</div>',
     '</div>'
   ].join('');
+  function refreshTargetShifts() {
+    const target = document.getElementById('swapTargetSelect').value;
+    const shifts = getMemberScheduledShifts(swapData.schedule, target).filter(function(s) {
+      return !(s.day === day && s.slotId === slot);
+    });
+    const shiftSelect = document.getElementById('swapTargetShiftSelect');
+    shiftSelect.innerHTML = shifts.map(function(s) {
+      const value = s.day + '|' + s.slotId;
+      return '<option value="' + escapeText(value) + '">' + escapeText(s.day + ' ' + slotLabel(s.slotId)) + '</option>';
+    }).join('');
+    document.getElementById('swapSubmitBtn').disabled = shifts.length === 0;
+    document.getElementById('swapSubmitBtn').style.opacity = shifts.length === 0 ? '0.5' : '1';
+  }
+  document.getElementById('swapTargetSelect').onchange = refreshTargetShifts;
+  refreshTargetShifts();
   document.getElementById('swapSubmitBtn').onclick = function() { submitShiftSwap(day, slot); };
   document.getElementById('swapCancelBtn').onclick = function() { overlay.style.display = 'none'; };
 }
 async function submitShiftSwap(day, slot) {
   const target = document.getElementById('swapTargetSelect').value;
+  const targetShift = document.getElementById('swapTargetShiftSelect').value;
+  if (!targetShift) { showToast('请选择对方要互换的班次'); return; }
+  const parts = targetShift.split('|');
   const reason = document.getElementById('swapReasonInput').value.trim();
   try {
     const res = await fetch(API + '/shift-swap/request', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ from: currentUser, to: target, day: day, slotId: slot, reason: reason })
+      body: JSON.stringify({
+        from: currentUser,
+        to: target,
+        fromDay: day,
+        fromSlotId: slot,
+        toDay: parts[0],
+        toSlotId: parts[1],
+        reason: reason
+      })
     });
     const data = await res.json();
     if (data.ok) {
@@ -2652,14 +2701,20 @@ function renderShiftSwapRequests(reqs) {
     if (st === 'approved') { statusColor = '#22c55e'; statusText = '已换班'; }
     else if (st === 'rejected') { statusColor = '#ef4444'; statusText = '已拒绝'; }
     else if (st === 'revoked') { statusColor = '#888'; statusText = '已撤回'; }
-    const direction = r.from === currentUser ? ('你 → ' + r.to) : (r.from + ' → 你');
+    const fromDay = r.fromDay || r.day;
+    const fromSlotId = r.fromSlotId || r.slotId;
+    const toDay = r.toDay || r.day;
+    const toSlotId = r.toSlotId || r.slotId;
+    const direction = r.from === currentUser ? ('你 与 ' + r.to + ' 互换') : (r.from + ' 想与你互换');
+    const swapText = fromDay + ' ' + slotLabel(fromSlotId) + ' ↔ ' + toDay + ' ' + slotLabel(toSlotId);
     html += '<div class="shift-card" style="border-left:4px solid ' + statusColor + '">';
     html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
-    html += '<div class="shift-day">' + escapeText(r.day) + '</div>';
-    html += '<div class="shift-slot">' + escapeText(slotLabel(r.slotId)) + '</div>';
+    html += '<div class="shift-day">' + escapeText(fromDay) + '</div>';
+    html += '<div class="shift-slot">' + escapeText(slotLabel(fromSlotId)) + '</div>';
     html += '<span class="status-badge" style="background:'+statusColor+'15;color:'+statusColor+';border:1px solid '+statusColor+'40;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600">' + statusText + '</span>';
     html += '</div>';
     html += '<div style="color:#666;font-size:12px;margin-top:6px">' + escapeText(direction) + '</div>';
+    html += '<div style="color:#444;font-size:12px;margin-top:4px;font-weight:600">' + escapeText(swapText) + '</div>';
     if (r.reason) html += '<div style="color:#888;font-size:12px;margin-top:4px">说明：' + escapeText(r.reason) + '</div>';
     if (st === 'pending' && r.to === currentUser) {
       html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
