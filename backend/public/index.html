@@ -4296,18 +4296,46 @@ function loadAdminCheckins(mode) {
             '<span>' + icon + '</span>' +
             '<span>' + c.date + ' ' + formatTime(c.time) + loc + '</span></div>';
         });
-        // 计算当日工时（补签退也参与配对，作为正常签退的替代）
+        // 计算当日工时：补签退是成员声明的"实际离开时间"，优先级最高
+        // 1) 如果当日有补签退，签到配对应优先用 supp 时间
+        // 2) 没有补签退才用正常签退
+        // 3) 只配同一天的 out，避免跨天污染
         const ins = records.filter(c => c.type === 'in');
-        const allOuts = records.filter(c => c.type === 'out').sort((a,b) => timeStrToMinutes(a.time) - timeStrToMinutes(b.time));
+        const suppOuts   = records.filter(c => c.type === 'out' &&  c.isSupp).sort((a,b) => timeStrToMinutes(a.time) - timeStrToMinutes(b.time));
+        const normalOuts = records.filter(c => c.type === 'out' && !c.isSupp).sort((a,b) => timeStrToMinutes(a.time) - timeStrToMinutes(b.time));
         const usedOuts = new Set();
         ins.forEach((iRec) => {
+          const iDate = iRec.date;
           const iMin = timeStrToMinutes(iRec.time);
+          // 只看同一天的 out
+          const daySupp   = suppOuts.filter(o => o.date === iDate);
+          const dayNormal = normalOuts.filter(o => o.date === iDate);
           let bestOut = null;
-          for (const o of allOuts) {
+          // 优先：补签退
+          for (const o of daySupp) {
             if (usedOuts.has(o.id || JSON.stringify(o))) continue;
             if (timeStrToMinutes(o.time) >= iMin) { bestOut = o; break; }
           }
-          if (!bestOut) { for (const o of allOuts) { if (!usedOuts.has(o.id || JSON.stringify(o))) { bestOut = o; break; } } }
+          // 凌晨跨天补签退（签到 23:00 后，签退 02:00）
+          if (!bestOut) {
+            for (const o of daySupp) {
+              if (usedOuts.has(o.id || JSON.stringify(o))) continue;
+              if (timeStrToMinutes(o.time) < iMin) { bestOut = o; break; }
+            }
+          }
+          // 没有补签退：正常签退
+          if (!bestOut) {
+            for (const o of dayNormal) {
+              if (usedOuts.has(o.id || JSON.stringify(o))) continue;
+              if (timeStrToMinutes(o.time) >= iMin) { bestOut = o; break; }
+            }
+            if (!bestOut) {
+              for (const o of dayNormal) {
+                if (usedOuts.has(o.id || JSON.stringify(o))) continue;
+                if (timeStrToMinutes(o.time) < iMin) { bestOut = o; break; }
+              }
+            }
+          }
           if (bestOut) {
             usedOuts.add(bestOut.id || JSON.stringify(bestOut));
             let mins = timeStrToMinutes(bestOut.time) - timeStrToMinutes(iRec.time);
