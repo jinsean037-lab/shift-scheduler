@@ -1633,6 +1633,12 @@ body {
           <p style="color:#999;font-size:13px;margin-bottom:12px">你的取消申请已提交，等待管理员审批。</p>
           <div id="myCancelRequests"></div>
         </div>
+        <!-- 换班申请 -->
+        <div class="section-card" id="mySwapSection" style="display:none">
+          <h3 style="color:var(--primary)">🔁 换班申请</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">排班表生效期间，可把自己的班次转给同意接班的成员。</p>
+          <div id="mySwapRequests"></div>
+        </div>
       </div>
 
       <!-- ===== 工时申报视图 ===== -->
@@ -2304,7 +2310,9 @@ function renderSchedule(data) {
       }
       // 历史排班或已确认：只读，不显示操作按钮
       if (data.isHistory || data.confirmed) {
-        // 只读模式
+        if (data.confirmed && isMe && currentRole !== 'admin') {
+          inner += '<button class="swap-btn" style="position:absolute;right:4px;bottom:4px;background:#4F46E5;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" onclick="openShiftSwapDialog(\'' + d + '\',\'' + s.key + '\')">换班</button>';
+        }
       } else if (count < max && !isMe && currentRole !== 'admin') {
         inner += '<button class="pick-btn" onclick="pickSlot(\'' + d + '\',\'' + s.key + '\')">选择</button>';
       } else if (isMe || (count >= max && !isMe && currentRole !== 'admin')) {
@@ -2466,6 +2474,7 @@ async function loadMyShifts() {
     renderMyShifts(data.shifts||[]);
     renderWaitlist(data.waitlist||[]);
     renderCancelRequests(data.cancelRequests||[]);
+    renderShiftSwapRequests(data.shiftSwapRequests||[]);
   } catch(e) { console.error('加载我的班次失败',e); }
 }
 function renderMyShifts(shifts, forHome) {
@@ -2491,7 +2500,12 @@ function renderMyShifts(shifts, forHome) {
     html += '<div class="' + cls + '">';
     html += '<div class="shift-day">' + displayDay + '</div>';
     html += '<div class="shift-slot">' + displaySlot + '</div>';
-    if (!forHome) { html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>'; }
+    if (!forHome) {
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
+      html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>';
+      html += '<button class="cancel-btn" style="background:#4F46E5" onclick="openShiftSwapDialog(\'' + s.day + '\',\'' + s.slot + '\')">换班</button>';
+      html += '</div>';
+    }
     html += '</div>';
   });
   html += '</div>';
@@ -2560,6 +2574,129 @@ function renderCancelRequests(reqs) {
   });
   html += '</div>';
   if(el) el.innerHTML = html;
+}
+function escapeText(str) {
+  return String(str || '').replace(/[&<>"']/g, function(ch) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+  });
+}
+async function getSwapMembers() {
+  try {
+    const res = await fetch(API + '/schedule');
+    const data = await res.json();
+    return (data.members || []).filter(function(m) { return m !== currentUser; });
+  } catch(e) {
+    return [];
+  }
+}
+async function openShiftSwapDialog(day, slot) {
+  const members = await getSwapMembers();
+  if (!members.length) { showToast('暂无可换班成员'); return; }
+  let overlay = document.getElementById('shiftSwapOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'shiftSwapOverlay';
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'flex';
+  overlay.innerHTML = [
+    '<div class="modal" style="max-width:420px">',
+    '<h3 style="color:var(--primary);font-size:18px;margin-bottom:12px;text-align:center">申请换班</h3>',
+    '<p style="font-size:13px;color:#666;margin-bottom:12px;text-align:center">' + escapeText(day) + ' ' + escapeText(slotLabel(slot)) + '</p>',
+    '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">接班成员</label>',
+    '<select id="swapTargetSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:12px">',
+    members.map(function(m) { return '<option value="' + escapeText(m) + '">' + escapeText(m) + '</option>'; }).join(''),
+    '</select>',
+    '<label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">说明（可选）</label>',
+    '<textarea id="swapReasonInput" rows="3" maxlength="200" placeholder="例如：当天有课/临时事务，已和对方沟通" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;resize:vertical;margin-bottom:14px"></textarea>',
+    '<div style="display:flex;gap:10px">',
+    '<button id="swapSubmitBtn" style="flex:1;padding:11px;background:#4F46E5;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">发送申请</button>',
+    '<button id="swapCancelBtn" style="flex:1;padding:11px;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer">取消</button>',
+    '</div>',
+    '</div>'
+  ].join('');
+  document.getElementById('swapSubmitBtn').onclick = function() { submitShiftSwap(day, slot); };
+  document.getElementById('swapCancelBtn').onclick = function() { overlay.style.display = 'none'; };
+}
+async function submitShiftSwap(day, slot) {
+  const target = document.getElementById('swapTargetSelect').value;
+  const reason = document.getElementById('swapReasonInput').value.trim();
+  try {
+    const res = await fetch(API + '/shift-swap/request', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ from: currentUser, to: target, day: day, slotId: slot, reason: reason })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const overlay = document.getElementById('shiftSwapOverlay');
+      if (overlay) overlay.style.display = 'none';
+      showToast('换班申请已发送');
+      loadMyShifts();
+    } else {
+      showToast(data.msg || '提交失败');
+    }
+  } catch(e) { showToast('网络错误'); }
+}
+function renderShiftSwapRequests(reqs) {
+  const el = document.getElementById('mySwapRequests');
+  const sec = document.getElementById('mySwapSection');
+  if (!el || !sec) return;
+  if (!reqs || !reqs.length) { el.innerHTML = ''; sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  let html = '<div class="shift-list">';
+  reqs.forEach(function(r) {
+    const st = r.status || 'pending';
+    let statusColor = '#f59e0b', statusText = '等待确认';
+    if (st === 'approved') { statusColor = '#22c55e'; statusText = '已换班'; }
+    else if (st === 'rejected') { statusColor = '#ef4444'; statusText = '已拒绝'; }
+    else if (st === 'revoked') { statusColor = '#888'; statusText = '已撤回'; }
+    const direction = r.from === currentUser ? ('你 → ' + r.to) : (r.from + ' → 你');
+    html += '<div class="shift-card" style="border-left:4px solid ' + statusColor + '">';
+    html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+    html += '<div class="shift-day">' + escapeText(r.day) + '</div>';
+    html += '<div class="shift-slot">' + escapeText(slotLabel(r.slotId)) + '</div>';
+    html += '<span class="status-badge" style="background:'+statusColor+'15;color:'+statusColor+';border:1px solid '+statusColor+'40;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600">' + statusText + '</span>';
+    html += '</div>';
+    html += '<div style="color:#666;font-size:12px;margin-top:6px">' + escapeText(direction) + '</div>';
+    if (r.reason) html += '<div style="color:#888;font-size:12px;margin-top:4px">说明：' + escapeText(r.reason) + '</div>';
+    if (st === 'pending' && r.to === currentUser) {
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
+      html += '<button class="cancel-btn" style="background:#22c55e" onclick="reviewShiftSwap(\'' + r.id + '\',\'approve\')">同意</button>';
+      html += '<button class="cancel-btn" onclick="reviewShiftSwap(\'' + r.id + '\',\'reject\')">拒绝</button>';
+      html += '</div>';
+    } else if (st === 'pending' && r.from === currentUser) {
+      html += '<button class="cancel-btn" style="background:#666;margin-top:8px" onclick="revokeShiftSwap(\'' + r.id + '\')">撤回申请</button>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+async function reviewShiftSwap(id, action) {
+  try {
+    const res = await fetch(API + '/shift-swap/review', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: id, reviewer: currentUser, action: action })
+    });
+    const data = await res.json();
+    if (data.ok) { showToast(data.msg || '已处理'); loadMyShifts(); loadSchedule(); }
+    else { showToast(data.msg || '处理失败'); }
+  } catch(e) { showToast('网络错误'); }
+}
+async function revokeShiftSwap(id) {
+  try {
+    const res = await fetch(API + '/shift-swap/revoke', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: id, name: currentUser })
+    });
+    const data = await res.json();
+    if (data.ok) { showToast(data.msg || '已撤回'); loadMyShifts(); }
+    else { showToast(data.msg || '撤回失败'); }
+  } catch(e) { showToast('网络错误'); }
 }
 async function cancelWaitlist(day, slot) {
   try {
@@ -4367,4 +4504,3 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
-
