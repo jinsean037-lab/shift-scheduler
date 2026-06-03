@@ -486,8 +486,10 @@ function publicShiftSwap(item) {
     id: item.id,
     from: item.from,
     to: item.to,
-    day: item.day,
-    slotId: item.slotId,
+    fromDay: item.fromDay || item.day,
+    fromSlotId: item.fromSlotId || item.slotId,
+    toDay: item.toDay || item.day,
+    toSlotId: item.toSlotId || item.slotId,
     status: item.status,
     reason: item.reason || '',
     createdAt: item.createdAt,
@@ -495,27 +497,44 @@ function publicShiftSwap(item) {
   }
 }
 
-// 成员：发起换班申请。仅允许在已确认排班的生效期内，将自己的班次转给其他成员。
+// 成员：发起换班申请。仅允许在已确认排班的生效期内，将自己的一个班次和对方的一个班次互换。
 app.post('/api/shift-swap/request', async (req, res) => {
   try {
-    const { from, to, day, slotId, reason } = req.body
-    if (!from || !to || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
+    const { from, to, reason } = req.body
+    const fromDay = req.body.fromDay || req.body.day
+    const fromSlotId = req.body.fromSlotId || req.body.slotId
+    const toDay = req.body.toDay
+    const toSlotId = req.body.toSlotId
+    if (!from || !to || !fromDay || !fromSlotId || !toDay || !toSlotId) return res.json({ ok: false, msg: '参数缺失' })
     if (from === to) return res.json({ ok: false, msg: '不能和自己换班' })
+    if (fromDay === toDay && fromSlotId === toSlotId) return res.json({ ok: false, msg: '不能选择同一个班次互换' })
     const store = await readStore()
     if (!isScheduleActive(store)) return res.json({ ok: false, msg: '当前不在排班表生效期间，暂不能换班' })
     if (!store.members.includes(from) || !store.members.includes(to)) return res.json({ ok: false, msg: '成员不存在' })
-    const list = getScheduleList(store, day, slotId)
-    if (!list || !list.includes(from)) return res.json({ ok: false, msg: '你不在该班次中，无法发起换班' })
-    if (list.includes(to)) return res.json({ ok: false, msg: '对方已在该班次中，无需换班' })
+    const fromList = getScheduleList(store, fromDay, fromSlotId)
+    const toList = getScheduleList(store, toDay, toSlotId)
+    if (!fromList || !fromList.includes(from)) return res.json({ ok: false, msg: '你不在原班次中，无法发起换班' })
+    if (!toList || !toList.includes(to)) return res.json({ ok: false, msg: '对方不在要互换的班次中' })
+    if (fromList.includes(to) || toList.includes(from)) return res.json({ ok: false, msg: '双方已同时出现在相关班次中，无需互换' })
     const swaps = getShiftSwapList(store)
-    const duplicate = swaps.find(s => s.from === from && s.to === to && s.day === day && s.slotId === slotId && s.status === 'pending')
+    const duplicate = swaps.find(s =>
+      s.from === from &&
+      s.to === to &&
+      (s.fromDay || s.day) === fromDay &&
+      (s.fromSlotId || s.slotId) === fromSlotId &&
+      (s.toDay || s.day) === toDay &&
+      (s.toSlotId || s.slotId) === toSlotId &&
+      s.status === 'pending'
+    )
     if (duplicate) return res.json({ ok: false, msg: '该换班申请已提交，等待对方确认' })
     const record = {
       id: `swap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       from,
       to,
-      day,
-      slotId,
+      fromDay,
+      fromSlotId,
+      toDay,
+      toSlotId,
       reason: (reason || '').slice(0, 200),
       status: 'pending',
       createdAt: new Date().toISOString()
@@ -544,7 +563,7 @@ app.get('/api/shift-swaps', async (req, res) => {
   }
 })
 
-// 成员：同意或拒绝别人发给自己的换班申请。同意后立即替换排班名单，打卡按新名单生效。
+// 成员：同意或拒绝别人发给自己的换班申请。同意后立即互换两个具体班次，打卡按新名单生效。
 app.post('/api/shift-swap/review', async (req, res) => {
   try {
     const { id, reviewer, action } = req.body
@@ -563,13 +582,21 @@ app.post('/api/shift-swap/review', async (req, res) => {
       return res.json({ ok: true, msg: '已拒绝换班申请', request: publicShiftSwap(item) })
     }
     if (!isScheduleActive(store)) return res.json({ ok: false, msg: '当前不在排班表生效期间，无法确认换班' })
-    const list = getScheduleList(store, item.day, item.slotId)
-    if (!list || !list.includes(item.from)) return res.json({ ok: false, msg: '原班次已变化，无法确认换班' })
-    if (list.includes(item.to)) return res.json({ ok: false, msg: '你已在该班次中，无需换班' })
-    const idx = list.indexOf(item.from)
-    list[idx] = item.to
-    delete store.scheduleTime[`${item.day}|${item.slotId}|${item.from}`]
-    store.scheduleTime[`${item.day}|${item.slotId}|${item.to}`] = Date.now()
+    const fromDay = item.fromDay || item.day
+    const fromSlotId = item.fromSlotId || item.slotId
+    const toDay = item.toDay || item.day
+    const toSlotId = item.toSlotId || item.slotId
+    const fromList = getScheduleList(store, fromDay, fromSlotId)
+    const toList = getScheduleList(store, toDay, toSlotId)
+    if (!fromList || !fromList.includes(item.from)) return res.json({ ok: false, msg: '发起人的原班次已变化，无法确认换班' })
+    if (!toList || !toList.includes(item.to)) return res.json({ ok: false, msg: '你的原班次已变化，无法确认换班' })
+    if (fromList.includes(item.to) || toList.includes(item.from)) return res.json({ ok: false, msg: '双方已同时出现在相关班次中，无需互换' })
+    fromList[fromList.indexOf(item.from)] = item.to
+    toList[toList.indexOf(item.to)] = item.from
+    delete store.scheduleTime[`${fromDay}|${fromSlotId}|${item.from}`]
+    delete store.scheduleTime[`${toDay}|${toSlotId}|${item.to}`]
+    store.scheduleTime[`${fromDay}|${fromSlotId}|${item.to}`] = Date.now()
+    store.scheduleTime[`${toDay}|${toSlotId}|${item.from}`] = Date.now()
     item.status = 'approved'
     item.reviewedAt = new Date().toISOString()
     await writeStore({ schedule: store.schedule, scheduleTime: store.scheduleTime, shiftSwapRequests: swaps })
