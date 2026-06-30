@@ -939,11 +939,18 @@ body {
 }
 .app-btn-danger:hover { opacity: 0.85; }
 
-/* 主体 */
+/* 主体：CSS Grid 双栏（绕开 flex 隐性约束，更稳） */
 .app-body {
-  display: flex;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-areas: "sidebar main";
   min-height: calc(100vh - 56px);
+  width: 100%;
+  max-width: 100%;
+  align-items: start;       /* 防止两栏被拉伸到同一高度 */
 }
+.app-body > .sidebar { grid-area: sidebar; }
+.app-body > .main-content { grid-area: main; }
 
 /* 左侧导航栏 */
 .sidebar {
@@ -955,8 +962,10 @@ body {
   flex-shrink: 0;
   position: sticky;
   top: 56px;
-  height: calc(100vh - 56px);
+  align-self: start;        /* grid 上下文：不被同行拉伸 */
+  max-height: calc(100vh - 56px);
   overflow-y: auto;
+  z-index: 10;
 }
 .sidebar-user-card {
   padding: 20px 16px;
@@ -1060,16 +1069,16 @@ body {
 
 /* 右侧内容区 */
 .main-content {
-  flex: 1;
   padding: 24px 28px;
-  overflow-y: auto;
+  overflow-x: auto;          /* 防止宽表格撑破布局 */
   background: #f7f8fa;
   min-width: 0;
+  max-width: 100%;
 }
 
 /* 页面视图 */
-.page-view { display: none; }
-.page-view.active { display: block; animation: fadeIn 0.25s ease; }
+.page-view { display: none; width: 100%; }
+.page-view.active { display: block; width: 100%; animation: fadeIn 0.25s ease; }
 @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
 /* 页面标题 */
@@ -1222,13 +1231,20 @@ body {
 .main-page .tabs { display: none !important; }
 .main-page .content-wrap { max-width: none; padding: 0; }
 
-/* 移动端适配 */
-@media(max-width:768px){
+/* 移动端适配（仅在真正窄的屏幕上才堆叠） */
+@media(max-width:900px){
+  .app-body {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "sidebar"
+      "main";
+  }
   .sidebar {
     width: 100%;
     position: relative;
     top: 0;
     height: auto;
+    max-height: none;
     border-right: none;
     border-bottom: 1px solid #eee;
   }
@@ -1236,8 +1252,7 @@ body {
   .sidebar-nav { padding: 8px 0; }
   .nav-item { padding: 8px 12px; font-size: 13px; }
   .sidebar-footer { display: none; }
-  .app-body { flex-direction: column; }
-  .main-content { padding: 16px; }
+  .main-content { padding: 16px; height: auto; }
   .stat-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .stat-card { padding: 12px 14px; }
   .stat-icon { width: 38px; height: 38px; font-size: 18px; }
