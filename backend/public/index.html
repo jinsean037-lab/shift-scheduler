@@ -1662,6 +1662,19 @@ body {
   </div>
 </div>
 
+<!-- 管理员端：成员工时申报明细 modal（用于排查统计异常） -->
+<div class="modal-overlay" id="adminMemberDetailModal">
+  <div class="wt-modal-box" id="adminMemberDetailBody" style="max-width:880px;width:95%">
+    <div class="wt-modal-title" id="adminMemberTitle">成员工时明细</div>
+    <div class="wt-modal-subtitle" id="adminMemberSubtitle">加载中…</div>
+    <div id="adminMemberSummary"></div>
+    <div id="adminMemberDaily" style="margin-top:12px"></div>
+    <div class="wt-modal-actions">
+      <button class="btn-secondary" onclick="hideAdminMemberDetail()">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 主页面 ===== -->
 <div class="main-page" id="mainPage">
   <!-- Toast 提示 -->
@@ -5020,6 +5033,113 @@ async function submitWorkTimeClaim() {
   }
 }
 
+// 管理员端：查看成员申报明细（含每天的工时/打卡/补报内容）
+// 复用 /api/worktime-claim/my-data 接口（已包含 daily 数组 + monthSummary）
+async function showAdminMemberDetail(name) {
+  const modal = document.getElementById('adminMemberDetailModal');
+  const titleEl = document.getElementById('adminMemberTitle');
+  const subEl   = document.getElementById('adminMemberSubtitle');
+  const sumEl   = document.getElementById('adminMemberSummary');
+  const dailyEl = document.getElementById('adminMemberDaily');
+  if (!modal) return;
+  
+  titleEl.textContent = name + ' · 工时申报明细';
+  subEl.textContent = '加载中…';
+  sumEl.innerHTML = '';
+  dailyEl.innerHTML = '<div style="text-align:center;padding:30px;color:#999">加载中…</div>';
+  modal.classList.add('show');
+  
+  try {
+    // 先取 workTimeClaim 的当前年月
+    const statusRes = await fetch(API + '/worktime-claim/status');
+    const statusData = await statusRes.json();
+    const wtc = statusData.workTimeClaim || {};
+    const year = wtc.year || new Date().getFullYear();
+    const month = wtc.month || (new Date().getMonth() + 1);
+    
+    const res = await fetch(API + '/worktime-claim/my-data?name=' + encodeURIComponent(name));
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.msg || '加载失败');
+    
+    subEl.textContent = year + '年' + month + '月 · 工时 ' + (data.workData?.totalHours || 0).toFixed(1) + ' 小时 / 报酬 ' + (data.workData?.totalPay || 0).toFixed(1) + ' 元';
+    
+    const ms = data.workData?.monthSummary || {};
+    sumEl.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+      '<span style="padding:3px 8px;background:#e8f5e9;color:#2e7d32;border-radius:4px;font-size:12px">✓ 已完成 ' + (ms.completedDays || 0) + ' 天</span>' +
+      '<span style="padding:3px 8px;background:#e3f2fd;color:#1565c0;border-radius:4px;font-size:12px">🕐 签到未签退 ' + (ms.incompleteDays || 0) + ' 天</span>' +
+      '<span style="padding:3px 8px;background:#fff8e1;color:#b45309;border-radius:4px;font-size:12px">📝 仅补报 ' + (ms.overtimeDays || 0) + ' 天</span>' +
+      '<span style="padding:3px 8px;background:#ffebee;color:#c41230;border-radius:4px;font-size:12px">⚠️ 缺勤 ' + (ms.absentDays || 0) + ' 天</span>' +
+      '</div>';
+    
+    const daily = data.workData?.daily || [];
+    // 只列出有工时或有排班的天（避免 30 行空白）
+    const interesting = daily.filter(d => d.totalHours > 0 || d.scheduled.length > 0 || d.approvedOvertimes.length > 0 || d.pendingOvertimes.length > 0);
+    
+    const STATUS_LABEL = { completed: '✓ 已完成', incomplete: '🕐 签到未签退', overtime: '📝 仅补报', 'overtime-pending': '⏳ 补报待审', absent: '⚠️ 缺勤', none: '— 无排班' };
+    const STATUS_COLOR = { completed: '#2e7d32', incomplete: '#1565c0', overtime: '#b45309', 'overtime-pending': '#ef6c00', absent: '#c41230', none: '#888' };
+    
+    let html = '<div style="max-height:60vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f8f9fa;position:sticky;top:0">';
+    html += '<th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0;width:90px">日期</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0;width:60px">状态</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0;width:60px">工时</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">打卡</th>';
+    html += '<th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">补报（含内容）</th>';
+    html += '</tr></thead><tbody>';
+    
+    if (interesting.length === 0) {
+      html += '<tr><td colspan="5" style="padding:30px;text-align:center;color:#999">当月无排班和打卡记录</td></tr>';
+    } else {
+      interesting.forEach(d => {
+        const color = STATUS_COLOR[d.status] || '#888';
+        const label = STATUS_LABEL[d.status] || d.status;
+        
+        // 打卡明细
+        let checkinStr = '';
+        if (d.checkinSlots && d.checkinSlots.length > 0) {
+          checkinStr = d.checkinSlots.map(cs => {
+            const suppTag = cs.supp ? ' <span style="color:#ef6c00;font-size:11px">(补签退)</span>' : '';
+            return (cs.out ? cs.in + '–' + cs.out : cs.in + ' <span style="color:#c41230">无签退</span>') + suppTag;
+          }).join('<br>');
+        }
+        
+        // 补报明细（含 content）
+        let otStr = '';
+        if (d.approvedOvertimes && d.approvedOvertimes.length > 0) {
+          otStr += d.approvedOvertimes.map(ot =>
+            '<div style="margin-bottom:4px"><span style="color:#2e7d32">✅ ' + ot.hours + 'h</span> · ' + escapeHtml(ot.content || '(无内容)') + '</div>'
+          ).join('');
+        }
+        if (d.pendingOvertimes && d.pendingOvertimes.length > 0) {
+          otStr += d.pendingOvertimes.map(ot =>
+            '<div style="margin-bottom:4px"><span style="color:#ef6c00">⏳ ' + ot.hours + 'h</span> · ' + escapeHtml(ot.content || '(无内容)') + '</div>'
+          ).join('');
+        }
+        
+        html += '<tr>';
+        html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5">' + d.date + '<br><span style="color:#999;font-size:11px">' + d.weekday + '</span></td>';
+        html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5;color:' + color + ';font-weight:600;font-size:12px">' + label + '</td>';
+        html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5;font-weight:600">' + d.totalHours.toFixed(1) + 'h</td>';
+        html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#555">' + (checkinStr || '<span style="color:#bbb">—</span>') + '</td>';
+        html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5;font-size:12px">' + (otStr || '<span style="color:#bbb">—</span>') + '</td>';
+        html += '</tr>';
+      });
+    }
+    
+    html += '</tbody></table></div>';
+    html += '<div style="margin-top:8px;padding:8px 12px;background:#fafafa;border-radius:6px;font-size:12px;color:#666">';
+    html += '💡 提示：如果工时偏高，请检查 1) 重复打卡 2) 跨天签退配对 3) 补报小时数 是否异常';
+    html += '</div>';
+    dailyEl.innerHTML = html;
+  } catch (e) {
+    dailyEl.innerHTML = '<div style="padding:30px;text-align:center;color:#c41230">⚠️ 加载失败：' + escapeHtml(e.message || '未知错误') + '</div>';
+  }
+}
+
+function hideAdminMemberDetail() {
+  document.getElementById('adminMemberDetailModal').classList.remove('show');
+}
+
 // 管理员端：加载工时申报管理页面
 async function loadAdminWorktime() {
   const content = document.getElementById('adminWorktimeContent');
@@ -5070,17 +5190,20 @@ async function loadAdminWorktime() {
       html += '</tr></thead><tbody>';
       
       allData.submissions.forEach(s => {
+        const safeName = escapeHtml(s.name);
         html += '<tr>';
-        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + s.name + '</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + safeName + '</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalHours || 0).toFixed(1) + ' 小时</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalPay || 0).toFixed(1) + ' 元</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submitted ? '<span style="color:#2e7d32">✅ 已提交</span>' : '<span style="color:#999">⏳ 未提交</span>') + '</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submittedAt ? s.submittedAt.slice(0, 16).replace('T', ' ') : '-') + '</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0;white-space:nowrap">';
+        // 查看明细：显示该成员每日工时/补报内容（用于排查统计异常）
+        html += '<button class="quick-btn" style="background:#5C6BC0;color:#fff;padding:4px 10px;font-size:12px;margin-right:6px" onclick="showAdminMemberDetail(\'' + safeName + '\')">🔍 查看明细</button>';
         if (s.submitted) {
-          html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0"><button class="quick-btn quick-btn-primary" onclick="exportAttendanceDocx(\'' + s.name + '\')" style="padding:4px 12px;font-size:12px">📄 导出考勤表</button></td>';
-        } else {
-          html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0"><span style="color:#ccc;font-size:12px">-</span></td>';
+          html += '<button class="quick-btn quick-btn-primary" onclick="exportAttendanceDocx(\'' + safeName + '\')" style="padding:4px 12px;font-size:12px">📄 导出考勤表</button>';
         }
+        html += '</td>';
         html += '</tr>';
       });
       
