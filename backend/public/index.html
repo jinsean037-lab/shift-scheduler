@@ -6134,10 +6134,15 @@ window.addEventListener('DOMContentLoaded', () => {
     if (currentRole==='admin') {
       document.getElementById('adminNavGroupTitle').style.display = '';
       document.getElementById('adminNavItem').style.display = '';
-      // 管理员隐藏所有成员端导航项
-      ['navSchedule','navCheckin','navStats','navWorktime'].forEach(id => {
+      // 管理员隐藏所有成员端导航项（含 v5.0 新增的「我的荣誉」「我的信息」，以及原有「搭子消息」）
+      ['navSchedule','navCheckin','navStats','navWorktime','navAchievements','navProfile'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
+      });
+      // 搭子消息：按 data-page='messages' 匹配（原代码用 id='navMessages'，统一按 data-page 隐藏更稳）
+      document.querySelectorAll('.nav-item').forEach(el => {
+        const page = el.getAttribute('data-page');
+        if (page === 'messages') el.style.display = 'none';
       });
     }
     switchTab('home');
