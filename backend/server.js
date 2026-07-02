@@ -1217,13 +1217,28 @@ const SUPP_WINDOWS = {
   pm2: { start: '16:00', end: '18:30' }   // 17:30 + 60
 }
 
-// 各 slot 的标准时长（小时），用于"已签到未签退"时估算工时
-// 2026-07-02 修正：之前固定按 2h 估算，pm1/pm2 实际是 1.5h，导致重复计费
+// 各 slot 的标准时长（小时），用于：
+// 1) "已签到未签退"时估算工时
+// 2) **配对后截断**：成员正常签到签退最多只能获得该 slot 的标准时长，超出部分必须靠补报
+// 2026-07-02 修正：之前固定 2h 估算 + 不截断配对，导致 6/3 那种 09:52-12:02 被算成 2.5h、6/9 那种跨天补签退错填算成 14h
 const SLOT_HOURS = {
   am1: 2,    // 8:00-10:00
   am2: 2,    // 10:00-12:00
   pm1: 1.5,  // 14:30-16:00
   pm2: 1.5,  // 16:00-17:30
+}
+
+// 跨天配对判定：配对时长超过这个阈值视为错配（应改补签退时间），强制按 slot 截断
+const MAX_PAIR_DURATION_MIN = 240  // 4 小时
+
+// 按 in-time 推断所属 slot（in-record 没有 slotId 时的回退方案）
+function slotByInTime(timeStr) {
+  const m = timeToMinutes(timeStr)
+  if (m >= 7.75*60 && m < 10.25*60) return 'am1'   // 7:45-10:15
+  if (m >= 9.75*60 && m < 12.25*60) return 'am2'   // 9:45-12:15
+  if (m >= 14.25*60 && m < 16.25*60) return 'pm1'  // 14:15-16:15
+  if (m >= 15.75*60 && m < 17.75*60) return 'pm2'  // 15:45-17:45
+  return null
 }
 
 // 打卡地点围栏（中山大学南校园岭南行政中心）
@@ -2005,6 +2020,26 @@ function calculateMemberWorkTime(store, name, year, month) {
         const outMin = timeToMinutes(mp.lastOut.time)
         let diffMinutes = outMin - inMin
         if (diffMinutes < 0) diffMinutes += 24 * 60
+
+        // 2026-07-02 限制 1：配对时长超过 4h 视为错配（跨天错填补签退的常见 bug）
+        // 强制截断到 4h，让成员知道要重新申请补签退
+        const originalDiff = diffMinutes
+        if (diffMinutes > MAX_PAIR_DURATION_MIN) {
+          diffMinutes = MAX_PAIR_DURATION_MIN
+        }
+
+        // 2026-07-02 限制 2：配对后截断到 slot 标准时长
+        // 成员有 am2 排班，正常签到签退最多只能获得 2h（即使实际签了 2.5h），超出部分需补报
+        let cappedBySlot = false
+        const slotId = (mp.firstIn && mp.firstIn.slotId) || slotByInTime(mp.firstIn.time)
+        if (slotId && SLOT_HOURS[slotId]) {
+          const slotCapMin = SLOT_HOURS[slotId] * 60
+          if (diffMinutes > slotCapMin) {
+            diffMinutes = slotCapMin
+            cappedBySlot = true
+          }
+        }
+
         const hours = Math.max(0, diffMinutes / 60)
         const rounded = Math.ceil(hours * 2) / 2
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
@@ -2015,7 +2050,10 @@ function calculateMemberWorkTime(store, name, year, month) {
           slotCount: mp.slots.length,
           in: mp.firstIn.time,
           out: mp.lastOut.time,
-          supp: !!mp.hasSupp
+          supp: !!mp.hasSupp,
+          originalDuration: originalDiff,        // 原始配对时长（分钟），用于排查
+          cappedBySlot,                          // true 表示被 slot 时长截断
+          slotId: slotId || null,                // 推断的 slot，用于排查
         })
       } else {
         // 无签退：按 slot 实际时长估算（pm1/pm2 是 1.5h 不是 2h）
