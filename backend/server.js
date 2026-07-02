@@ -5,6 +5,17 @@ const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   WidthType, AlignmentType, HeadingLevel, BorderStyle, ShadingType
 } = require('docx')
+// v5.0 邮件模块
+const nodemailer = require('nodemailer')
+
+// ========== SMTP 配置（v5.0）============
+// 163 SMTP：smtp.163.com:465 (SSL)。授权码从环境变量读，本地默认值便于开发。
+const SMTP_HOST   = process.env.SMTP_HOST   || 'smtp.163.com'
+const SMTP_PORT   = parseInt(process.env.SMTP_PORT || '465', 10)
+const SMTP_SECURE = process.env.SMTP_SECURE !== 'false'  // 默认 SSL
+const SMTP_USER   = process.env.SMTP_USER   || 'lnxyxgbss@163.com'
+const SMTP_PASS   = process.env.SMTP_PASS   || 'VNvc3XzCUpBBsZBN'
+const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || '中山大学岭南学院学工办'
 
 // ========== MongoDB 连接 ==========
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://1327446407_db_user:<db_password>@ac-1pkoj3t-shard-00-00.mdoh4fq.mongodb.net:27017,ac-1pkoj3t-shard-00-01.mdoh4fq.mongodb.net:27017,ac-1pkoj3t-shard-00-02.mdoh4fq.mongodb.net:27017/?ssl=true&replicaSet=atlas-fvozf6-shard-0&authSource=admin&appName=Cluster0'
@@ -62,6 +73,9 @@ function defaultStore() {
     // { '2026-07': { weeks: [{ week: 1, date: '2026-07-08', hours: 0.5 }, ...] } }
     // hours=0 表示本次例会无工时但仍然显示在成员勾选列表里
     meetings: {},
+    // v5.0 邮件模块
+    emailLogs: [],        // { at, to, subject, status, error?, messageId? } 最新 200 条
+    // 成员邮箱字段：旧数据从 {name:'xxx', password:'yyy'} 升级后会读 members[name].email
     // 值班搭子留言
     partnerMessages: [],
   suppCheckouts: [],
@@ -309,6 +323,16 @@ app.post('/api/admin/schedule-confirm', async (req, res) => {
     
     await writeStore(store)
     res.json({ ok: true, scheduleStart: store.scheduleStart, scheduleEnd: store.scheduleEnd, confirmedPeriods: store.confirmedPeriods })
+
+    // v5.0：给所有有邮箱的成员发"排班已开启"通知（后台异步，不阻塞响应）
+    if (store.memberEmails && Object.keys(store.memberEmails).length > 0) {
+      const tpl = buildScheduleConfirmEmail(store, scheduleStart, scheduleEnd)
+      Object.values(store.memberEmails).forEach((email) => {
+        if (!email) return
+        sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text })
+          .catch(err => console.warn('[email] schedule-confirm 邮件发送失败:', err))
+      })
+    }
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -1138,6 +1162,14 @@ app.post('/api/admin/reset-password', async (req, res) => {
     store.passwords[name] = newPassword
     await writeStore({ passwords: store.passwords })
     res.json({ ok: true, passwords: store.passwords, msg: `已重置 ${name} 的密码` })
+
+    // v5.0：给成员发密码重置邮件（如果有邮箱）
+    const email = store.memberEmails && store.memberEmails[name]
+    if (email) {
+      const tpl = buildPasswordResetEmail(name, newPassword)
+      sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text })
+        .then(r => { if (!r.ok) console.warn('[email] reset-password 邮件发送失败:', r.error) })
+    }
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -1881,6 +1913,208 @@ app.post('/api/admin/worktime-claim/toggle', async (req, res) => {
     
     await writeStore({ workTimeClaim: store.workTimeClaim })
     res.json({ ok: true, workTimeClaim: store.workTimeClaim })
+
+    // v5.0：开启申报时给所有成员发邮件
+    if (isOpen && store.memberEmails && Object.keys(store.memberEmails).length > 0) {
+      const tpl = buildWorktimeClaimOpenEmail(store, year, month)
+      Object.values(store.memberEmails).forEach((email) => {
+        if (!email) return
+        sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text })
+          .catch(err => console.warn('[email] worktime-claim/toggle 邮件发送失败:', err))
+      })
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// v5.0：发送月度总结邮件（管理员手动触发）
+// body: { year, month, name?: 'all'|string }
+app.post('/api/admin/email/monthly-summary', async (req, res) => {
+  try {
+    const { year, month, name } = req.body || {}
+    if (!year || !month) return res.json({ ok: false, msg: '缺少year/month参数' })
+    const store = await readStore()
+    const targets = (name && name !== 'all') ? [name] : (Object.keys(store.memberEmails || {}))
+    let sentCount = 0
+    let failCount = 0
+    const results = []
+    for (const n of targets) {
+      const email = (store.memberEmails || {})[n]
+      if (!email) { results.push({ name: n, ok: false, error: '未设置邮箱' }); continue }
+      const tpl = buildMonthlySummaryEmail(store, n, year, month)
+      // 重新 read 不必要，store 已经最新
+      const r = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text })
+      results.push({ name: n, ok: r.ok, error: r.error })
+      if (r.ok) sentCount++; else failCount++
+    }
+    res.json({ ok: true, sentCount, failCount, results })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// v5.0：测试邮件发送
+app.post('/api/admin/email/test', async (req, res) => {
+  try {
+    const { to } = req.body || {}
+    if (!to) return res.json({ ok: false, msg: '缺少收件人 to' })
+    const result = await sendEmail({
+      to,
+      subject: '【测试】排班系统邮件连通性测试',
+      text: '这是一封测试邮件，证明 SMTP 配置正确。\n如果你收到这封邮件说明 163 SMTP 已配置成功。',
+      html: '<div style="font-family:Arial,sans-serif;padding:24px;background:#f9fafb;border-radius:8px"><h2 style="color:#8B1A1A">📧 邮件测试</h2><p>这是一封来自 <b>学工办助理排班管理系统</b> 的连通性测试邮件。</p><p style="color:#888;font-size:13px">如果你看到这封邮件，说明 SMTP 配置已生效。</p></div>',
+    })
+    if (result.ok) res.json({ ok: true, info: result.info })
+    else res.json({ ok: false, error: result.error })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// v5.0：读邮件发送日志
+app.get('/api/admin/email/logs', async (req, res) => {
+  try {
+    const store = await readStore()
+    const logs = (store.emailLogs || []).slice(0, 100)
+    res.json({ ok: true, logs })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// v5.0：管理员读所有成员的邮箱映射（{ name: email }，空字符串表示未设）
+app.get('/api/admin/email/members', async (req, res) => {
+  try {
+    const store = await readStore()
+    const emails = {}
+    const list = store.members || []
+    list.forEach(n => {
+      emails[n] = (store.memberEmails && store.memberEmails[n]) || ''
+    })
+    res.json({ ok: true, emails, members: list })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// v5.0：修改成员邮箱（成员可改自己，管理员可改任意人）
+// body: { name, email }  name 来自 currentUser（成员）或 body（管理员）
+app.put('/api/member/email', async (req, res) => {
+  try {
+    const { name, email } = req.body || {}
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const value = (email || '').trim()
+    // 简单邮箱格式校验
+    if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return res.json({ ok: false, msg: '邮箱格式不正确' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    if (!store.memberEmails) store.memberEmails = {}
+    store.memberEmails[name] = value
+    await writeStore({ memberEmails: store.memberEmails })
+    res.json({ ok: true, msg: '邮箱已更新' })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// v5.0：读某成员邮箱
+app.get('/api/member/email', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const store = await readStore()
+    const email = (store.memberEmails && store.memberEmails[name]) || ''
+    res.json({ ok: true, name, email })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// v5.0：成员个人信息（独立维护：银行账号、院系、学号、宿舍、电话）
+// 首次进系统时必须完善，避免每月申报手填。
+// PUT /api/member/profile body: { name, profile: { bankAccount, department, studentId, dorm, phone } }
+app.get('/api/member/profile', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const store = await readStore()
+    let profile = (store.memberProfiles && store.memberProfiles[name]) || {}
+    // 兜底：旧 submission 里的字段也回填（兼容历史）
+    if (!profile.bankAccount || !profile.studentId || !profile.phone) {
+      const sub = ((store.workTimeClaim && store.workTimeClaim.submissions) || {})[name]
+      if (sub) {
+        profile = {
+          bankAccount: profile.bankAccount || sub.bankAccount || '',
+          department:  profile.department  || sub.department  || '岭南学院',
+          studentId:   profile.studentId   || sub.studentId   || '',
+          dorm:        profile.dorm        || sub.dorm        || '',
+          phone:       profile.phone       || sub.phone       || '',
+        }
+      }
+    }
+    res.json({ ok: true, name, profile })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+app.put('/api/member/profile', async (req, res) => {
+  try {
+    const { name, profile } = req.body || {}
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    if (!profile || typeof profile !== 'object') return res.json({ ok: false, msg: 'profile 必须为对象' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    const clean = {
+      bankAccount: String(profile.bankAccount || '').trim(),
+      department:  String(profile.department || '岭南学院').trim(),
+      studentId:   String(profile.studentId || '').trim(),
+      dorm:        String(profile.dorm || '').trim(),
+      phone:       String(profile.phone || '').trim(),
+    }
+    if (!store.memberProfiles) store.memberProfiles = {}
+    store.memberProfiles[name] = clean
+    await writeStore({ memberProfiles: store.memberProfiles })
+    res.json({ ok: true, msg: '个人信息已保存', profile: clean })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// v5.0：成员读自己的所有已获得荣誉（按月聚合，所有月份）
+app.get('/api/member/achievements', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const store = await readStore()
+    // 遍历已开过的所有月份：wtc.year/month + 重新构建即可；简单起见取当前月 + 后推 6 个月
+    const allAchs = []
+    const seen = new Set()
+    // 当前 wtc
+    const curWt = store.workTimeClaim || {}
+    const months = []
+    if (curWt.year && curWt.month) months.push({ year: curWt.year, month: curWt.month })
+    // 也加最近 6 个月
+    const d = new Date()
+    for (let i = 0; i < 6; i++) {
+      const y = d.getFullYear(), m = d.getMonth() + 1 - i
+      const my = m <= 0 ? y - 1 : y
+      const mm = m <= 0 ? 12 + m : m
+      months.push({ year: my, month: mm })
+    }
+    months.forEach(({ year, month }) => {
+      try {
+        const achs = computeMemberMonthlyAchievements(store, name, year, month)
+        achs.forEach(a => {
+          const key = year + '-' + month + '-' + a.id
+          if (seen.has(key)) return
+          seen.add(key)
+          allAchs.push({ ...a, year, month })
+        })
+      } catch (_) {}
+    })
+    res.json({ ok: true, achievements: allAchs })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -2883,3 +3117,334 @@ start().catch(e => {
   console.error('[fatal] 启动失败:', e.message)
   process.exit(1)
 })
+
+// ========== v5.0 邮件模块 ==========
+
+// 创建并复用 transporter（懒加载）
+let _transporter = null
+function getMailer() {
+  if (_transporter) return _transporter
+  _transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  })
+  return _transporter
+}
+
+// 核心发送：调用后阻塞异步发送，并把结果写入 store.emailLogs
+// opts: { to, subject, html, text, fromName? }
+// 返回: { ok, info?, error? }
+async function sendEmail(opts) {
+  const store = await readStore()
+  // 先看成员邮箱是否有效（只看 to 是已注册成员的情况）
+  if (!opts || !opts.to) return { ok: false, error: '缺少收件人' }
+  const log = {
+    at: getBeijingDateTimeString(),
+    to: opts.to,
+    subject: opts.subject || '',
+    status: 'pending',
+  }
+  function appendLog(entry) {
+    store.emailLogs = Array.isArray(store.emailLogs) ? store.emailLogs : []
+    store.emailLogs.unshift(entry)
+    if (store.emailLogs.length > 200) store.emailLogs.length = 200  // 最多保留 200 条
+    try { writeStore({ emailLogs: store.emailLogs }) } catch (_) {}
+  }
+  appendLog(log)
+  try {
+    const mailer = getMailer()
+    const info = await mailer.sendMail({
+      from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+      to: opts.to,
+      subject: opts.subject || '',
+      text: opts.text || '',
+      html: opts.html || '',
+    })
+    log.status = 'ok'
+    log.messageId = info.messageId
+    appendLog(log)
+    return { ok: true, info }
+  } catch (e) {
+    log.status = 'fail'
+    log.error = (e && (e.message || String(e))) || '未知错误'
+    appendLog(log)
+    return { ok: false, error: log.error }
+  }
+}
+
+// ========== v5.0 称号算法 ==========
+// 评定一个成员在某月获得的称号（数组），可叠加
+
+// 某成员的月度累计工时（按 store.allLogs 计算，跨月累计）
+function getMemberTotalHours(store, name) {
+  let total = 0
+  const months = new Set()
+  // 用 allLogs 是更优雅但没存，就用 submissions[name] 不全
+  // 简化为：从各月 workTimeClaim.submissions 累加；如果没值则返回 0
+  if (store.workTimeClaim && store.workTimeClaim.submissions && store.workTimeClaim.submissions[name]) {
+    total = store.workTimeClaim.submissions[name].totalHours || 0
+  }
+  // 退路：用 overtime approved 累加
+  if (store.overtimes) {
+    store.overtimes.forEach(ot => {
+      if (ot.name === name && ot.status === 'approved') total += (ot.hours || 0)
+    })
+  }
+  // 也累加上已批准 schedule hours / 没有好源数据时跳过
+  return total
+}
+
+// 计算某成员当月 day-detail（用于称号判定）
+function computeMemberMonthlyAchievements(store, name, year, month) {
+  const achs = []
+  if (!store.workTimeClaim || !store.workTimeClaim.year || !store.workTimeClaim.month) {
+    return achs
+  }
+  const wtc = store.workTimeClaim
+  // 复用之前的 calculateMemberWorkTime
+  let workData
+  try {
+    workData = calculateMemberWorkTime(store, name, wtc.year, wtc.month)
+  } catch (_) {
+    workData = {}
+  }
+  const ms = workData.monthSummary || {}
+  const daily = workData.daily || []
+  const meetings = workData.meetings || []
+
+  // 🏆 全勤达人：本月所有排班天都完成（completed），且至少有一天排班
+  const scheduledDays = daily.filter(d => d.scheduled && d.scheduled.length > 0)
+  const completedDays = scheduledDays.filter(d => d.status === 'completed' || d.status === 'incomplete')
+  if (scheduledDays.length >= 3 && completedDays.length === scheduledDays.length) {
+    achs.push({ id: 'full_attend', icon: '🏆', name: '本月全勤达人', desc: '本月所有排班天都准时打卡' })
+  }
+
+  // 🌟 例会全勤：本月所有例会都参会
+  if (meetings.length > 0 && meetings.every(m => m.attended)) {
+    achs.push({ id: 'meeting_full', icon: '🌟', name: '例会全勤', desc: '本月所有例会都参会了' })
+  }
+
+  // ⏰ 守时之神：本月 5 天以上签到记录时间在 [班次-15min, 班次+5min] 范围内（v1 简化：要求所有有数据的签到都守时）
+  // 这里略复杂：暂不实现，v2 时再做
+
+  // 📚 学习标兵（v1 临时用例会时长达到阈值的标签）
+  const meetingHours = meetings.reduce((s, m) => s + (m.attendedHours || 0), 0)
+  if (meetingHours >= 1.5) {
+    achs.push({ id: 'learner', icon: '📚', name: '学习标兵', desc: '本月例会参会 ≥ ' + meetingHours.toFixed(1) + ' 小时' })
+  }
+
+  // 🌙 深夜值班：本月有至少 2 次 pm2 班次打卡
+  const lateShifts = daily.filter(d =>
+    d.scheduled && d.scheduled.some(s => s.slotId === 'pm2') && (d.status === 'completed' || d.status === 'incomplete')
+  ).length
+  if (lateShifts >= 2) {
+    achs.push({ id: 'late_shift', icon: '🌙', name: '深夜守护者', desc: '本月完成 ' + lateShifts + ' 个 pm2 班次' })
+  }
+
+  // ⭐ 累计里程碑（100h/200h/500h/1000h）—— 跨月累计
+  const totalHours = getMemberTotalHours(store, name)
+  const milestones = [100, 200, 500, 1000]
+  milestones.forEach(ms_val => {
+    if (totalHours >= ms_val && totalHours < ms_val + 10) {  // 只在刚跨过节点那一周给
+      // v1 简化：每个里程碑都展示（不要求"首次跨过"）
+      achs.push({
+        id: 'milestone_' + ms_val,
+        icon: '🥇',
+        name: '累计 ' + ms_val + ' 小时',
+        desc: '你已累计值班 ' + totalHours.toFixed(1) + ' 小时',
+      })
+    }
+  })
+
+  // 🎯 单日标准：本月有 1 天以上达到当天 3h+ 班次（勤奋型）
+  const heavyDays = daily.filter(d => (d.totalHours || 0) >= 3).length
+  if (heavyDays >= 1) {
+    achs.push({ id: 'hard_worker', icon: '💪', name: '勤奋之星', desc: '本月有 ' + heavyDays + ' 天超过 3 小时' })
+  }
+
+  // 🐦 早起鸟：本月有 am1 或 am2 班次打卡（前提 am 班）
+  const morningShifts = daily.filter(d =>
+    d.scheduled && d.scheduled.some(s => s.slotId === 'am1' || s.slotId === 'am2') && (d.status === 'completed' || d.status === 'incomplete')
+  ).length
+  if (morningShifts >= 1) {
+    achs.push({ id: 'early_bird', icon: '🐦', name: '早起鸟', desc: '本月完成 ' + morningShifts + ' 个早班' })
+  }
+
+  // 🌈 满勤+例会双满：本月全勤 + 例会全勤 都达成
+  const hasFull = achs.some(a => a.id === 'full_attend')
+  const hasMeetFull = achs.some(a => a.id === 'meeting_full')
+  if (hasFull && hasMeetFull) {
+    achs.push({ id: 'double_perfect', icon: '🌈', name: '双满贯', desc: '本月值班 + 例会双全勤' })
+  }
+
+  return achs
+}
+
+// ========== v5.0 邮件模板 ==========
+
+// 月度总结邮件 HTML 模板
+function buildMonthlySummaryEmail(store, name, year, month) {
+  let workData
+  try { workData = calculateMemberWorkTime(store, name, year, month) } catch (_) { workData = {} }
+  const totalHours = workData.totalHours || 0
+  const totalPay = workData.totalPay || 0
+  const days = (workData.daily || []).filter(d => (d.totalHours > 0) || (d.scheduled && d.scheduled.length > 0))
+  const meetings = workData.meetings || []
+  const achs = computeMemberMonthlyAchievements(store, name, year, month)
+
+  // 日历字符串
+  const monthLabel = year + ' 年 ' + month + ' 月'
+  const subject = `【${SMTP_FROM_NAME}】${name} · ${monthLabel} 工时与荣誉总结`
+
+  // 行（每天）：简洁
+  const dayRows = days.map(d => {
+    const statusCls = d.status === 'completed' ? '#d1fae5' : d.status === 'incomplete' ? '#dbeafe' : d.status === 'overtime' ? '#fef3c7' : d.status === 'absent' ? '#fee2e2' : '#f3f4f6'
+    const statusText = ({completed:'✓完成', incomplete:'🕐待补', overtime:'📝补报', 'overtime-pending':'⏳待审', absent:'⚠️缺勤', none:'—'})[d.status] || d.status
+    return `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #eef0f3;color:#444">${d.date.slice(5)} ${d.weekday || ''}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eef0f3;text-align:center">
+        <span style="padding:2px 8px;border-radius:10px;font-size:12px;background:${statusCls}">${statusText}</span>
+      </td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eef0f3;text-align:right;font-weight:600">${(d.totalHours || 0).toFixed(1)}h</td>
+    </tr>`
+  }).join('')
+
+  // 称号行
+  const achRows = achs.map(a => `
+    <tr><td style="padding:14px 18px;font-size:28px;width:60px;vertical-align:top">${a.icon}</td>
+    <td style="padding:14px 18px;vertical-align:top">
+      <div style="font-size:15px;font-weight:700;color:#7c3aed;margin-bottom:4px">${a.name}</div>
+      <div style="font-size:13px;color:#666">${a.desc}</div>
+    </td></tr>`).join('')
+
+  // 例会行
+  const meetRows = meetings.map(m => `
+    <tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #f0f0f0">第 ${m.week} 周 · ${m.date}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;text-align:right;color:${m.attended ? '#166534' : '#9ca3af'}">${m.attended ? '✅ 参会 · ' + m.hours + 'h' : '○ 未参会 · ' + m.hours + 'h'}</td>
+    </tr>`).join('')
+
+  const html = `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${subject}</title></head>
+<body style="margin:0;padding:0;background:#f6f7f9;font-family:'Microsoft YaHei',Arial,sans-serif;color:#333">
+  <div style="max-width:680px;margin:24px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+    <div style="background:linear-gradient(135deg,#8B1A1A,#c9302c);color:#fff;padding:28px 36px;text-align:center">
+      <div style="font-size:13px;opacity:0.85;letter-spacing:2px">中山大学岭南学院 · 学工办助理</div>
+      <h1 style="margin:8px 0 0;font-size:24px;font-weight:600">${monthLabel} 工时与荣誉总结</h1>
+    </div>
+
+    <div style="padding:24px 36px">
+      <div style="font-size:15px;line-height:1.7;margin-bottom:6px">亲爱的 <b style="color:#8B1A1A">${name}</b> 同学：</div>
+      <div style="font-size:14px;line-height:1.7;color:#555;margin-bottom:20px">这是你 ${monthLabel} 的勤工助学值班总结，请查收。</div>
+
+      <div style="display:flex;gap:14px;margin-bottom:24px;text-align:center">
+        <div style="flex:1;padding:18px;background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:10px">
+          <div style="font-size:13px;color:#92400e">累计工时</div>
+          <div style="font-size:28px;font-weight:700;color:#92400e;margin-top:4px">${totalHours.toFixed(1)}<span style="font-size:14px">h</span></div>
+        </div>
+        <div style="flex:1;padding:18px;background:linear-gradient(135deg,#fce7f3,#fbcfe8);border-radius:10px">
+          <div style="font-size:13px;color:#9d174d">本月报酬</div>
+          <div style="font-size:28px;font-weight:700;color:#9d174d;margin-top:4px">¥${totalPay.toFixed(1)}</div>
+        </div>
+        <div style="flex:1;padding:18px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:10px">
+          <div style="font-size:13px;color:#1e40af">值班天数</div>
+          <div style="font-size:28px;font-weight:700;color:#1e40af;margin-top:4px">${ms_days(workData)}<span style="font-size:14px">天</span></div>
+        </div>
+      </div>
+
+      ${achs.length > 0 ? `
+      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">🏅 本月获得的荣誉</h2>
+      <table style="width:100%;border-collapse:collapse;background:#faf6ff;border:1px solid #e9d5ff;border-radius:10px;overflow:hidden">${achRows}</table>
+      ` : `
+      <div style="margin:20px 0;padding:14px;background:#f9fafb;border-radius:8px;color:#666;font-size:14px;text-align:center">💪 本月暂未获得荣誉称号，继续加油！</div>
+      `}
+
+      ${meetings.length > 0 ? `
+      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">📅 本月例会参会</h2>
+      <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden"><tbody>${meetRows || '<tr><td style="padding:14px;text-align:center;color:#999" colspan="2">本月无例会</td></tr>'}</tbody></table>
+      ` : ''}
+
+      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">📋 每日明细</h2>
+      <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;font-size:13px">
+        <thead><tr style="background:#f8fafc"><th style="padding:10px 12px;text-align:left;border-bottom:1px solid #e5e7eb">日期</th><th style="padding:10px 12px;border-bottom:1px solid #e5e7eb">状态</th><th style="padding:10px 12px;text-align:right;border-bottom:1px solid #e5e7eb">工时</th></tr></thead>
+        <tbody>${dayRows || '<tr><td colspan="3" style="padding:20px;text-align:center;color:#999">本月无排班和打卡记录</td></tr>'}</tbody>
+      </table>
+
+      <div style="margin-top:28px;padding:16px;background:#fef9c3;border-left:4px solid #facc15;border-radius:6px;font-size:13px;color:#713f12;line-height:1.6">
+        💡 <b>温馨提示</b>：如有疑问或数据不符，请登录系统核对每周打卡记录，或在工作群联系管理员。
+      </div>
+    </div>
+
+    <div style="padding:18px 36px;background:#f9fafb;border-top:1px solid #eef0f3;font-size:12px;color:#888;text-align:center;line-height:1.6">
+      ${SMTP_FROM_NAME}<br>
+      本邮件由系统自动发送，请勿直接回复
+    </div>
+  </div>
+</body></html>`
+
+  const text = `${monthLabel} 工时与荣誉总结\n姓名：${name}\n累计工时：${totalHours.toFixed(1)}h\n本月报酬：¥${totalPay.toFixed(1)}\n荣誉：${achs.map(a => a.name).join('、') || '无'}`
+  return { subject, html, text }
+}
+
+function ms_days(workData) {
+  const ms = (workData && workData.monthSummary) || {}
+  return (ms.completedDays || 0) + (ms.overtimeDays || 0)
+}
+
+// 其他通用模板
+function buildScheduleConfirmEmail(store, scheduleStart, scheduleEnd, days, slotCount) {
+  const subject = `【${SMTP_FROM_NAME}】${formatMonth(new Date(scheduleStart))}排班已开启，请尽快选班`
+  const html = `
+<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f6f7f9;font-family:'Microsoft YaHei',Arial,sans-serif">
+<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:10px;padding:32px">
+  <h2 style="color:#8B1A1A;margin:0 0 18px">📅 排班已开启</h2>
+  <p style="line-height:1.7;color:#444">新一轮排班表已发布，请尽快登录系统选班。</p>
+  <div style="padding:16px;background:#fef3c7;border-radius:8px;margin:18px 0">
+    <div><b>排班周期：</b>${scheduleStart} ~ ${scheduleEnd}</div>
+    <div><b>已排时段数：</b>${slotCount}</div>
+  </div>
+  <p style="color:#888;font-size:13px">${SMTP_FROM_NAME} · 自动通知</p>
+</div>
+</body></html>`
+  return { subject, html, text: `排班已开启：${scheduleStart} ~ ${scheduleEnd}` }
+}
+
+function buildWorktimeClaimOpenEmail(store, year, month) {
+  const subject = `【${SMTP_FROM_NAME}】${year} 年 ${month} 月工时申报已开放`
+  const html = `
+<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f6f7f9;font-family:'Microsoft YaHei',Arial,sans-serif">
+<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:10px;padding:32px">
+  <h2 style="color:#8B1A1A;margin:0 0 18px">💼 月度工时申报已开放</h2>
+  <p style="line-height:1.7;color:#444">${year} 年 ${month} 月工时申报已开放，请登录系统核对工时并提交。</p>
+  <div style="padding:16px;background:#dbeafe;border-radius:8px;margin:18px 0;color:#1e40af">
+    ⏰ 请在管理员关闭申报之前提交
+  </div>
+  <p style="color:#888;font-size:13px">${SMTP_FROM_NAME} · 自动通知</p>
+</div>
+</body></html>`
+  return { subject, html, text: `${year} 年 ${month} 月工时申报已开放` }
+}
+
+function buildPasswordResetEmail(name, newPassword) {
+  const subject = `【${SMTP_FROM_NAME}】密码已重置通知`
+  const html = `
+<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f6f7f9;font-family:'Microsoft YaHei',Arial,sans-serif">
+<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:10px;padding:32px">
+  <h2 style="color:#8B1A1A;margin:0 0 18px">🔑 密码已重置</h2>
+  <p style="line-height:1.7;color:#444">管理员已为账号 <b style="color:#8B1A1A">${name}</b> 重置登录密码：</p>
+  <div style="padding:18px;background:#f3f4f6;border-radius:8px;margin:18px 0;text-align:center">
+    <div style="font-size:28px;font-weight:700;letter-spacing:4px;color:#8B1A1A;font-family:Consolas,Monaco,monospace">${newPassword}</div>
+  </div>
+  <p style="line-height:1.7;color:#666;font-size:13px">⚠️ 请尽快登录系统并在"修改密码"中重置成自己的密码。如非本人操作请及时联系管理员。</p>
+  <p style="color:#888;font-size:13px">${SMTP_FROM_NAME} · 自动通知</p>
+</div>
+</body></html>`
+  return { subject, html, text: `账号 ${name} 密码已重置为：${newPassword}` }
+}
+
+function formatMonth(d) {
+  return d.getFullYear() + '年' + (d.getMonth() + 1) + '月'
+}
