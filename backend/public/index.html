@@ -699,6 +699,21 @@ body {
   height: 10px;
   border-radius: 3px;
 }
+.wt-refresh-btn {
+  background: white;
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .12s ease;
+}
+.wt-refresh-btn:hover {
+  background: var(--primary);
+  color: white;
+}
 .wt-cal-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -770,6 +785,13 @@ body {
 }
 .wt-cal-cell.completed .wt-cal-hours { color: #2e7d32; }
 .wt-cal-cell.completed .wt-cal-status { color: #2e7d32; }
+/* 已签到未签退（按 2h 估算） */
+.wt-cal-cell.incomplete {
+  background: linear-gradient(135deg, #e3f2fd 0%, #e8eaf6 100%);
+  border-color: #90caf9;
+}
+.wt-cal-cell.incomplete .wt-cal-hours { color: #1565c0; }
+.wt-cal-cell.incomplete .wt-cal-status { color: #1565c0; }
 /* 补报（覆盖缺勤 / 仅额外工作） */
 .wt-cal-cell.overtime {
   background: linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%);
@@ -892,6 +914,7 @@ body {
   margin: 4px 0 12px;
 }
 .wt-modal-status.completed { background: #e8f5e9; color: #2e7d32; }
+.wt-modal-status.incomplete { background: #e3f2fd; color: #1565c0; }
 .wt-modal-status.overtime { background: #fff8e1; color: #b45309; }
 .wt-modal-status.overtime-pending { background: #fff3e0; color: #ef6c00; }
 .wt-modal-status.absent { background: #ffebee; color: #c41230; }
@@ -4692,11 +4715,12 @@ let wtYear = 0, wtMonth = 0;
 
 // 状态文本与图标
 const WT_STATUS_META = {
-  completed:        { icon: '✓', text: '已完成', cls: 'completed',       desc: '已正常打卡' },
-  overtime:         { icon: '📝', text: '补报',   cls: 'overtime',        desc: '通过补报覆盖缺勤或额外工作' },
+  completed:        { icon: '✓', text: '已完成',   cls: 'completed',       desc: '已正常打卡' },
+  incomplete:       { icon: '🕐', text: '已签到未签退', cls: 'incomplete',  desc: '有签到记录但缺少签退，按2小时估算' },
+  overtime:         { icon: '📝', text: '补报',     cls: 'overtime',        desc: '通过补报覆盖缺勤或额外工作' },
   'overtime-pending':{icon: '⏳', text: '补报待审', cls: 'overtime-pending', desc: '补报已提交，等待管理员审核' },
-  absent:           { icon: '⚠️', text: '缺勤',   cls: 'absent',          desc: '排班未到且未提交补报' },
-  none:             { icon: '—', text: '',        cls: 'none',            desc: '当天无排班' },
+  absent:           { icon: '⚠️', text: '缺勤',     cls: 'absent',          desc: '排班未到且未提交补报' },
+  none:             { icon: '—', text: '',         cls: 'none',            desc: '当天无排班' },
 };
 
 // 成员端：加载工时申报页面
@@ -4749,12 +4773,16 @@ async function loadWorkTimeClaim() {
     html += '<div class="worktime-calendar">';
     html += '<div class="wt-cal-header">';
     html += '<div class="wt-cal-title">📅 ' + wtYear + '年' + wtMonth + '月 · 工时日历</div>';
+    html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
     html += '<div class="wt-cal-legend">';
     html += '<span><i style="background:#c8e6c9"></i>已打卡</span>';
+    html += '<span><i style="background:#90caf9"></i>已签到未签退</span>';
     html += '<span><i style="background:#ffe082"></i>补报</span>';
     html += '<span><i style="background:#ffcc80"></i>补报待审</span>';
     html += '<span><i style="background:#ffcdd2"></i>缺勤</span>';
     html += '<span><i style="background:#eef0f3"></i>无排班</span>';
+    html += '</div>';
+    html += '<button class="wt-refresh-btn" onclick="loadWorkTimeClaim()" title="刷新数据">🔄 刷新</button>';
     html += '</div></div>';
     html += '<div class="wt-cal-weekdays"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>';
     html += '<div class="wt-cal-grid">';
@@ -4767,7 +4795,8 @@ async function loadWorkTimeClaim() {
     html += '<div class="wt-summary-grid">';
     html += '<div class="wt-summary-card s-hours"><div class="lbl">月工作时长</div><div class="val">' + (wtWorkData.totalHours || 0).toFixed(1) + '<span style="font-size:13px;font-weight:400"> 小时</span></div><div class="sub">含打卡 + 通过补报</div></div>';
     html += '<div class="wt-summary-card s-pay"><div class="lbl">月劳务报酬</div><div class="val">' + (wtWorkData.totalPay || 0).toFixed(1) + '<span style="font-size:13px;font-weight:400"> 元</span></div><div class="sub">25元/小时</div></div>';
-    html += '<div class="wt-summary-card s-completed"><div class="lbl">已完成天数</div><div class="val">' + (ms.completedDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">有打卡记录</div></div>';
+    html += '<div class="wt-summary-card s-completed"><div class="lbl">已完成天数</div><div class="val">' + (ms.completedDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">签到+签退齐全</div></div>';
+    html += '<div class="wt-summary-card" style="background:linear-gradient(135deg,#1976d2,#42a5f5)"><div class="lbl">签到未签退</div><div class="val">' + (ms.incompleteDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">按2小时估算</div></div>';
     html += '<div class="wt-summary-card s-overtime"><div class="lbl">仅补报天数</div><div class="val">' + (ms.overtimeDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">无打卡但有补报</div></div>';
     html += '<div class="wt-summary-card s-absent"><div class="lbl">缺勤天数</div><div class="val">' + (ms.absentDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">排班未到且未补报</div></div>';
     html += '</div></div>';
@@ -4828,9 +4857,9 @@ function buildWtCalendarGrid() {
     const isFutureCls = isFuture ? 'future' : '';
     const hasOt = day.approvedOvertimes && day.approvedOvertimes.length > 0;
     const badgeHtml = hasOt ? `<div class="wt-cal-badge">+补</div>` : '';
-    const actionHtml = (day.status === 'absent' && !isFuture) 
-      ? `<div class="wt-cal-action">去补报</div>` 
-      : '';
+    let actionHtml = '';
+    if (day.status === 'absent' && !isFuture) actionHtml = `<div class="wt-cal-action">去补报</div>`;
+    else if (day.status === 'incomplete' && !isFuture) actionHtml = `<div class="wt-cal-action" style="background:#1565c0">补签退</div>`;
     html += `<div class="wt-cal-cell ${meta.cls} ${isToday} ${isFutureCls}" onclick="showWtDayDetail('${dateStr}')">
       ${badgeHtml}
       <div><span class="wt-cal-date">${d}</span><span class="wt-cal-weekday">${day.weekday.replace('周','')}</span></div>
@@ -4910,14 +4939,16 @@ function showWtDayDetail(dateStr) {
   }
   document.getElementById('wtDayContent').innerHTML = rows;
   
-  // 底部按钮
+  // 底部按钮（所有状态都补一个关闭按钮，避免卡住弹窗）
   let actions = '';
+  const closeBtn = `<button class="btn-secondary" onclick="hideWtDayDetail()">关闭</button>`;
   if (day.status === 'absent') {
-    actions = `<button class="btn-warn" onclick="hideWtDayDetail();wtGoOvertime('${dateStr}')">📝 去补报工时</button>`;
-  } else if (day.status === 'overtime-pending') {
-    actions = `<button class="btn-secondary" onclick="hideWtDayDetail()">关闭</button>`;
+    actions = `<button class="btn-warn" onclick="hideWtDayDetail();wtGoOvertime('${dateStr}')">📝 去补报工时</button>` + closeBtn;
+  } else if (day.status === 'incomplete') {
+    // 已签到未签退：提醒去补签退（在打卡页）
+    actions = `<button class="btn-primary" onclick="hideWtDayDetail();wtGoCheckin('${dateStr}')">📍 去补签退</button>` + closeBtn;
   } else {
-    actions = `<button class="btn-secondary" onclick="hideWtDayDetail()">关闭</button>`;
+    actions = closeBtn;
   }
   document.getElementById('wtDayActions').innerHTML = actions;
   
@@ -4940,6 +4971,17 @@ function wtGoOvertime(dateStr) {
       dateInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
       showToast('已填入日期 ' + dateStr + '，请补充工作内容并提交');
     }
+  }, 200);
+}
+
+// 跳转到打卡页签退（用于"已签到未签退"状态）
+function wtGoCheckin(dateStr) {
+  switchTab('checkin');
+  setTimeout(() => {
+    showToast('请为 ' + dateStr + ' 补签退（也可事后申请补签退）');
+    // 滚动到我的打卡记录区块
+    const el = document.getElementById('myCheckinList');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, 200);
 }
 
