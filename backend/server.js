@@ -3114,6 +3114,10 @@ function getMailer() {
     port: SMTP_PORT,
     secure: SMTP_SECURE,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    // 显式设置超时，避免 SMTP 卡住让前端显示"发送中"挂死
+    connectionTimeout: 15000,   // TCP 连接超时 15s（Render 到 163 慢时也能失败快速）
+    greetingTimeout:  15000,   // SMTP 握手超时
+    socketTimeout:    30000,   // socket 读超时
   })
   return _transporter
 }
@@ -3154,6 +3158,10 @@ async function sendEmail(opts) {
   } catch (e) {
     log.status = 'fail'
     log.error = (e && (e.message || String(e))) || '未知错误'
+    // v5.0.2：ETIMEDOUT/ENETUNREACH 常见是部署平台到 SMTP 服务器的网络问题（不是配置问题），给运维提示
+    if (e && (e.code === 'ETIMEDOUT' || e.code === 'ENETUNREACH' || e.code === 'ECONNREFUSED')) {
+      log.error = log.error + ' ｜ 诊断：部署平台（如 Render）到 ' + SMTP_HOST + ':' + SMTP_PORT + ' 的出站网络不通。建议换 SendGrid/Mailgun/Resend 等海外邮件服务，或切换到阿里云/腾讯云等大陆平台。'
+    }
     appendLog(log)
     return { ok: false, error: log.error }
   }
