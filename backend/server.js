@@ -1878,6 +1878,19 @@ app.get('/api/admin/worktime-claim/all', async (req, res) => {
 //          approvedOvertimes, pendingOvertimes, totalHours, status }
 //   status: 'completed'(已打卡) | 'overtime'(已补报/补报覆盖缺勤) | 'absent'(缺勤) | 'none'(无排班无工作)
 const SLOT_LABEL_MAP = { am1: '8:00-10:00', am2: '10:00-12:00', pm1: '14:30-16:00', pm2: '16:00-17:30' }
+
+// 把任意 time 字段归一化为 "HH:MM"
+// 普通打卡存的是 now.toISOString()（"YYYY-MM-DDTHH:MM:SS.sssZ"）
+// 补签退存的是 "HH:MM:SS"（item.time + ':00'）
+// 早期的可能直接就是 "HH:MM"
+function normalizeHHMM(timeStr) {
+  if (!timeStr) return ''
+  const isoIdx = timeStr.indexOf('T')
+  if (isoIdx >= 0) timeStr = timeStr.slice(isoIdx + 1)
+  const [h, m] = timeStr.split(':')
+  if (!h || !m) return timeStr
+  return h.padStart(2, '0') + ':' + m.padStart(2, '0')
+}
 function calculateMemberWorkTime(store, name, year, month) {
   const checkins = store.checkins || []
   const allOvertimes = store.overtimes || []
@@ -2061,8 +2074,8 @@ function calculateMemberWorkTime(store, name, year, month) {
           }
         }
         return {
-          in: iRec.time,
-          out: bestOut ? bestOut.time : null,
+          in: normalizeHHMM(iRec.time),
+          out: bestOut ? normalizeHHMM(bestOut.time) : null,
           supp: !!(bestOut && bestOut.isSupp)
         }
       })
@@ -2128,7 +2141,16 @@ function calculateMemberWorkTime(store, name, year, month) {
 }
 
 function timeToMinutes(timeStr) {
+  if (!timeStr) return 0
+  // 兼容三种格式：
+  //   "HH:MM"            （如 "08:32"）
+  //   "HH:MM:SS"         （如 "08:32:00"，补签退记录）
+  //   "YYYY-MM-DDTHH:MM:SS.sssZ"  （普通打卡存的是 now.toISOString()，如 "2026-06-01T08:32:00.000Z"）
+  // 2026-07-02 修复：之前只支持 HH:MM，导致普通签退的 ISO 时间解析失败 → 配对不上 → 误判"已签到未签退"
+  const isoIdx = timeStr.indexOf('T')
+  if (isoIdx >= 0) timeStr = timeStr.slice(isoIdx + 1)
   const [h, m] = timeStr.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return 0
   return h * 60 + m
 }
 
