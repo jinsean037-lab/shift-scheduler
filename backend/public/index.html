@@ -1723,7 +1723,15 @@ body {
         <a class="nav-item" data-page="stats" id="navStats" onclick="switchTab('stats')">
           <span class="nav-icon">📋</span><span>取消与候补申请</span>
         </a>
-        <a class="nav-item" data-page="worktime" id="navWorktime" onclick="switchTab('worktime')">
+          <a class="nav-item" data-page="achievements" id="navAchievements" onclick="switchTab('achievements')">
+            <span class="nav-icon">🏅</span>
+            <span>我的荣誉</span>
+          </a>
+          <a class="nav-item" data-page="profile" id="navProfile" onclick="switchTab('profile')">
+            <span class="nav-icon">📋</span>
+            <span>我的信息</span>
+          </a>
+          <a class="nav-item" data-page="worktime" id="navWorktime" onclick="switchTab('worktime')">
           <span class="nav-icon">💼</span><span>工时申报</span>
         </a>
 
@@ -1760,8 +1768,8 @@ body {
           <a class="nav-subitem" data-page="admin-meetings" onclick="switchTab('admin-meetings')">
             <span>📅 例会设置</span>
           </a>
-          <a class="nav-subitem" data-page="admin-monthly" onclick="switchTab('admin-monthly')">
-            <span>📊 本月值班</span>
+          <a class="nav-subitem" data-page="admin-email" onclick="switchTab('admin-email')">
+            <span>📧 邮件配置</span>
           </a>
         </div>
       </div>
@@ -1971,6 +1979,28 @@ body {
           <h3 style="color:var(--primary)">🔁 换班申请</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">排班表生效期间，可和其他成员互换两个具体班次。</p>
           <div id="mySwapRequests"></div>
+        </div>
+      </div>
+
+      <!-- ===== v5.0 我的荣誉墙 ===== -->
+      <div class="page-view" id="achievementsView">
+        <div class="page-title-row">
+          <h2>🏅 我的荣誉墙</h2>
+          <p class="page-subtitle">看看你这一路走来摘下了哪些勋章</p>
+        </div>
+        <div class="admin-section" id="achievementsContent">
+          <p style="color:#999;font-size:13px;padding:30px;text-align:center">加载中…</p>
+        </div>
+      </div>
+
+      <!-- ===== v5.0 我的个人信息 ===== -->
+      <div class="page-view" id="profileView">
+        <div class="page-title-row">
+          <h2>📋 我的信息</h2>
+          <p class="page-subtitle">完善个人信息后，每月工时申报会自动填入；邮件通知也会发到此邮箱</p>
+        </div>
+        <div class="admin-section" id="profileContent">
+          <p style="color:#999;font-size:13px;padding:30px;text-align:center">加载中…</p>
         </div>
       </div>
 
@@ -2231,6 +2261,36 @@ body {
           </div>
         </div>
       </div>
+
+      <!-- 管理子页面：邮件配置 v5.0 -->
+      <div class="page-view" id="adminEmailView">
+        <div class="page-title-row">
+          <h2>📧 邮件配置</h2>
+          <p class="page-subtitle">配置 SMTP 与通知触发。授权码已写在服务端 .env 或代码默认值中（前端不展示）。</p>
+        </div>
+        <div class="admin-section">
+          <h3>🔌 SMTP 当前生效</h3>
+          <div id="adminEmailConfig" style="margin-top:8px"></div>
+        </div>
+        <div class="admin-section">
+          <h3>📨 测试邮件</h3>
+          <p style="color:#666;font-size:13px">向指定地址发送测试邮件，验证 SMTP 可用性。</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
+            <input type="email" id="adminEmailTestTo" placeholder="收件人邮箱" style="flex:1;min-width:200px;padding:8px;border:1px solid #d4d4d8;border-radius:6px">
+            <button class="admin-btn primary" onclick="adminSendTestEmail()">发送测试</button>
+          </div>
+          <div id="adminEmailTestResult" style="margin-top:8px;font-size:13px"></div>
+        </div>
+        <div class="admin-section">
+          <h3>👥 成员邮箱</h3>
+          <p style="color:#666;font-size:13px">已登记邮箱的成员会在触发通知时自动收到邮件。</p>
+          <div id="adminEmailMembers" style="margin-top:8px;max-height:240px;overflow:auto;border:1px solid #e5e7eb;border-radius:6px"></div>
+        </div>
+        <div class="admin-section">
+          <h3>📜 发送日志（最近 50 条）</h3>
+          <div id="adminEmailLogs" style="margin-top:8px;max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:6px"></div>
+        </div>
+      </div>
     </main>
   </div>
 </div>
@@ -2390,6 +2450,16 @@ function switchTab(tab) {
     const nav = document.querySelector('.nav-item[data-page="worktime"]');
     if (nav) nav.classList.add('active');
     loadWorkTimeClaim();
+  } else if (tab === 'achievements') {
+    document.getElementById('achievementsView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="achievements"]');
+    if (nav) nav.classList.add('active');
+    loadMyAchievements();
+  } else if (tab === 'profile') {
+    document.getElementById('profileView').classList.add('active');
+    const nav = document.querySelector('.nav-item[data-page="profile"]');
+    if (nav) nav.classList.add('active');
+    loadMyProfile();
   } else if (tab === 'admin') {
     // 兼容：点击管理中心时展开子菜单并跳到排班确认
     toggleAdminSubmenu(true);
@@ -2433,6 +2503,10 @@ function switchTab(tab) {
     document.getElementById('adminMeetingsView').classList.add('active');
     highlightAdminSub('admin-meetings');
     loadAdminMeetings();
+  } else if (tab === 'admin-email') {
+    document.getElementById('adminEmailView').classList.add('active');
+    highlightAdminSub('admin-email');
+    loadAdminEmail();
   }
   }
   catch(e) {
@@ -4894,16 +4968,28 @@ async function loadWorkTimeClaim() {
     html += '<div class="wt-summary-card s-absent"><div class="lbl">缺勤天数</div><div class="val">' + (ms.absentDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">排班未到且未补报</div></div>';
     html += '</div></div>';
     
-    // 个人信息表单
-    html += '<div class="section-card" style="margin-top:16px"><h3>📝 个人信息确认</h3>';
+    // 个人信息表单（v5.0：表单值在下方预填阶段从 profile 注入）
+    html += '<div class="section-card" style="margin-top:16px"><h3>📝 个人信息确认（已从「我的信息」自动填入）</h3>';
+    html += '<p style="color:#888;font-size:12px;margin-top:4px">💡 如需修改姓名/银行卡号/学号/宿舍/电话，请到侧栏「📋 我的信息」维护，保存后此页下次会自动同步。</p>';
+    html += '<div id="wtProfileBanner"></div>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px">';
     html += '<div><label style="font-size:13px;color:#666">姓名</label><input type="text" id="wtName" value="' + currentUser + '" readonly style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;background:#f5f5f5;margin-top:4px"></div>';
-    html += '<div><label style="font-size:13px;color:#666">银行账号</label><input type="text" id="wtBank" placeholder="请输入银行账号" value="' + (submission?.bankAccount || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">银行账号</label><input type="text" id="wtBank" placeholder="请先在「我的信息」中填写" value="' + (submission?.bankAccount || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
     html += '<div><label style="font-size:13px;color:#666">院系</label><input type="text" id="wtDept" value="' + (submission?.department || '岭南学院') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
-    html += '<div><label style="font-size:13px;color:#666">学号</label><input type="text" id="wtStudentId" placeholder="请输入学号" value="' + (submission?.studentId || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
-    html += '<div><label style="font-size:13px;color:#666">宿舍</label><input type="text" id="wtDorm" placeholder="请输入宿舍号" value="' + (submission?.dorm || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
-    html += '<div><label style="font-size:13px;color:#666">联系电话</label><input type="text" id="wtPhone" placeholder="请输入联系电话" value="' + (submission?.phone || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">学号</label><input type="text" id="wtStudentId" placeholder="请先在「我的信息」中填写" value="' + (submission?.studentId || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">宿舍</label><input type="text" id="wtDorm" placeholder="可选" value="' + (submission?.dorm || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
+    html += '<div><label style="font-size:13px;color:#666">联系电话</label><input type="text" id="wtPhone" placeholder="请先在「我的信息」中填写" value="' + (submission?.phone || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
     html += '</div></div>';
+
+    // v5.0：账号与通知（邮箱）
+    html += '<div class="section-card" style="margin-top:16px"><h3>📧 账号与邮件通知</h3>'
+    html += '<p style="color:#666;font-size:13px;margin-top:4px">填写邮箱后，密码重置 / 排班开启 / 申报开启 / 月度总结 都会自动发到此邮箱。</p>'
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">'
+    html += '<div><label style="font-size:13px;color:#666">邮箱</label><input type="email" id="wtEmail" placeholder="例如：zhang@163.com" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>'
+    html += '<div style="display:flex;align-items:flex-end"><button class="quick-btn quick-btn-primary" onclick="saveMemberEmail()">💾 保存邮箱</button></div>'
+    html += '</div>'
+    html += '<div id="wtEmailStatus" style="margin-top:8px;font-size:12px;color:#888">加载中…</div>'
+    html += '</div>'
 
     // 2026-07-02 新增：例会参会确认
     const meetings = wtWorkData.meetings || []
@@ -4936,11 +5022,370 @@ async function loadWorkTimeClaim() {
       html += '<button class="quick-btn quick-btn-primary" style="padding:12px 40px;font-size:16px" onclick="submitWorkTimeClaim()">提交申报</button>';
     }
     html += '</div>';
-    
+
     content.innerHTML = html;
+
+    // v5.0：异步拉取邮箱并填入（不阻塞渲染）
+    fetch(API + '/member/email?name=' + encodeURIComponent(currentUser))
+      .then(r => r.json())
+      .then(d => {
+        const statusEl = document.getElementById('wtEmailStatus')
+        const inputEl = document.getElementById('wtEmail')
+        if (!statusEl || !inputEl) return
+        if (d.ok && d.email) {
+          inputEl.value = d.email
+          statusEl.innerHTML = '<span style="color:#2e7d32">✅ 当前邮箱：' + escapeText(d.email) + '</span>'
+        } else {
+          statusEl.innerHTML = '<span style="color:#f59e0b">⚠️ 尚未填写邮箱，请补充（用于接收系统通知）</span>'
+        }
+      })
+      .catch(() => {
+        const statusEl = document.getElementById('wtEmailStatus')
+        if (statusEl) statusEl.innerHTML = '<span style="color:#999">邮箱加载失败</span>'
+      })
+
+    // v5.0：从「我的信息」profile 拉取并预填 wt 表单 + 缺项时顶部 banner 提醒
+    fetch(API + '/member/profile?name=' + encodeURIComponent(currentUser))
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) return
+        const p = d.profile || {}
+        const setVal = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v }
+        setVal('wtBank', p.bankAccount)
+        setVal('wtDept', p.department)
+        setVal('wtStudentId', p.studentId)
+        setVal('wtDorm', p.dorm)
+        setVal('wtPhone', p.phone)
+        const missing = []
+        if (!p.bankAccount) missing.push('银行账号')
+        if (!p.studentId) missing.push('学号')
+        if (!p.phone) missing.push('联系电话')
+        const banner = document.getElementById('wtProfileBanner')
+        if (banner && missing.length > 0) {
+          banner.innerHTML = '<div style="margin-top:10px;padding:12px 16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:6px;color:#92400e;font-size:13px">⚠️ 你的个人信息还没填完整（缺：' + missing.join('、') + '）。请到侧栏「📋 我的信息」完善，本页表格会自动填入。</div>'
+        }
+      })
+      .catch(() => {})
   } catch (e) {
     console.error('loadWorkTimeClaim error:', e);
     content.innerHTML = '<div class="section-card"><p style="color:#c41230;font-size:14px;text-align:center;padding:30px">加载失败，请刷新重试</p></div>';
+  }
+}
+
+// v5.0：保存个人邮箱
+async function saveMemberEmail() {
+  const input = document.getElementById('wtEmail')
+  const status = document.getElementById('wtEmailStatus')
+  if (!input || !status) return
+  const email = input.value.trim()
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    status.innerHTML = '<span style="color:#c41230">❌ 邮箱格式不正确</span>'
+    return
+  }
+  try {
+    const res = await fetch(API + '/member/email', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentUser, email })
+    })
+    const data = await res.json()
+    if (data.ok) {
+      status.innerHTML = '<span style="color:#2e7d32">✅ ' + (email ? '邮箱已保存：' + escapeText(email) : '邮箱已清空') + '</span>'
+      showToast('✅ 邮箱已保存')
+    } else {
+      status.innerHTML = '<span style="color:#c41230">❌ ' + escapeText(data.msg || '保存失败') + '</span>'
+    }
+  } catch (e) {
+    status.innerHTML = '<span style="color:#c41230">❌ 网络错误</span>'
+  }
+}
+
+// ========== v5.0 我的个人信息（独立维护页） ==========
+async function loadMyProfile() {
+  const contentEl = document.getElementById('profileContent')
+  if (!contentEl) return
+  contentEl.innerHTML = '<p style="color:#999;font-size:13px;padding:30px;text-align:center">加载中…</p>'
+  try {
+    // 同时读 profile + email
+    const [pRes, eRes] = await Promise.all([
+      fetch(API + '/member/profile?name=' + encodeURIComponent(currentUser)),
+      fetch(API + '/member/email?name=' + encodeURIComponent(currentUser)),
+    ])
+    const pData = await pRes.json()
+    const eData = await eRes.json()
+    const p = (pData.ok && pData.profile) || {}
+    const email = (eData.ok && eData.email) || ''
+    const missing = []
+    if (!p.bankAccount) missing.push('银行账号')
+    if (!p.studentId) missing.push('学号')
+    if (!p.phone) missing.push('联系电话')
+    if (!email) missing.push('邮箱')
+    const isIncomplete = missing.length > 0
+
+    let html = ''
+    if (isIncomplete) {
+      html += '<div style="padding:14px 18px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;margin-bottom:18px;color:#92400e">'
+      html += '⚠️ <b>首次使用请先完善个人信息</b>（' + missing.join('、') + ' 还没填）。完善后，每月工时申报会自动填入，无需手动输入。'
+      html += '</div>'
+    }
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
+    html += profileField('姓名', currentUser, true)
+    html += profileField('邮箱', email, false, 'email')
+    html += profileField('银行账号', p.bankAccount || '', false)
+    html += profileField('院系', p.department || '岭南学院', false)
+    html += profileField('学号', p.studentId || '', false)
+    html += profileField('宿舍', p.dorm || '', false)
+    html += profileField('联系电话', p.phone || '', false, 'tel')
+    html += '</div>'
+    html += '<div style="margin-top:18px;text-align:center"><button class="quick-btn quick-btn-primary" style="padding:12px 36px;font-size:15px" onclick="saveMyProfile()">💾 保存全部信息</button></div>'
+    html += '<div id="profileStatus" style="margin-top:10px;text-align:center;font-size:13px;color:#888"></div>'
+    contentEl.innerHTML = html
+  } catch (e) {
+    contentEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:20px;text-align:center">⚠️ 加载失败：' + escapeText(e.message || '网络错误') + '</p>'
+  }
+}
+
+function profileField(label, value, readonly, type) {
+  const id = 'pf_' + label
+  const ro = readonly ? 'readonly' : ''
+  const tp = type || 'text'
+  return '<div><label style="font-size:13px;color:#666">' + escapeText(label) + '</label>' +
+    '<input type="' + tp + '" id="' + id + '" value="' + escapeText(String(value || '')) + '" ' + ro +
+    ' style="width:100%;padding:9px;border:1.5px solid ' + (readonly ? '#e2e8f0;background:#f5f5f5' : '#d4d4d8') + ';border-radius:6px;margin-top:4px' + (readonly ? ';cursor:not-allowed' : '') + '"></div>'
+}
+
+async function saveMyProfile() {
+  const status = document.getElementById('profileStatus')
+  const v = id => (document.getElementById('pf_' + id) || {}).value || ''
+  const email = v('邮箱').trim()
+  const profile = {
+    bankAccount: v('银行账号').trim(),
+    department:  v('院系').trim() || '岭南学院',
+    studentId:   v('学号').trim(),
+    dorm:        v('宿舍').trim(),
+    phone:       v('联系电话').trim(),
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    status.innerHTML = '<span style="color:#c41230">❌ 邮箱格式不正确</span>'
+    return
+  }
+  if (!profile.bankAccount || !profile.studentId || !profile.phone) {
+    status.innerHTML = '<span style="color:#c41230">❌ 银行账号 / 学号 / 联系电话为必填</span>'
+    return
+  }
+  status.innerHTML = '<span style="color:#888">保存中…</span>'
+  try {
+    // 并行保存 profile 和 email
+    const [pRes, eRes] = await Promise.all([
+      fetch(API + '/member/profile', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: currentUser, profile })
+      }),
+      fetch(API + '/member/email', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: currentUser, email })
+      }),
+    ])
+    const pData = await pRes.json()
+    const eData = await eRes.json()
+    if (pData.ok && eData.ok) {
+      status.innerHTML = '<span style="color:#2e7d32">✅ 已保存。工时申报页会自动填入。</span>'
+      showToast('✅ 个人信息已保存')
+    } else {
+      status.innerHTML = '<span style="color:#c41230">❌ ' + escapeText((pData.msg || eData.msg || '保存失败')) + '</span>'
+    }
+  } catch (e) {
+    status.innerHTML = '<span style="color:#c41230">❌ 网络错误</span>'
+  }
+}
+
+// v5.0：发送月度总结邮件（name='all' 一键全发，否则单发）
+async function sendMonthlySummary(name) {
+  try {
+    const statusRes = await fetch(API + '/worktime-claim/status')
+    const statusData = await statusRes.json()
+    const wtc = statusData.workTimeClaim || {}
+    if (!wtc.year || !wtc.month) { showToast('当前未开启月度申报'); return }
+    const isAll = name === 'all'
+    if (isAll && !confirm('确认要给所有成员（已登记邮箱的）发送 ' + wtc.year + ' 年 ' + wtc.month + ' 月的工时总结邮件吗？')) return
+
+    showToast('📧 正在发送…（请稍候）')
+    const res = await fetch(API + '/admin/email/monthly-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year: wtc.year, month: wtc.month, name })
+    })
+    const data = await res.json()
+    if (data.ok) {
+      const f = data.failCount > 0 ? '（' + data.failCount + ' 失败）' : ''
+      showToast('✅ ' + (isAll ? '全发完成' : '已发送') + '：成功 ' + data.sentCount + ' 封' + f)
+    } else {
+      showToast('❌ ' + (data.msg || '发送失败'))
+    }
+  } catch (e) {
+    showToast('❌ 网络错误')
+  }
+}
+
+// ========== v5.0 管理员邮件配置页 ==========
+async function loadAdminEmail() {
+  // 拉一次 logs 和所有成员邮箱
+  try {
+    const logsRes = await fetch(API + '/admin/email/logs')
+    const logsData = await logsRes.json()
+    const logsEl = document.getElementById('adminEmailLogs')
+    if (logsEl && logsData.ok) {
+      const logs = logsData.logs || []
+      if (logs.length === 0) {
+        logsEl.innerHTML = '<p style="color:#999;font-size:13px;padding:14px;text-align:center">暂无发送记录</p>'
+      } else {
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f8f9fa;position:sticky;top:0"><th style="padding:6px 10px;text-align:left">时间</th><th style="padding:6px 10px;text-align:left">收件人</th><th style="padding:6px 10px;text-align:left">主题</th><th style="padding:6px 10px;text-align:center;width:80px">状态</th></tr></thead><tbody>'
+        logs.slice(0, 50).forEach(l => {
+          const okBg = l.status === 'ok' ? '#d1fae5' : l.status === 'fail' ? '#fee2e2' : '#fef9c3'
+          const okTxt = l.status === 'ok' ? '✅ 成功' : l.status === 'fail' ? '❌ 失败' : '⏳ 发送中'
+          html += '<tr style="border-bottom:1px solid #f0f0f0">'
+          html += '<td style="padding:6px 10px;color:#666">' + escapeText(l.at || '') + '</td>'
+          html += '<td style="padding:6px 10px">' + escapeText(l.to || '') + '</td>'
+          html += '<td style="padding:6px 10px;color:#444">' + escapeText((l.subject || '').slice(0, 40)) + '</td>'
+          html += '<td style="padding:6px 10px;text-align:center;background:' + okBg + '">' + okTxt + (l.error ? '<br><span style="color:#dc2626;font-size:11px">' + escapeText(l.error.slice(0, 40)) + '</span>' : '') + '</td>'
+          html += '</tr>'
+        })
+        html += '</tbody></table>'
+        logsEl.innerHTML = html
+      }
+    }
+    // 读 members + emails —— 通过 /api/schedule-all（含 confirmedPeriods/current.schedule）+ 全 member 列表
+    // 为简化：直接拉成员邮件通过新接口（用 /api/members）—— 但项目没有该接口。复用 adminWorktime 那边抓的
+    const statusRes = await fetch(API + '/worktime-claim/status')
+    const statusData = await statusRes.json()
+    const ccfgEl = document.getElementById('adminEmailConfig')
+    const mbrEl = document.getElementById('adminEmailMembers')
+    if (ccfgEl) {
+      ccfgEl.innerHTML = '<table style="font-size:13px"><tr><td style="padding:4px 12px;color:#666">SMTP 服务器</td><td style="padding:4px 12px"><code>smtp.163.com:465</code> （SSL）</td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">发件人</td><td style="padding:4px 12px"><code>lnxyxgbss@163.com</code></td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">授权码</td><td style="padding:4px 12px;color:#2e7d32"><code>●●●●●●●●●● (已配置，从服务端 .env 或默认值读取)</code></td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">发件人名称</td><td style="padding:4px 12px">中山大学岭南学院学工办</td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">触发场景</td><td style="padding:4px 12px">密码重置 · 排班开启 · 申报开启 · 月度总结</td></tr></table>'
+        + '<p style="margin-top:8px;color:#888;font-size:12px">⚠️ 授权码只在服务端代码 / 环境变量中保存，前端无法修改。如需更换发件邮箱请修改 server.js 顶部 SMTP_* 常量并重启服务。</p>'
+    }
+    if (mbrEl) {
+      // 通过 schedule-all 拉成员
+      const schedRes = await fetch(API + '/schedule-all')
+      const schedData = await schedRes.json()
+      const pwdRes = await fetch(API + '/admin/passwords')
+      const pwdData = await pwdRes.json()
+      const names = Object.keys((pwdData && pwdData.passwords) || {})
+      // 读所有成员邮箱：用 wd 已有工时申报 all 间接拿到 all members，但获取各自 email 还是得循环
+      // 为快速，利用已知:  members  =  pwdData 里的 keys（管理员加进去的成员 + DEFAULT_MEMBERS 中存在 store.members）
+      // 再单独拉每个的 email：循环 N 个请求会很多；做个 /api/admin/email/list 一次性取
+      // 但节约时间，用 /api/schedule-all + 假定 store.members 已读：注意 store.members 由 server.js 管
+      const membersRes = await fetch(API + '/admin/email/members').catch(() => null)
+      let emailMap = {}
+      if (membersRes) {
+        const md = await membersRes.json()
+        if (md.ok) emailMap = md.emails || {}
+      }
+      if (Object.keys(emailMap).length === 0) {
+        // 兜底：让每行手动输入（提供 inline 编辑）
+        mbrEl.innerHTML = '<p style="color:#999;font-size:13px;padding:14px">暂无成员邮箱数据。请在下方表格直接编辑——姓名后输入邮箱后单击「保存」。</p>'
+        mbrEl.innerHTML += '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f5f0"><th style="padding:6px 10px;text-align:left">姓名</th><th style="padding:6px 10px;text-align:left">邮箱</th><th style="padding:6px 10px;text-align:center;width:100px">操作</th></tr></thead><tbody>'
+        names.forEach(n => {
+          mbrEl.innerHTML += '<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 10px">' + escapeText(n) + '</td><td style="padding:6px 10px"><input type="email" id="memail_' + n + '" style="width:100%;padding:6px;border:1px solid #d4d4d8;border-radius:4px"></td><td style="padding:6px 10px;text-align:center"><button class="admin-btn" style="background:#5C6BC0;color:#fff;padding:4px 12px" onclick="adminSaveMemberEmail(\'' + escapeText(n).replace(/'/g, "\\'") + '\')">保存</button></td></tr>'
+        })
+        mbrEl.innerHTML += '</tbody></table>'
+      } else {
+        let t = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f5f0"><th style="padding:6px 10px;text-align:left">姓名</th><th style="padding:6px 10px;text-align:left">邮箱</th><th style="padding:6px 10px;text-align:center;width:100px">操作</th></tr></thead><tbody>'
+        names.forEach(n => {
+          const cur = emailMap[n] || ''
+          t += '<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 10px">' + escapeText(n) + '</td><td style="padding:6px 10px"><input type="email" id="memail_' + n + '" value="' + escapeText(cur) + '" style="width:100%;padding:6px;border:1px solid #d4d4d8;border-radius:4px"></td><td style="padding:6px 10px;text-align:center"><button class="admin-btn" style="background:#5C6BC0;color:#fff;padding:4px 12px" onclick="adminSaveMemberEmail(\'' + escapeText(n).replace(/'/g, "\\'") + '\')">保存</button></td></tr>'
+        })
+        t += '</tbody></table>'
+        mbrEl.innerHTML = t
+      }
+    }
+  } catch (e) {
+    console.error('loadAdminEmail error:', e)
+  }
+}
+
+async function adminSaveMemberEmail(name) {
+  const input = document.getElementById('memail_' + name)
+  if (!input) return
+  const email = input.value.trim()
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('❌ ' + name + ' 邮箱格式不正确'); return }
+  try {
+    const res = await fetch(API + '/member/email', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    })
+    const d = await res.json()
+    if (d.ok) showToast('✅ 已保存 ' + name + (email ? '：' + email : '（清空）'))
+    else showToast('❌ ' + (d.msg || '失败'))
+  } catch (e) { showToast('❌ 网络错误') }
+}
+
+async function adminSendTestEmail() {
+  const to = document.getElementById('adminEmailTestTo').value.trim()
+  const result = document.getElementById('adminEmailTestResult')
+  if (!to) { result.innerHTML = '<span style="color:#c41230">请填写收件人</span>'; return }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { result.innerHTML = '<span style="color:#c41230">邮箱格式不对</span>'; return }
+  result.innerHTML = '<span style="color:#888">正在发送…</span>'
+  try {
+    const res = await fetch(API + '/admin/email/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to })
+    })
+    const data = await res.json()
+    if (data.ok) result.innerHTML = '<span style="color:#2e7d32">✅ 发送成功！messageId=' + escapeText(data.info && data.info.messageId || '') + '</span>'
+    else result.innerHTML = '<span style="color:#c41230">❌ ' + escapeText(data.error || '失败') + '</span>'
+  } catch (e) {
+    result.innerHTML = '<span style="color:#c41230">❌ 网络错误</span>'
+  }
+}
+
+// ========== v5.0 我的荣誉墙 ==========
+async function loadMyAchievements() {
+  const contentEl = document.getElementById('achievementsContent')
+  if (!contentEl) return
+  contentEl.innerHTML = '<p style="color:#999;font-size:13px;padding:30px;text-align:center">加载中…</p>'
+  try {
+    const res = await fetch(API + '/member/achievements?name=' + encodeURIComponent(currentUser))
+    const data = await res.json()
+    if (!data.ok) throw new Error(data.msg || '加载失败')
+    const list = data.achievements || []
+    // 按月份倒序 + 称号去重优先
+    list.sort((a, b) => (b.year - a.year) || (b.month - a.month))
+
+    if (list.length === 0) {
+      contentEl.innerHTML = '<div style="text-align:center;padding:60px 20px;background:#fafafa;border-radius:12px"><div style="font-size:48px;margin-bottom:12px">🌱</div><div style="font-size:16px;color:#666;margin-bottom:8px">荣誉墙还空空的呢</div><div style="color:#888;font-size:13px">完成更多排班，参加例会，下次再见就有勋章啦 ✨</div></div>'
+      return
+    }
+    // 按月份分组
+    const groups = {}
+    list.forEach(a => {
+      const k = a.year + ' 年 ' + a.month + ' 月'
+      if (!groups[k]) groups[k] = []
+      groups[k].push(a)
+    })
+    let html = ''
+    Object.keys(groups).forEach(monthLabel => {
+      const items = groups[monthLabel]
+      html += '<div style="margin-bottom:24px">'
+      html += '<h3 style="color:#8B1A1A;font-size:16px;margin-bottom:12px">📅 ' + monthLabel + '</h3>'
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">'
+      items.forEach(a => {
+        html += '<div style="padding:18px;background:linear-gradient(135deg,#faf6ff,#fce7f3);border:1px solid #e9d5ff;border-radius:12px;text-align:center">'
+        html += '<div style="font-size:48px;line-height:1;margin-bottom:8px">' + a.icon + '</div>'
+        html += '<div style="font-size:15px;font-weight:700;color:#7c3aed;margin-bottom:4px">' + escapeText(a.name) + '</div>'
+        html += '<div style="font-size:12px;color:#666;line-height:1.5">' + escapeText(a.desc) + '</div>'
+        html += '</div>'
+      })
+      html += '</div></div>'
+    })
+    html += '<div style="text-align:center;padding:16px;color:#999;font-size:13px;border-top:1px solid #eef0f3;margin-top:12px">共 ' + list.length + ' 项荣誉 · ' + Object.keys(groups).length + ' 个月</div>'
+    contentEl.innerHTML = html
+  } catch (e) {
+    contentEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:20px;text-align:center">⚠️ 加载失败：' + escapeText(e.message || '未知错误') + '</p>'
   }
 }
 
@@ -5300,7 +5745,17 @@ async function loadAdminWorktime() {
       html += '<button class="quick-btn quick-btn-primary" onclick="toggleWorkTimeClaim(true)">开启申报</button>';
     }
     html += '</div></div>';
-    
+
+    // v5.0：邮件工具栏
+    if (wtc.year && wtc.month) {
+      html += '<div class="section-card" style="margin-top:16px;background:linear-gradient(135deg,#faf6ff,#fce7f3)"><h3>📧 月度总结邮件</h3>'
+      html += '<p style="color:#666;font-size:13px;margin-top:6px">每月申报结束后，给已申报成员自动发送当月工时与荣誉总结。可逐位发也可一键全发。</p>'
+      html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
+      html += '<button class="quick-btn quick-btn-primary" onclick="sendMonthlySummary(\'all\')">🚀 一键全发（含荣誉）</button>'
+      html += '<span style="color:#888;font-size:12px;align-self:center">目标月份：<b>' + wtc.year + ' 年 ' + wtc.month + ' 月</b></span>'
+      html += '</div></div>'
+    }
+
     // 成员申报统计表
     html += '<div class="section-card" style="margin-top:16px"><h3>📋 成员申报统计</h3>';
     
@@ -5331,7 +5786,8 @@ async function loadAdminWorktime() {
         // 查看明细：显示该成员每日工时/补报内容（用于排查统计异常）
         html += '<button class="quick-btn" style="background:#5C6BC0;color:#fff;padding:4px 10px;font-size:12px;margin-right:6px" onclick="showAdminMemberDetail(\'' + safeName + '\')">🔍 查看明细</button>';
         if (s.submitted) {
-          html += '<button class="quick-btn quick-btn-primary" onclick="exportAttendanceDocx(\'' + safeName + '\')" style="padding:4px 12px;font-size:12px">📄 导出考勤表</button>';
+          html += '<button class="quick-btn quick-btn-primary" onclick="exportAttendanceDocx(\'' + safeName + '\')" style="padding:4px 12px;font-size:12px;margin-right:6px">📄 导出考勤表</button>';
+          html += '<button class="quick-btn" style="background:#8b5cf6;color:#fff;padding:4px 12px;font-size:12px" onclick="sendMonthlySummary(\'' + safeName + '\')">📧 发月度总结</button>';
         }
         html += '</td>';
         html += '</tr>';
