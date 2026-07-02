@@ -2129,7 +2129,13 @@ body {
         <!-- 补签退审核 -->
         <div class="admin-section">
           <h3 style="color:#8B1A1A;font-size:16px;margin-bottom:12px">📝 补签退申请</h3>
-          <button class="admin-btn" onclick="loadSuppCheckouts()" style="margin-bottom:10px">刷新列表</button>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+            <button class="admin-btn" onclick="loadSuppCheckouts()">刷新列表</button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#666;cursor:pointer">
+              <input type="checkbox" id="suppShowAll" onchange="loadSuppCheckouts()" style="width:16px;height:16px;cursor:pointer">
+              显示已处理 (approved/rejected)
+            </label>
+          </div>
           <div id="suppCheckoutList" style="margin-top:10px"><p style="color:#999;font-size:13px">点击"刷新列表"加载补签退申请</p></div>
         </div>
       </div>
@@ -2141,6 +2147,9 @@ body {
           <p class="page-subtitle">审核成员提交的额外工作时间补报申请</p>
         </div>
         <div class="admin-section">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+            <button class="admin-btn primary" onclick="loadAdminOvertime()">🔄 刷新列表</button>
+          </div>
           <div id="adminOtList"><p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无补报申请</p></div>
         </div>
       </div>
@@ -2249,7 +2258,11 @@ async function loadSuppCheckouts() {
     var list = data.list || [];
     var container = document.getElementById('suppCheckoutList');
     if (!container) return;
-    if (list.length === 0) { container.innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px">暂无补签退申请</p>'; return; }
+    // 2026-07-02：默认只显示待审核（pending），勾选"显示已处理"才显示全部
+    var showAllEl = document.getElementById('suppShowAll');
+    var showAll = !!(showAllEl && showAllEl.checked);
+    if (!showAll) list = list.filter(function(it) { return it.status === 'pending' });
+    if (list.length === 0) { container.innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px">' + (showAll ? '暂无补签退申请' : '暂无待审核补签退申请 ✓ （勾选"显示已处理"可看历史）') + '</p>'; return; }
     var html = '<div style="display:flex;flex-direction:column;gap:10px">';
     list.forEach(function(item) {
       var statusBadge = '', actions = '';
@@ -2260,7 +2273,7 @@ async function loadSuppCheckouts() {
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-weight:700;font-size:14px;color:#8B1A1A">' + item.name + '</span>' + statusBadge + '<span style="margin-left:auto;font-size:11px;color:#aaa">' + item.date + ' ' + item.time + '</span></div>';
       if (item.reason) html += '<div style="font-size:12px;color:#666;margin-bottom:4px">备注：' + item.reason.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
       if (item.comment) html += '<div style="font-size:11px;color:#888;margin-top:2px">审核意见：' + item.comment.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
-      if (item.reviewedAt) html += '<div style="font-size:11px;color:#aaa;margin-top:2px">审核时间：' + item.reviewedAt.slice(0,16).replace('T',' ') + '</div>';
+      if (item.reviewedAt) html += '<div style="font-size:11px;color:#aaa;margin-top:2px">审核时间：' + formatSubmittedAt(item.reviewedAt) + '</div>';
       html += actions + '</div>';
     });
     html += '</div>'; container.innerHTML = html;
