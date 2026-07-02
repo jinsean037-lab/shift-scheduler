@@ -56,8 +56,12 @@ function defaultStore() {
       year: null,
       month: null,
       isOpen: false,
-      submissions: {} // { '王梓豪': { name, bankAccount, department, studentId, dorm, phone, totalHours, totalPay, submittedAt } }
+      submissions: {} // { '王梓豪': { name, bankAccount, department, studentId, dorm, phone, totalHours, totalPay, submittedAt, meetingsAttended } }
     },
+    // 2026-07-02 新增：每周例会定义（按月键存储）
+    // { '2026-07': { weeks: [{ week: 1, date: '2026-07-08', hours: 0.5 }, ...] } }
+    // hours=0 表示本次例会无工时但仍然显示在成员勾选列表里
+    meetings: {},
     // 值班搭子留言
     partnerMessages: [],
   suppCheckouts: [],
@@ -1783,6 +1787,77 @@ app.post('/api/cancel-waitlist', async (req, res) => {
 // ========== 工时申报 API ==========
 
 // 管理员：开启/关闭本月工时申报
+// ========== 2026-07-02 新增：每月例会管理 ==========
+// 管理员：获取指定年月的例会定义
+app.get('/api/admin/meetings', async (req, res) => {
+  try {
+    const year = parseInt(req.query.year)
+    const month = parseInt(req.query.month)
+    if (!year || !month) return res.status(400).json({ ok: false, msg: '缺少year/month参数' })
+    const store = await readStore()
+    const key = `${year}-${String(month).padStart(2, '0')}`
+    const weeks = (store.meetings && store.meetings[key] && store.meetings[key].weeks) || []
+    res.json({ ok: true, year, month, weeks })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：保存指定年月的例会定义（替换式，weeks 必传）
+// body: { year, month, weeks: [{ week: 1, date: '2026-07-08', hours: 0.5 }, ...] }
+app.post('/api/admin/meetings', async (req, res) => {
+  try {
+    const { year, month, weeks } = req.body || {}
+    if (!year || !month) return res.status(400).json({ ok: false, msg: '缺少year/month参数' })
+    if (!Array.isArray(weeks)) return res.status(400).json({ ok: false, msg: 'weeks 必须为数组' })
+    
+    const store = await readStore()
+    if (!store.meetings) store.meetings = {}
+    const key = `${year}-${String(month).padStart(2, '0')}`
+    
+    // 兜底清洗：丢掉非法条目（week 缺失/date 非 YYYY-MM-DD/hours 非有限数）
+    const cleaned = weeks
+      .filter(w => w && typeof w.week === 'number' && w.week >= 1)
+      .map(w => ({
+        week: w.week,
+        date: (typeof w.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.date)) ? w.date : null,
+        hours: (typeof w.hours === 'number' && isFinite(w.hours) && w.hours >= 0) ? Math.round(w.hours * 2) / 2 : 0,
+      }))
+      .filter(w => w.date)
+      .sort((a, b) => a.week - b.week)
+    
+    store.meetings[key] = { year, month, weeks: cleaned }
+    await writeStore({ meetings: store.meetings })
+    res.json({ ok: true, msg: '例会设置已保存', year, month, weeks: cleaned })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：获取指定年月的例会定义（同时返回当前已提交的参会状态，便于 UI 渲染回显）
+app.get('/api/meetings', async (req, res) => {
+  try {
+    const year = parseInt(req.query.year)
+    const month = parseInt(req.query.month)
+    const name = req.query.name
+    if (!year || !month) return res.status(400).json({ ok: false, msg: '缺少year/month参数' })
+    
+    const store = await readStore()
+    const key = `${year}-${String(month).padStart(2, '0')}`
+    const weeks = (store.meetings && store.meetings[key] && store.meetings[key].weeks) || []
+    
+    let attended = {}
+    if (name) {
+      const sub = ((store.workTimeClaim && store.workTimeClaim.submissions) || {})[name]
+      if (sub && sub.meetingsAttended) attended = sub.meetingsAttended
+    }
+    
+    res.json({ ok: true, year, month, weeks, attended })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 app.post('/api/admin/worktime-claim/toggle', async (req, res) => {
   try {
     const { year, month, isOpen } = req.body
@@ -1851,7 +1926,7 @@ app.get('/api/worktime-claim/my-data', async (req, res) => {
 // 成员：提交工时申报
 app.post('/api/worktime-claim/submit', async (req, res) => {
   try {
-    const { name, bankAccount, department, studentId, dorm, phone } = req.body
+    const { name, bankAccount, department, studentId, dorm, phone, meetingsAttended } = req.body
     if (!name) return res.status(400).json({ ok: false, msg: '缺少name参数' })
     
     const store = await readStore()
@@ -1864,6 +1939,18 @@ app.post('/api/worktime-claim/submit', async (req, res) => {
     // 计算工时
     const workData = calculateMemberWorkTime(store, name, wtc.year, wtc.month)
     
+    // 清洗例会参会勾选：只接受 { week: bool } 结构，丢掉非数字 key
+    let sanitizedMeetings = {}
+    if (meetingsAttended && typeof meetingsAttended === 'object') {
+      const monthKey = `${wtc.year}-${String(wtc.month).padStart(2, '0')}`
+      const monthMeetings = (store.meetings && store.meetings[monthKey] && store.meetings[monthKey].weeks) || []
+      const validWeeks = new Set(monthMeetings.map(m => m.week))
+      Object.entries(meetingsAttended).forEach(([k, v]) => {
+        const wk = parseInt(k)
+        if (validWeeks.has(wk)) sanitizedMeetings[wk] = !!v
+      })
+    }
+    
     // 保存提交
     wtc.submissions[name] = {
       name,
@@ -1875,6 +1962,7 @@ app.post('/api/worktime-claim/submit', async (req, res) => {
       totalHours: workData.totalHours,
       totalPay: workData.totalPay,
       workDays: workData.workDays,
+      meetingsAttended: sanitizedMeetings,
       submittedAt: new Date().toISOString()
     }
     
@@ -2186,7 +2274,19 @@ function calculateMemberWorkTime(store, name, year, month) {
     d.finalHours = d.hours // 已按次向上取整
     totalHours += d.hours
   })
-  
+
+  // 2026-07-02 新增：把本月例会参会工时叠加进 totalHours
+  // 例会参会数据来自 submissions[name].meetingsAttended（成员自己勾的）
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`
+  const monthMeetings = (store.meetings && store.meetings[monthKey] && store.meetings[monthKey].weeks) || []
+  const submissionForTotal = (store.workTimeClaim && store.workTimeClaim.submissions && store.workTimeClaim.submissions[name]) || null
+  const meetingsAttendedForTotal = (submissionForTotal && submissionForTotal.meetingsAttended) || {}
+  let meetingHoursTotal = 0
+  monthMeetings.forEach(m => {
+    if (meetingsAttendedForTotal[m.week]) meetingHoursTotal += (m.hours || 0)
+  })
+  totalHours += meetingHoursTotal
+
   const totalPay = parseFloat((totalHours * 25).toFixed(1))
   
   // ========== 构建每日明细（用于日历展示）==========
@@ -2294,13 +2394,24 @@ function calculateMemberWorkTime(store, name, year, month) {
     })
   }
   
+  // 2026-07-02 新增：例会列表（带成员的参会状态，便于 UI 一并渲染）
+  // 复用上面 totalHours 计算时已经取过的 monthMeetings + meetingsAttendedForTotal
+  const meetings = monthMeetings.map(m => ({
+    week: m.week,
+    date: m.date,
+    hours: m.hours,
+    attended: !!meetingsAttendedForTotal[m.week],
+    attendedHours: meetingsAttendedForTotal[m.week] ? (m.hours || 0) : 0
+  }))
+
   return {
     totalHours,
     totalPay,
     workByDate,
     workDays: Object.keys(workByDate).length,
     daily,
-    monthSummary: { completedDays: completedCount, incompleteDays: incompleteCount, overtimeDays: overtimeCount, absentDays: absentCount, daysInMonth }
+    monthSummary: { completedDays: completedCount, incompleteDays: incompleteCount, overtimeDays: overtimeCount, absentDays: absentCount, daysInMonth },
+    meetings,
   }
 }
 
