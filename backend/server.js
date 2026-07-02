@@ -505,6 +505,14 @@ function getBeijingDateString() {
   return new Date(beijingMs).toISOString().slice(0, 10)
 }
 
+// 2026-07-02 新增：返回 Beijing 时间的 "YYYY-MM-DD HH:MM:SS" 字符串（用于 submittedAt 等展示字段）
+function getBeijingDateTimeString(date) {
+  const d = date instanceof Date ? date : new Date()
+  const beijingMs = d.getTime() + 8 * 3600 * 1000
+  const bj = new Date(beijingMs)
+  return bj.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 function isDateInSchedulePeriod(store, dateStr) {
   if (!store.scheduleStart || !store.scheduleEnd || !dateStr) return false
   const start = String(store.scheduleStart).slice(0, 10)
@@ -1963,7 +1971,7 @@ app.post('/api/worktime-claim/submit', async (req, res) => {
       totalPay: workData.totalPay,
       workDays: workData.workDays,
       meetingsAttended: sanitizedMeetings,
-      submittedAt: new Date().toISOString()
+      submittedAt: getBeijingDateTimeString()
     }
     
     store.workTimeClaim = wtc
