@@ -1755,6 +1755,11 @@ body {
             <span>💼 工时申报</span>
           </a>
           <a class="nav-subitem" data-page="admin-monthly" onclick="switchTab('admin-monthly')">
+            月度统计
+          </a>
+          <a class="nav-subitem" data-page="admin-meetings" onclick="switchTab('admin-meetings')">
+            例会设置
+          </a>
             <span>📊 本月值班</span>
           </a>
         </div>
@@ -2193,6 +2198,29 @@ body {
 
       <!-- 保留旧 adminView 作为兼容（隐藏不用） -->
       <div class="page-view" id="adminView" style="display:none"></div>
+
+      <!-- 管理子页面：例会设置 -->
+      <div class="page-view" id="adminMeetingsView">
+        <div class="page-title-row">
+          <h2>📅 每月例会设置</h2>
+          <p class="page-subtitle">为每月每次例会单独设置时长（单位：小时，支持 0.5 步进）。成员在工时申报时可勾选"已参会"。</p>
+        </div>
+        <div class="admin-section">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="admin-btn" onclick="loadAdminMeetings(-1)">◀ 上一月</button>
+            <span id="adminMeetingsLabel" style="font-size:16px;font-weight:700;color:var(--primary);min-width:120px;text-align:center">加载中…</span>
+            <button class="admin-btn" onclick="loadAdminMeetings(1)">下一月 ▶</button>
+            <button class="admin-btn" onclick="addMeetingRow()">➕ 添加一周</button>
+            <button class="admin-btn primary" onclick="saveAdminMeetings()">💾 保存</button>
+          </div>
+        </div>
+        <div class="admin-section">
+          <h3>例会列表</h3>
+          <div id="adminMeetingsList">
+            <p style="color:#999;font-size:13px;padding:20px;text-align:center">加载中…</p>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </div>
@@ -2387,6 +2415,10 @@ function switchTab(tab) {
     document.getElementById('adminMonthlyView').classList.add('active');
     highlightAdminSub('admin-monthly');
     loadAdminMonthly();
+  } else if (tab === 'admin-meetings') {
+    document.getElementById('adminMeetingsView').classList.add('active');
+    highlightAdminSub('admin-meetings');
+    loadAdminMeetings();
   }
   }
   catch(e) {
@@ -4824,7 +4856,30 @@ async function loadWorkTimeClaim() {
     html += '<div><label style="font-size:13px;color:#666">宿舍</label><input type="text" id="wtDorm" placeholder="请输入宿舍号" value="' + (submission?.dorm || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
     html += '<div><label style="font-size:13px;color:#666">联系电话</label><input type="text" id="wtPhone" placeholder="请输入联系电话" value="' + (submission?.phone || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
     html += '</div></div>';
-    
+
+    // 2026-07-02 新增：例会参会确认
+    const meetings = wtWorkData.meetings || []
+    if (meetings.length > 0) {
+      html += '<div class="section-card" style="margin-top:16px"><h3>📅 本月例会参会确认</h3>'
+      html += '<p style="color:#666;font-size:13px;margin-top:6px">勾选你实际参加的例会，不参会不扣工时（按管理员设定的时长计算）。</p>'
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px">'
+      meetings.forEach(m => {
+        const checked = m.attended ? 'checked' : ''
+        const bgColor = m.attended ? '#f0fdf4' : '#fff'
+        html += '<label style="display:flex;align-items:center;gap:10px;padding:12px;border:1.5px solid ' + (m.attended ? '#22c55e' : '#e2e8f0') + ';border-radius:8px;cursor:pointer;background:' + bgColor + '">'
+        html += '<input type="checkbox" class="wt-meet-chk" data-week="' + m.week + '" ' + checked + ' style="width:18px;height:18px;accent-color:#22c55e;cursor:pointer">'
+        html += '<div style="flex:1">'
+        html += '<div style="font-weight:600;font-size:14px">第 ' + m.week + ' 周例会 · ' + m.date + '</div>'
+        html += '<div style="color:#666;font-size:12px;margin-top:2px">时长 ' + m.hours + ' 小时' + (m.attended ? ' · ✅ 已计入' : ' · 未参会不计') + '</div>'
+        html += '</div></label>'
+      })
+      html += '</div>'
+      // 实时汇总
+      const meetingHoursTotal = meetings.filter(m => m.attended).reduce((s, m) => s + (m.hours || 0), 0)
+      html += '<div style="margin-top:12px;padding:10px 14px;background:#f0f9ff;border-radius:6px;color:#0c4a6e;font-size:13px">已勾选 ' + meetings.filter(m => m.attended).length + ' / ' + meetings.length + ' 次例会，参会工时合计 <b>' + meetingHoursTotal.toFixed(1) + ' 小时</b></div>'
+      html += '</div>'
+    }
+
     // 提交按钮
     html += '<div style="margin-top:20px;text-align:center">';
     if (submission) {
@@ -5009,17 +5064,24 @@ async function submitWorkTimeClaim() {
   const studentId = document.getElementById('wtStudentId').value.trim();
   const dorm = document.getElementById('wtDorm').value.trim();
   const phone = document.getElementById('wtPhone').value.trim();
-  
+
   if (!bankAccount || !studentId || !phone) {
     showToast('请填写完整信息（银行账号、学号、联系电话为必填）');
     return;
   }
-  
+
+  // 2026-07-02 新增：收集本月例会参会勾选
+  const meetingsAttended = {}
+  document.querySelectorAll('.wt-meet-chk').forEach(cb => {
+    const wk = parseInt(cb.dataset.week)
+    if (!isNaN(wk)) meetingsAttended[wk] = cb.checked
+  })
+
   try {
     const res = await fetch(API + '/worktime-claim/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: currentUser, bankAccount, department, studentId, dorm, phone })
+      body: JSON.stringify({ name: currentUser, bankAccount, department, studentId, dorm, phone, meetingsAttended })
     });
     const data = await res.json();
     if (data.ok) {
@@ -5286,6 +5348,123 @@ const SHIFT_STATUS_META = {
   missed:         { color: '#f8d7da', text: '#721c24', label: '✗ 缺勤'   },
   pending:        { color: '#e2e3e5', text: '#383d41', label: '⌛ 未到'   }
 };
+
+// ========== 2026-07-02 新增：管理员例会设置 ==========
+let _adminMeetingsState = { year: null, month: null }
+
+async function loadAdminMeetings(monthDelta) {
+  if (monthDelta && _adminMeetingsState.year) {
+    const d = new Date(_adminMeetingsState.year, _adminMeetingsState.month - 1 + monthDelta, 1)
+    _adminMeetingsState.year = d.getFullYear()
+    _adminMeetingsState.month = d.getMonth() + 1
+  } else if (!_adminMeetingsState.year) {
+    const now = new Date()
+    _adminMeetingsState.year = now.getFullYear()
+    _adminMeetingsState.month = now.getMonth() + 1
+  }
+  const { year, month } = _adminMeetingsState
+  const label = document.getElementById('adminMeetingsLabel')
+  if (label) label.textContent = year + ' 年 ' + month + ' 月'
+  const listEl = document.getElementById('adminMeetingsList')
+  if (!listEl) return
+  listEl.innerHTML = '<p style="color:#999;font-size:13px;padding:20px;text-align:center">加载中…</p>'
+  try {
+    const res = await fetch(API + '/admin/meetings?year=' + year + '&month=' + month)
+    const data = await res.json()
+    if (!data.ok) throw new Error(data.msg || '加载失败')
+    renderAdminMeetingsRows(data.weeks || [])
+  } catch (e) {
+    console.error('loadAdminMeetings error:', e)
+    listEl.innerHTML = '<p style="color:#c41230;padding:16px;text-align:center">⚠️ 加载失败: ' + (e.message || '网络错误') + '</p>'
+  }
+}
+
+function renderAdminMeetingsRows(weeks) {
+  const listEl = document.getElementById('adminMeetingsList')
+  if (!listEl) return
+  // 如果完全空就给一行占位（让用户能直接填）
+  const rows = weeks.length ? weeks.slice() : []
+  if (rows.length === 0) rows.push({ week: 1, date: '', hours: 1 })
+  rows.sort((a, b) => a.week - b.week)
+  let html = '<table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden">'
+  html += '<thead><tr style="background:var(--primary);color:#fff">'
+  html += '<th style="padding:10px;text-align:center;width:80px">周次</th>'
+  html += '<th style="padding:10px;text-align:center">例会日期</th>'
+  html += '<th style="padding:10px;text-align:center;width:120px">工时(h)</th>'
+  html += '<th style="padding:10px;text-align:center;width:80px">操作</th>'
+  html += '</tr></thead><tbody>'
+  rows.forEach((r, idx) => {
+    html += '<tr style="border-bottom:1px solid #eef0f3">'
+    html += '<td style="padding:8px;text-align:center"><input type="number" min="1" max="6" value="' + (r.week || (idx + 1)) + '" data-field="week" data-idx="' + idx + '" style="width:60px;padding:6px;text-align:center;border:1px solid #d4d4d8;border-radius:4px"></td>'
+    html += '<td style="padding:8px;text-align:center"><input type="date" value="' + (r.date || '') + '" data-field="date" data-idx="' + idx + '" style="padding:6px;border:1px solid #d4d4d8;border-radius:4px"></td>'
+    html += '<td style="padding:8px;text-align:center"><input type="number" min="0" max="8" step="0.5" value="' + (r.hours != null ? r.hours : 1) + '" data-field="hours" data-idx="' + idx + '" style="width:80px;padding:6px;text-align:center;border:1px solid #d4d4d8;border-radius:4px"></td>'
+    html += '<td style="padding:8px;text-align:center"><button onclick="removeMeetingRow(' + idx + ')" style="background:#fee2e2;color:#dc2626;border:none;padding:4px 10px;border-radius:4px;cursor:pointer">删除</button></td>'
+    html += '</tr>'
+  })
+  html += '</tbody></table>'
+  html += '<p style="color:#888;font-size:12px;margin-top:10px">说明：填 0 即可表示"该周无例会/取消"，时长只算参会成员的。可删除多余的行。</p>'
+  listEl.innerHTML = html
+}
+
+function addMeetingRow() {
+  const listEl = document.getElementById('adminMeetingsList')
+  if (!listEl) return
+  const inputs = listEl.querySelectorAll('input[data-field="week"]')
+  let nextWeek = 1
+  inputs.forEach(inp => { const v = parseInt(inp.value); if (v >= nextWeek) nextWeek = v + 1 })
+  // 默认新行追加到末尾：复用当前 render 重新画
+  const weeks = collectMeetingRows()
+  weeks.push({ week: nextWeek, date: '', hours: 1 })
+  renderAdminMeetingsRows(weeks)
+}
+
+function removeMeetingRow(idx) {
+  const weeks = collectMeetingRows()
+  weeks.splice(idx, 1)
+  renderAdminMeetingsRows(weeks)
+}
+
+function collectMeetingRows() {
+  const listEl = document.getElementById('adminMeetingsList')
+  if (!listEl) return []
+  const rows = []
+  listEl.querySelectorAll('tbody tr').forEach(tr => {
+    const week = parseInt(tr.querySelector('input[data-field="week"]').value)
+    const date = tr.querySelector('input[data-field="date"]').value || ''
+    const hours = parseFloat(tr.querySelector('input[data-field="hours"]').value)
+    rows.push({ week, date, hours: isFinite(hours) ? hours : 0 })
+  })
+  return rows
+}
+
+async function saveAdminMeetings() {
+  const weeks = collectMeetingRows()
+  // 过滤掉有空日期的（避免脏数据）
+  const filtered = weeks.filter(w => w.date && /^\d{4}-\d{2}-\d{2}$/.test(w.date))
+  if (filtered.length === 0) { showToast('请至少填一个有效的例会日期'); return }
+  // week 去重，避免同 week 两个
+  const seenWeek = new Set()
+  for (const w of filtered) {
+    if (seenWeek.has(w.week)) { showToast('周次不能重复（第 ' + w.week + ' 周已有记录）'); return }
+    seenWeek.add(w.week)
+  }
+  try {
+    const res = await fetch(API + '/admin/meetings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year: _adminMeetingsState.year, month: _adminMeetingsState.month, weeks: filtered })
+    })
+    const data = await res.json()
+    if (data.ok) {
+      showToast('✅ 例会设置已保存（' + data.weeks.length + ' 条）')
+      renderAdminMeetingsRows(data.weeks)
+    } else {
+      showToast(data.msg || '保存失败')
+    }
+  } catch (e) {
+    showToast('网络错误')
+  }
+}
 
 async function loadAdminMonthly(monthDelta) {
   // 首次进入：取服务器时间（避免本地时间错位），后续可前后翻月
