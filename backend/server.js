@@ -1228,8 +1228,27 @@ const SLOT_HOURS = {
   pm2: 1.5,  // 16:00-17:30
 }
 
+// 2026-07-02 v3：每个 slot 的标准时段（分钟数），用于多 slot 工时分配
+// 和 SLOT_WINDOWS（±15min buffer 的签到窗口）区别开，这里是严格的 slot 时段边界
+const SLOT_STANDARD_WINDOWS = {
+  am1: { startMin:  480, endMin:  600 },  // 8:00-10:00
+  am2: { startMin:  600, endMin:  720 },  // 10:00-12:00
+  pm1: { startMin:  870, endMin:  960 },  // 14:30-16:00
+  pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
+}
+
 // 跨天配对判定：配对时长超过这个阈值视为错配（应改补签退时间），强制按 slot 截断
 const MAX_PAIR_DURATION_MIN = 240  // 4 小时
+
+// 2026-07-02 v3：判定 in/out pair 与某个 slot 是否有覆盖
+// - 有 outMin：要求 inMin ≤ slotEnd+buf 且 outMin ≥ slotStart-buf（相交）
+// - 无 outMin（只有签到）：要求 inMin 落在 slotStart-buf 到 slotEnd+buf 之间
+function isPairCoveringSlot(inMin, outMin, slotStart, slotEnd, buf) {
+  if (outMin === null || outMin === undefined) {
+    return inMin >= slotStart - buf && inMin <= slotEnd + buf
+  }
+  return inMin <= slotEnd + buf && outMin >= slotStart - buf
+}
 
 // 按 in-time 推断所属 slot（in-record 没有 slotId 时的回退方案）
 function slotByInTime(timeStr) {
@@ -1239,6 +1258,19 @@ function slotByInTime(timeStr) {
   if (m >= 14.25*60 && m < 16.25*60) return 'pm1'  // 14:15-16:15
   if (m >= 15.75*60 && m < 17.75*60) return 'pm2'  // 15:45-17:45
   return null
+}
+
+// 2026-07-02 v3：获取某成员在指定日期实际排班的所有 slot（合并换班覆盖）
+function getMemberScheduledSlots(store, dateStr, name) {
+  const weekday = dateToWeekday(dateStr)
+  const slotIds = []
+  if (!weekday || !['周一','周二','周三','周四','周五'].includes(weekday)) return slotIds
+  if (!isDateInSchedulePeriod(store, dateStr)) return slotIds
+  for (const slotId of ['am1', 'am2', 'pm1', 'pm2']) {
+    const members = getEffectiveSlotMembers(store, dateStr, weekday, slotId)
+    if (members.includes(name)) slotIds.push(slotId)
+  }
+  return slotIds
 }
 
 // 打卡地点围栏（中山大学南校园岭南行政中心）
@@ -2014,6 +2046,13 @@ function calculateMemberWorkTime(store, name, year, month) {
     if (currentMerge) mergedPairs.push(currentMerge)
     
     // Step 3: 计算每个合并组的工时
+    // 2026-07-02 v3 重写：按 slot 时间边界分配，支持同日多班连打
+    // - 多个排班 slot：每个被覆盖的 slot 计完整时长（合并的 in/out pair 跨界覆盖）
+    // - 单个排班 slot：cap 在 slot 标准时长内（溢出需补报）
+    // - 无排班：回退到 slotByInTime 推断
+    const scheduledSlots = getMemberScheduledSlots(store, date, name)
+    const SLOT_BUF = 15  // 配对覆盖判定的 buffer（与 slotByInTime 对齐）
+
     mergedPairs.forEach(mp => {
       if (mp.lastOut) {
         const inMin = timeToMinutes(mp.firstIn.time)
@@ -2021,27 +2060,59 @@ function calculateMemberWorkTime(store, name, year, month) {
         let diffMinutes = outMin - inMin
         if (diffMinutes < 0) diffMinutes += 24 * 60
 
-        // 2026-07-02 限制 1：配对时长超过 4h 视为错配（跨天错填补签退的常见 bug）
-        // 强制截断到 4h，让成员知道要重新申请补签退
+        // 限制 1：配对时长超过 4h 视为错配（跨天错填补签退的常见 bug）
         const originalDiff = diffMinutes
         if (diffMinutes > MAX_PAIR_DURATION_MIN) {
           diffMinutes = MAX_PAIR_DURATION_MIN
         }
 
-        // 2026-07-02 限制 2：配对后截断到 slot 标准时长
-        // 成员有 am2 排班，正常签到签退最多只能获得 2h（即使实际签了 2.5h），超出部分需补报
+        // 限制 2：按 slot 边界分配
         let cappedBySlot = false
-        const slotId = (mp.firstIn && mp.firstIn.slotId) || slotByInTime(mp.firstIn.time)
-        if (slotId && SLOT_HOURS[slotId]) {
-          const slotCapMin = SLOT_HOURS[slotId] * 60
-          if (diffMinutes > slotCapMin) {
-            diffMinutes = slotCapMin
-            cappedBySlot = true
+        let rounded = 0
+        const slotBreakdown = []
+
+        if (scheduledSlots.length === 0) {
+          // 无排班但有打卡：回退到单 slot 推断（按 firstIn 的 slotId 或 in-time）
+          const slotId = (mp.firstIn && mp.firstIn.slotId) || slotByInTime(mp.firstIn.time)
+          if (slotId && SLOT_HOURS[slotId]) {
+            const slotCapMin = SLOT_HOURS[slotId] * 60
+            if (diffMinutes > slotCapMin) { diffMinutes = slotCapMin; cappedBySlot = true }
+            rounded = Math.ceil((Math.max(0, diffMinutes) / 60) * 2) / 2
+            slotBreakdown.push({ slotId, hours: rounded })
+          } else {
+            rounded = Math.ceil((Math.max(0, diffMinutes) / 60) * 2) / 2
+          }
+        } else if (scheduledSlots.length === 1) {
+          // 单 slot：cap 在 slot 标准时长（避免溢出浪费）
+          const sid = scheduledSlots[0]
+          const slotCapMin = SLOT_HOURS[sid] * 60
+          if (diffMinutes > slotCapMin) { diffMinutes = slotCapMin; cappedBySlot = true }
+          rounded = Math.ceil((Math.max(0, diffMinutes) / 60) * 2) / 2
+          slotBreakdown.push({ slotId: sid, hours: rounded })
+        } else {
+          // 多 slot：每个被覆盖的 slot 计完整时长（in/out pair 跨过 slot 边界）
+          for (const sid of scheduledSlots) {
+            const { startMin, endMin } = SLOT_STANDARD_WINDOWS[sid]
+            if (isPairCoveringSlot(inMin, outMin, startMin, endMin, SLOT_BUF)) {
+              const h = SLOT_HOURS[sid]
+              rounded += h
+              slotBreakdown.push({ slotId: sid, hours: h })
+            }
+          }
+          // 没覆盖到任何排班 slot：回退到按 firstIn 的 slotId 单 slot 算
+          if (rounded === 0) {
+            const slotId = (mp.firstIn && mp.firstIn.slotId) || slotByInTime(mp.firstIn.time)
+            if (slotId && SLOT_HOURS[slotId]) {
+              const slotCapMin = SLOT_HOURS[slotId] * 60
+              if (diffMinutes > slotCapMin) { diffMinutes = slotCapMin; cappedBySlot = true }
+              rounded = Math.ceil((Math.max(0, diffMinutes) / 60) * 2) / 2
+              slotBreakdown.push({ slotId, hours: rounded })
+            } else {
+              rounded = Math.ceil((Math.max(0, diffMinutes) / 60) * 2) / 2
+            }
           }
         }
 
-        const hours = Math.max(0, diffMinutes / 60)
-        const rounded = Math.ceil(hours * 2) / 2
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
         workByDate[date].hours += rounded
         workByDate[date].checkinHours += rounded
@@ -2053,23 +2124,48 @@ function calculateMemberWorkTime(store, name, year, month) {
           supp: !!mp.hasSupp,
           originalDuration: originalDiff,        // 原始配对时长（分钟），用于排查
           cappedBySlot,                          // true 表示被 slot 时长截断
-          slotId: slotId || null,                // 推断的 slot，用于排查
+          slotBreakdown,                         // v3：每个 slot 的分配工时（用于 UI/debug）
+          scheduledSlots,                        // v3：当天所有排班 slot（用于 UI/debug）
         })
       } else {
-        // 无签退：按 slot 实际时长估算（pm1/pm2 是 1.5h 不是 2h）
+        // 无签退：按成员当天排班的每个 slot 估算（v3：也支持多 slot）
         let estHours = 0
         const slotBreakdown = []
-        mp.slots.forEach(inRec => {
-          const sid = inRec.slotId
-          const h = (sid && SLOT_HOURS[sid]) || 2  // 未知 slotId 默认 2h
+        const inMin = timeToMinutes(mp.firstIn.time)
+
+        if (scheduledSlots.length === 0) {
+          // 没排班：按 in-time 推断（与原来行为一致）
+          const fallbackSid = (mp.firstIn && mp.firstIn.slotId) || slotByInTime(mp.firstIn.time)
+          const sid = fallbackSid || 'am1'
+          const h = SLOT_HOURS[sid] || 2
           const rounded = Math.ceil(h * 2) / 2
           estHours += rounded
-          slotBreakdown.push({ slotId: sid || 'unknown', hours: rounded })
-        })
+          slotBreakdown.push({ slotId: sid, hours: rounded })
+        } else {
+          // 有排班：每个被 in-time 覆盖的 slot 计完整时长
+          for (const sid of scheduledSlots) {
+            const { startMin, endMin } = SLOT_STANDARD_WINDOWS[sid]
+            if (isPairCoveringSlot(inMin, null, startMin, endMin, SLOT_BUF)) {
+              const h = SLOT_HOURS[sid]
+              const rounded = Math.ceil(h * 2) / 2
+              estHours += rounded
+              slotBreakdown.push({ slotId: sid, hours: rounded })
+            }
+          }
+          // Fallback: 一个 slot 都没匹配上，按 in-record 的 slotId 兜底
+          if (slotBreakdown.length === 0) {
+            const sid = (mp.firstIn && mp.firstIn.slotId) || slotByInTime(mp.firstIn.time) || 'am1'
+            const h = SLOT_HOURS[sid] || 2
+            const rounded = Math.ceil(h * 2) / 2
+            estHours += rounded
+            slotBreakdown.push({ slotId: sid, hours: rounded })
+          }
+        }
+
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
         workByDate[date].hours += estHours
         workByDate[date].checkinHours += estHours
-        workByDate[date].slots.push({ estimated: true, slotCount: mp.slots.length, hours: estHours, slotBreakdown })
+        workByDate[date].slots.push({ estimated: true, slotCount: mp.slots.length, hours: estHours, slotBreakdown, scheduledSlots })
       }
     })
   })
