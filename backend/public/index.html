@@ -3791,6 +3791,29 @@ function formatTime(isoStr) {
   catch { return isoStr.slice(0, 5); }
 }
 
+// 2026-07-02 新增：显示 submittedAt 这类"已存 Beijing"或"老格式 UTC ISO"的时间字段
+// - 兼容 Beijing 字符串 "YYYY-MM-DD HH:MM:SS" → 直接展示前 16 字符
+// - 兼容老 UTC ISO 字符串 "YYYY-MM-DDTHH:MM:SS.sssZ" → +8h 转 Beijing 后再展示
+function formatSubmittedAt(t) {
+  if (!t) return '-'
+  // 新格式（已 Beijing）
+  if (typeof t === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(t)) {
+    return t.slice(0, 16)
+  }
+  // 老格式（UTC ISO）
+  if (typeof t === 'string' && t.includes('T')) {
+    const d = new Date(t)
+    if (!isNaN(d.getTime())) {
+      const bjMs = d.getTime() + 8 * 3600 * 1000
+      const bj = new Date(bjMs)
+      const pad = n => String(n).padStart(2, '0')
+      return bj.getUTCFullYear() + '-' + pad(bj.getUTCMonth() + 1) + '-' + pad(bj.getUTCDate()) + ' '
+        + pad(bj.getUTCHours()) + ':' + pad(bj.getUTCMinutes()) + ':' + pad(bj.getUTCSeconds())
+    }
+  }
+  return String(t).slice(0, 16) || '-'
+}
+
 // 将时间字符串转为分钟数（兼容纯时间和ISO格式）
 function timeStrToMinutes(t) {
   if (!t) return 0;
@@ -4809,7 +4832,7 @@ async function loadWorkTimeClaim() {
     
     // 已提交提示
     if (submission) {
-      html += '<div class="tip-bar" style="background:#e8f5e9;color:#2e7d32;margin-bottom:16px">✅ 你已于 ' + submission.submittedAt.slice(0, 16).replace('T', ' ') + ' 提交申报</div>';
+      html += '<div class="tip-bar" style="background:#e8f5e9;color:#2e7d32;margin-bottom:16px">✅ 你已于 ' + formatSubmittedAt(submission.submittedAt) + ' 提交申报</div>';
     } else {
       html += '<div class="tip-bar" style="background:#fff8e1;color:#b45309;margin-bottom:16px">💡 请仔细核对每日工时，如有差异点击日期查看详情，或在下方提交申报</div>';
     }
@@ -5132,7 +5155,27 @@ async function showAdminMemberDetail(name) {
       '<span style="padding:3px 8px;background:#fff8e1;color:#b45309;border-radius:4px;font-size:12px">📝 仅补报 ' + (ms.overtimeDays || 0) + ' 天</span>' +
       '<span style="padding:3px 8px;background:#ffebee;color:#c41230;border-radius:4px;font-size:12px">⚠️ 缺勤 ' + (ms.absentDays || 0) + ' 天</span>' +
       '</div>';
-    
+
+    // 2026-07-02 新增：例会参会区块
+    const meetings = data.workData?.meetings || [];
+    if (meetings.length > 0) {
+      const attendedList = meetings.filter(m => m.attended);
+      const unattendedList = meetings.filter(m => !m.attended);
+      const meetingHoursSum = attendedList.reduce((s, m) => s + (m.hours || 0), 0);
+      let meetHtml = '<div style="margin-top:10px;padding:10px 12px;background:#faf6ff;border:1px solid #e9d5ff;border-radius:8px">';
+      meetHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-weight:600;color:#7c3aed">📅 本月例会参会</span>';
+      meetHtml += '<span style="font-size:12px;color:#666">已勾 ' + attendedList.length + ' / ' + meetings.length + ' 次 · 参会工时 <b style="color:#7c3aed">' + meetingHoursSum.toFixed(1) + 'h</b></span></div>';
+      meetHtml += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      meetings.forEach(m => {
+        const tag = m.attended
+          ? '<span style="background:#dcfce7;color:#166534;border:1px solid #86efac">✅ 第 ' + m.week + ' 周 ' + m.date + ' · ' + m.hours + 'h</span>'
+          : '<span style="background:#f5f5f5;color:#888;border:1px solid #e5e7eb">○ 第 ' + m.week + ' 周 ' + m.date + ' · ' + m.hours + 'h（未参会）</span>';
+        meetHtml += '<span style="padding:3px 10px;border-radius:12px;font-size:12px">' + tag + '</span>';
+      });
+      meetHtml += '</div></div>';
+      sumEl.innerHTML += meetHtml;
+    }
+
     const daily = data.workData?.daily || [];
     // 只列出有工时或有排班的天（避免 30 行空白）
     const interesting = daily.filter(d => d.totalHours > 0 || d.scheduled.length > 0 || d.approvedOvertimes.length > 0 || d.pendingOvertimes.length > 0);
@@ -5258,7 +5301,7 @@ async function loadAdminWorktime() {
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalHours || 0).toFixed(1) + ' 小时</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalPay || 0).toFixed(1) + ' 元</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submitted ? '<span style="color:#2e7d32">✅ 已提交</span>' : '<span style="color:#999">⏳ 未提交</span>') + '</td>';
-        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submittedAt ? s.submittedAt.slice(0, 16).replace('T', ' ') : '-') + '</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + formatSubmittedAt(s.submittedAt) + '</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0;white-space:nowrap">';
         // 查看明细：显示该成员每日工时/补报内容（用于排查统计异常）
         html += '<button class="quick-btn" style="background:#5C6BC0;color:#fff;padding:4px 10px;font-size:12px;margin-right:6px" onclick="showAdminMemberDetail(\'' + safeName + '\')">🔍 查看明细</button>';
