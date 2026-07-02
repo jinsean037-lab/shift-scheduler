@@ -660,6 +660,268 @@ body {
   padding-bottom: 10px;
   border-bottom: 2px solid #f0f2f5;
 }
+
+/* ========== 工时申报日历 (v4.2) ========== */
+.worktime-calendar {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.wt-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wt-cal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.wt-cal-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #666;
+}
+.wt-cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.wt-cal-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.wt-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.wt-cal-weekdays > div {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  padding: 6px 0;
+}
+.wt-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.wt-cal-cell {
+  position: relative;
+  background: #fafbfc;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  min-height: 76px;
+  padding: 6px 6px 8px;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.wt-cal-cell:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+.wt-cal-cell.is-today {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.wt-cal-date {
+  font-size: 14px;
+  font-weight: 700;
+  color: #333;
+}
+.wt-cal-weekday {
+  font-size: 10px;
+  color: #999;
+  margin-left: 4px;
+}
+.wt-cal-hours {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-top: auto;
+}
+.wt-cal-status {
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+}
+/* 已完成（已打卡） */
+.wt-cal-cell.completed {
+  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+  border-color: #c8e6c9;
+}
+.wt-cal-cell.completed .wt-cal-hours { color: #2e7d32; }
+.wt-cal-cell.completed .wt-cal-status { color: #2e7d32; }
+/* 补报（覆盖缺勤 / 仅额外工作） */
+.wt-cal-cell.overtime {
+  background: linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%);
+  border-color: #ffe082;
+}
+.wt-cal-cell.overtime .wt-cal-hours { color: #b45309; }
+.wt-cal-cell.overtime .wt-cal-status { color: #b45309; }
+/* 补报待审核 */
+.wt-cal-cell.overtime-pending {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  border-color: #ffcc80;
+}
+.wt-cal-cell.overtime-pending .wt-cal-hours { color: #ef6c00; }
+.wt-cal-cell.overtime-pending .wt-cal-status { color: #ef6c00; }
+/* 缺勤 */
+.wt-cal-cell.absent {
+  background: linear-gradient(135deg, #ffebee 0%, #fce4ec 100%);
+  border-color: #ffcdd2;
+}
+.wt-cal-cell.absent .wt-cal-hours { color: #c41230; }
+.wt-cal-cell.absent .wt-cal-status { color: #c41230; }
+/* 无排班 */
+.wt-cal-cell.none {
+  background: #fafbfc;
+  border-color: #eef0f3;
+  opacity: 0.7;
+}
+.wt-cal-cell.none .wt-cal-hours { color: #bbb; }
+.wt-cal-cell.future { opacity: 0.55; }
+.wt-cal-cell.empty { background: transparent; border: none; cursor: default; min-height: 76px; }
+.wt-cal-cell.empty:hover { transform: none; box-shadow: none; }
+.wt-cal-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.7);
+  color: inherit;
+  font-weight: 600;
+}
+.wt-cal-action {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #fff;
+  background: var(--primary);
+  border-radius: 4px;
+  padding: 2px 5px;
+  text-align: center;
+  font-weight: 600;
+}
+.wt-cal-cell.absent .wt-cal-action { background: #c41230; }
+
+/* 工时申报汇总统计 */
+.wt-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.wt-summary-card {
+  padding: 16px;
+  border-radius: 10px;
+  color: #fff;
+}
+.wt-summary-card .lbl { font-size: 12px; opacity: 0.9; }
+.wt-summary-card .val { font-size: 24px; font-weight: 700; margin-top: 4px; }
+.wt-summary-card .sub { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+.wt-summary-card.s-hours { background: linear-gradient(135deg, #667eea, #764ba2); }
+.wt-summary-card.s-pay { background: linear-gradient(135deg, #f093fb, #f5576c); }
+.wt-summary-card.s-completed { background: linear-gradient(135deg, #43a047, #66bb6a); }
+.wt-summary-card.s-overtime { background: linear-gradient(135deg, #ffb300, #ffa726); }
+.wt-summary-card.s-absent { background: linear-gradient(135deg, #e53935, #ef5350); }
+
+/* 日详情 modal */
+.wt-modal-box {
+  background: white;
+  border-radius: 16px;
+  padding: 26px 26px 22px;
+  width: 92%;
+  max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  max-height: 88vh;
+  overflow-y: auto;
+  text-align: left;
+}
+.wt-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+.wt-modal-subtitle {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f2f5;
+}
+.wt-modal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #f0f2f5;
+  font-size: 13px;
+}
+.wt-modal-row:last-child { border-bottom: none; }
+.wt-modal-row .label { color: #666; font-weight: 600; flex-shrink: 0; min-width: 64px; }
+.wt-modal-row .value { color: #222; text-align: right; flex: 1; }
+.wt-modal-row .ot-content { font-size: 12px; color: #888; margin-top: 2px; }
+.wt-modal-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 4px 0 12px;
+}
+.wt-modal-status.completed { background: #e8f5e9; color: #2e7d32; }
+.wt-modal-status.overtime { background: #fff8e1; color: #b45309; }
+.wt-modal-status.overtime-pending { background: #fff3e0; color: #ef6c00; }
+.wt-modal-status.absent { background: #ffebee; color: #c41230; }
+.wt-modal-status.none { background: #f5f5f5; color: #888; }
+.wt-modal-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.wt-modal-actions button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.wt-modal-actions .btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+.wt-modal-actions .btn-secondary {
+  background: #f0f2f5;
+  color: #666;
+}
+.wt-modal-actions .btn-warn {
+  background: #c41230;
+  color: #fff;
+}
 .shift-item {
   display: flex;
   align-items: center;
@@ -1363,6 +1625,17 @@ body {
     <div class="error" id="cancelReasonError"></div>
     <button onclick="doCancelRequest()">提交申请</button>
     <div class="back-link"><a href="javascript:hideCancelReasonModal()">取消</a></div>
+  </div>
+</div>
+
+<!-- 工时申报 - 日详情 modal -->
+<div class="modal-overlay" id="wtDayModal">
+  <div class="wt-modal-box" id="wtDayModalBody">
+    <div class="wt-modal-title" id="wtDayTitle">2026年7月1日</div>
+    <div class="wt-modal-subtitle" id="wtDaySubtitle">周一 · 排班 8:00-10:00, 10:00-12:00</div>
+    <div id="wtDayStatusBadge"></div>
+    <div id="wtDayContent"></div>
+    <div class="wt-modal-actions" id="wtDayActions"></div>
   </div>
 </div>
 
@@ -4412,6 +4685,20 @@ function approveOt(id, action) {
 
 // ========== 工时申报 ==========
 
+// 全局：保存当前成员的每日明细，渲染日历和 modal 时使用
+let wtDailyMap = {}; // { 'YYYY-MM-DD': dayObj }
+let wtWorkData = {}; // 当前工时数据
+let wtYear = 0, wtMonth = 0;
+
+// 状态文本与图标
+const WT_STATUS_META = {
+  completed:        { icon: '✓', text: '已完成', cls: 'completed',       desc: '已正常打卡' },
+  overtime:         { icon: '📝', text: '补报',   cls: 'overtime',        desc: '通过补报覆盖缺勤或额外工作' },
+  'overtime-pending':{icon: '⏳', text: '补报待审', cls: 'overtime-pending', desc: '补报已提交，等待管理员审核' },
+  absent:           { icon: '⚠️', text: '缺勤',   cls: 'absent',          desc: '排班未到且未提交补报' },
+  none:             { icon: '—', text: '',        cls: 'none',            desc: '当天无排班' },
+};
+
 // 成员端：加载工时申报页面
 async function loadWorkTimeClaim() {
   const content = document.getElementById('worktimeContent');
@@ -4440,7 +4727,12 @@ async function loadWorkTimeClaim() {
       return;
     }
     
-    const work = myData.workData || {};
+    wtWorkData = myData.workData || {};
+    wtYear = myData.year;
+    wtMonth = myData.month;
+    wtDailyMap = {};
+    (wtWorkData.daily || []).forEach(d => { wtDailyMap[d.date] = d; });
+    
     const submission = myData.submission;
     
     // 渲染页面
@@ -4449,10 +4741,39 @@ async function loadWorkTimeClaim() {
     // 已提交提示
     if (submission) {
       html += '<div class="tip-bar" style="background:#e8f5e9;color:#2e7d32;margin-bottom:16px">✅ 你已于 ' + submission.submittedAt.slice(0, 16).replace('T', ' ') + ' 提交申报</div>';
+    } else {
+      html += '<div class="tip-bar" style="background:#fff8e1;color:#b45309;margin-bottom:16px">💡 请仔细核对每日工时，如有差异点击日期查看详情，或在下方提交申报</div>';
     }
     
+    // 日历视图
+    html += '<div class="worktime-calendar">';
+    html += '<div class="wt-cal-header">';
+    html += '<div class="wt-cal-title">📅 ' + wtYear + '年' + wtMonth + '月 · 工时日历</div>';
+    html += '<div class="wt-cal-legend">';
+    html += '<span><i style="background:#c8e6c9"></i>已打卡</span>';
+    html += '<span><i style="background:#ffe082"></i>补报</span>';
+    html += '<span><i style="background:#ffcc80"></i>补报待审</span>';
+    html += '<span><i style="background:#ffcdd2"></i>缺勤</span>';
+    html += '<span><i style="background:#eef0f3"></i>无排班</span>';
+    html += '</div></div>';
+    html += '<div class="wt-cal-weekdays"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>';
+    html += '<div class="wt-cal-grid">';
+    html += buildWtCalendarGrid();
+    html += '</div></div>';
+    
+    // 工时汇总
+    const ms = wtWorkData.monthSummary || {};
+    html += '<div class="section-card" style="margin-top:16px"><h3>📊 工时汇总</h3>';
+    html += '<div class="wt-summary-grid">';
+    html += '<div class="wt-summary-card s-hours"><div class="lbl">月工作时长</div><div class="val">' + (wtWorkData.totalHours || 0).toFixed(1) + '<span style="font-size:13px;font-weight:400"> 小时</span></div><div class="sub">含打卡 + 通过补报</div></div>';
+    html += '<div class="wt-summary-card s-pay"><div class="lbl">月劳务报酬</div><div class="val">' + (wtWorkData.totalPay || 0).toFixed(1) + '<span style="font-size:13px;font-weight:400"> 元</span></div><div class="sub">25元/小时</div></div>';
+    html += '<div class="wt-summary-card s-completed"><div class="lbl">已完成天数</div><div class="val">' + (ms.completedDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">有打卡记录</div></div>';
+    html += '<div class="wt-summary-card s-overtime"><div class="lbl">仅补报天数</div><div class="val">' + (ms.overtimeDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">无打卡但有补报</div></div>';
+    html += '<div class="wt-summary-card s-absent"><div class="lbl">缺勤天数</div><div class="val">' + (ms.absentDays || 0) + '<span style="font-size:13px;font-weight:400"> 天</span></div><div class="sub">排班未到且未补报</div></div>';
+    html += '</div></div>';
+    
     // 个人信息表单
-    html += '<div class="section-card"><h3>📝 个人信息确认</h3>';
+    html += '<div class="section-card" style="margin-top:16px"><h3>📝 个人信息确认</h3>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px">';
     html += '<div><label style="font-size:13px;color:#666">姓名</label><input type="text" id="wtName" value="' + currentUser + '" readonly style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;background:#f5f5f5;margin-top:4px"></div>';
     html += '<div><label style="font-size:13px;color:#666">银行账号</label><input type="text" id="wtBank" placeholder="请输入银行账号" value="' + (submission?.bankAccount || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
@@ -4460,23 +4781,6 @@ async function loadWorkTimeClaim() {
     html += '<div><label style="font-size:13px;color:#666">学号</label><input type="text" id="wtStudentId" placeholder="请输入学号" value="' + (submission?.studentId || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
     html += '<div><label style="font-size:13px;color:#666">宿舍</label><input type="text" id="wtDorm" placeholder="请输入宿舍号" value="' + (submission?.dorm || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
     html += '<div><label style="font-size:13px;color:#666">联系电话</label><input type="text" id="wtPhone" placeholder="请输入联系电话" value="' + (submission?.phone || '') + '" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>';
-    html += '</div></div>';
-    
-    // 工时统计
-    html += '<div class="section-card" style="margin-top:16px"><h3>📊 工时统计（自动计算）</h3>';
-    html += '<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px">';
-    html += '<div style="padding:16px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:10px;flex:1;min-width:150px">';
-    html += '<div style="font-size:13px;opacity:0.9">月工作时间总计</div>';
-    html += '<div style="font-size:28px;font-weight:700;margin-top:4px">' + (work.totalHours || 0).toFixed(1) + ' <span style="font-size:14px;font-weight:400">小时</span></div>';
-    html += '</div>';
-    html += '<div style="padding:16px 20px;background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff;border-radius:10px;flex:1;min-width:150px">';
-    html += '<div style="font-size:13px;opacity:0.9">月劳务报酬总计</div>';
-    html += '<div style="font-size:28px;font-weight:700;margin-top:4px">' + (work.totalPay || 0).toFixed(1) + ' <span style="font-size:14px;font-weight:400">元</span></div>';
-    html += '</div>';
-    html += '<div style="padding:16px 20px;background:#f5f5f5;border-radius:10px;flex:1;min-width:150px">';
-    html += '<div style="font-size:13px;color:#666">工作天数</div>';
-    html += '<div style="font-size:28px;font-weight:700;margin-top:4px;color:#333">' + (work.workDays || 0) + ' <span style="font-size:14px;font-weight:400;color:#666">天</span></div>';
-    html += '</div>';
     html += '</div></div>';
     
     // 提交按钮
@@ -4493,6 +4797,154 @@ async function loadWorkTimeClaim() {
     console.error('loadWorkTimeClaim error:', e);
     content.innerHTML = '<div class="section-card"><p style="color:#c41230;font-size:14px;text-align:center;padding:30px">加载失败，请刷新重试</p></div>';
   }
+}
+
+// 渲染日历格子（处理月初对齐空格）
+function buildWtCalendarGrid() {
+  if (!wtYear || !wtMonth) return '';
+  const firstDate = new Date(wtYear, wtMonth - 1, 1);
+  const firstWeekday = firstDate.getDay(); // 0=Sun
+  const daysInMonth = new Date(wtYear, wtMonth, 0).getDate();
+  const todayStr = (function(){
+    const d = new Date(); const tz = d.getTime() + 8*3600*1000;
+    return new Date(tz).toISOString().slice(0,10);
+  })();
+  
+  let html = '';
+  // 月初空格
+  for (let i = 0; i < firstWeekday; i++) html += '<div class="wt-cal-cell empty"></div>';
+  // 每天一个 cell
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${wtYear}-${String(wtMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const day = wtDailyMap[dateStr];
+    if (!day) {
+      html += `<div class="wt-cal-cell none future"><div class="wt-cal-date">${d}</div></div>`;
+      continue;
+    }
+    const meta = WT_STATUS_META[day.status] || WT_STATUS_META.none;
+    const isFuture = dateStr > todayStr;
+    const hours = day.totalHours ? day.totalHours.toFixed(1) + 'h' : '';
+    const isToday = day.isToday ? 'is-today' : '';
+    const isFutureCls = isFuture ? 'future' : '';
+    const hasOt = day.approvedOvertimes && day.approvedOvertimes.length > 0;
+    const badgeHtml = hasOt ? `<div class="wt-cal-badge">+补</div>` : '';
+    const actionHtml = (day.status === 'absent' && !isFuture) 
+      ? `<div class="wt-cal-action">去补报</div>` 
+      : '';
+    html += `<div class="wt-cal-cell ${meta.cls} ${isToday} ${isFutureCls}" onclick="showWtDayDetail('${dateStr}')">
+      ${badgeHtml}
+      <div><span class="wt-cal-date">${d}</span><span class="wt-cal-weekday">${day.weekday.replace('周','')}</span></div>
+      <div class="wt-cal-hours">${hours || '&nbsp;'}</div>
+      ${day.status !== 'none' ? `<div class="wt-cal-status">${meta.icon} ${meta.text}</div>` : ''}
+      ${actionHtml}
+    </div>`;
+  }
+  return html;
+}
+
+// 显示某天的详情
+function showWtDayDetail(dateStr) {
+  const day = wtDailyMap[dateStr];
+  if (!day) return;
+  const meta = WT_STATUS_META[day.status] || WT_STATUS_META.none;
+  const dateObj = new Date(dateStr + 'T12:00:00+08:00');
+  const dateLabel = `${dateObj.getFullYear()}年${dateObj.getMonth()+1}月${dateObj.getDate()}日`;
+  
+  document.getElementById('wtDayTitle').textContent = dateLabel + ' · ' + day.weekday;
+  
+  // 副标题：排班信息
+  let subParts = [];
+  if (day.scheduled.length > 0) {
+    subParts.push('排班：' + day.scheduled.map(s => s.label).join(', '));
+  }
+  if (subParts.length === 0) subParts.push('当天无排班');
+  document.getElementById('wtDaySubtitle').textContent = subParts.join('　');
+  
+  // 状态徽章
+  document.getElementById('wtDayStatusBadge').innerHTML = 
+    `<span class="wt-modal-status ${meta.cls}">${meta.icon} ${meta.text} · ${meta.desc}</span>`;
+  
+  // 内容
+  let rows = '';
+  
+  // 打卡记录
+  if (day.checkinSlots && day.checkinSlots.length > 0) {
+    day.checkinSlots.forEach((cs, idx) => {
+      const suppTag = cs.supp ? ' <span style="color:#ef6c00;font-size:11px">（含补签退）</span>' : '';
+      const outTxt = cs.out || '<span style="color:#c41230">未签退</span>';
+      rows += `<div class="wt-modal-row">
+        <div class="label">打卡 ${idx + 1}</div>
+        <div class="value">${cs.in} - ${outTxt}${suppTag}</div>
+      </div>`;
+    });
+  }
+  
+  // 通过的补报
+  if (day.approvedOvertimes && day.approvedOvertimes.length > 0) {
+    day.approvedOvertimes.forEach(ot => {
+      rows += `<div class="wt-modal-row">
+        <div class="label">通过补报</div>
+        <div class="value">${ot.hours}小时<div class="ot-content">${escapeHtml(ot.content)}</div></div>
+      </div>`;
+    });
+  }
+  
+  // 待审核补报
+  if (day.pendingOvertimes && day.pendingOvertimes.length > 0) {
+    day.pendingOvertimes.forEach(ot => {
+      rows += `<div class="wt-modal-row">
+        <div class="label">⏳ 待审补报</div>
+        <div class="value">${ot.hours}小时<div class="ot-content">${escapeHtml(ot.content)}</div></div>
+      </div>`;
+    });
+  }
+  
+  // 当天工时合计
+  rows += `<div class="wt-modal-row" style="border-bottom:none">
+    <div class="label">当日合计</div>
+    <div class="value" style="font-weight:700;color:var(--primary)">${day.totalHours.toFixed(1)} 小时</div>
+  </div>`;
+  
+  if (!rows || day.checkinSlots.length === 0 && day.approvedOvertimes.length === 0 && day.pendingOvertimes.length === 0) {
+    rows = `<div style="padding:24px 0;color:#999;font-size:13px;text-align:center">当天无打卡也无补报记录</div>`;
+  }
+  document.getElementById('wtDayContent').innerHTML = rows;
+  
+  // 底部按钮
+  let actions = '';
+  if (day.status === 'absent') {
+    actions = `<button class="btn-warn" onclick="hideWtDayDetail();wtGoOvertime('${dateStr}')">📝 去补报工时</button>`;
+  } else if (day.status === 'overtime-pending') {
+    actions = `<button class="btn-secondary" onclick="hideWtDayDetail()">关闭</button>`;
+  } else {
+    actions = `<button class="btn-secondary" onclick="hideWtDayDetail()">关闭</button>`;
+  }
+  document.getElementById('wtDayActions').innerHTML = actions;
+  
+  document.getElementById('wtDayModal').classList.add('show');
+}
+
+function hideWtDayDetail() {
+  document.getElementById('wtDayModal').classList.remove('show');
+}
+
+// 跳转到补报页面，预填日期
+function wtGoOvertime(dateStr) {
+  switchTab('checkin');
+  // 等待 view 切换完成
+  setTimeout(() => {
+    const dateInput = document.getElementById('otDate');
+    if (dateInput) {
+      dateInput.value = dateStr;
+      dateInput.focus();
+      dateInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showToast('已填入日期 ' + dateStr + '，请补充工作内容并提交');
+    }
+  }, 200);
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // 成员端：提交工时申报
