@@ -3827,13 +3827,24 @@ function formatSubmittedAt(t) {
   return String(t).slice(0, 16) || '-'
 }
 
-// 将时间字符串转为分钟数（兼容纯时间和ISO格式）
+// 将时间字符串转为 Beijing 分钟数（兼容纯时间和ISO格式）
+// 2026-07-02 修复：ISO 时间（"2026-06-11T08:58:00.000Z"）原实现会得到 UTC 分钟，差 8h。
+// 现在统一转 Beijing 后取 hour:minute。
 function timeStrToMinutes(t) {
   if (!t) return 0;
+  // ISO 格式（含 T）：parse UTC Date，+8h 后取 Beijing 时分
+  if (typeof t === 'string' && t.includes('T')) {
+    const d = new Date(t)
+    if (!isNaN(d.getTime())) {
+      const bjMs = d.getTime() + 8 * 3600 * 1000
+      const bj = new Date(bjMs)
+      return bj.getUTCHours() * 60 + bj.getUTCMinutes()
+    }
+    return 0
+  }
+  // "HH:MM" / "HH:MM:SS" 已经是本地（补签退或纯时间格式）
   const m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (m) return parseInt(m[1])*60 + parseInt(m[2]);
-  try { const d = new Date(t); if (!isNaN(d)) return d.getHours()*60 + d.getMinutes(); }
-  catch(e) {}
+  if (m) return parseInt(m[1]) * 60 + parseInt(m[2]);
   return 0;
 }
 
