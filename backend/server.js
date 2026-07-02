@@ -2024,6 +2024,7 @@ function calculateMemberWorkTime(store, name, year, month) {
   let absentCount = 0
   let overtimeCount = 0
   let completedCount = 0
+  let incompleteCount = 0
   
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -2073,16 +2074,22 @@ function calculateMemberWorkTime(store, name, year, month) {
     const pendingOvertimes  = dayPending.map(ot => ({ hours: ot.hours, content: ot.content }))
     
     const wbDate = workByDate[dateStr] || { hours: 0 }
-    const hasCheckin = checkinSlots.some(cs => cs.out)
+    const hasAnyCheckin = checkinSlots.length > 0
+    const hasCompletedCheckin = checkinSlots.some(cs => cs.out)
+    const hasIncompleteCheckin = hasAnyCheckin && !hasCompletedCheckin
     const hasApprovedOt = approvedOvertimes.length > 0
     const hasPendingOt = pendingOvertimes.length > 0
     const isScheduled = scheduled.length > 0
     
-    // 状态判定
+    // 状态判定（优先级：完成 > 未完成签到 > 通过补报 > 待审补报 > 缺勤 > 无排班）
     let status = 'none'
-    if (hasCheckin) {
+    if (hasCompletedCheckin) {
       status = 'completed'
       completedCount++
+    } else if (hasIncompleteCheckin) {
+      // 有签到但没签退：按 2h 估算（已在 workByDate 中），不算缺勤
+      status = 'incomplete'
+      incompleteCount++
     } else if (hasApprovedOt) {
       // 规则：当天有通过的补报 → 算"补报"状态，不算缺勤
       status = 'overtime'
@@ -2116,7 +2123,7 @@ function calculateMemberWorkTime(store, name, year, month) {
     workByDate,
     workDays: Object.keys(workByDate).length,
     daily,
-    monthSummary: { completedDays: completedCount, overtimeDays: overtimeCount, absentDays: absentCount, daysInMonth }
+    monthSummary: { completedDays: completedCount, incompleteDays: incompleteCount, overtimeDays: overtimeCount, absentDays: absentCount, daysInMonth }
   }
 }
 
