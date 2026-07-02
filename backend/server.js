@@ -1880,13 +1880,26 @@ app.get('/api/admin/worktime-claim/all', async (req, res) => {
 const SLOT_LABEL_MAP = { am1: '8:00-10:00', am2: '10:00-12:00', pm1: '14:30-16:00', pm2: '16:00-17:30' }
 
 // 把任意 time 字段归一化为 "HH:MM"
-// 普通打卡存的是 now.toISOString()（"YYYY-MM-DDTHH:MM:SS.sssZ"）
-// 补签退存的是 "HH:MM:SS"（item.time + ':00'）
-// 早期的可能直接就是 "HH:MM"
+// 普通打卡存的是 now.toISOString()（"YYYY-MM-DDTHH:MM:SS.sssZ"，UTC）
+// 补签退存的是 "HH:MM:SS"（item.time + ':00'，已经是本地时间）
+// 早期可能直接就是 "HH:MM"
+// 2026-07-02 修复：ISO 时间是 UTC，需要 +8h 转 Beijing 时区；非 ISO 已经是本地时间
 function normalizeHHMM(timeStr) {
   if (!timeStr) return ''
   const isoIdx = timeStr.indexOf('T')
-  if (isoIdx >= 0) timeStr = timeStr.slice(isoIdx + 1)
+  if (isoIdx >= 0) {
+    // ISO 格式：解析为 UTC Date 对象，再转 Beijing (+8)
+    const d = new Date(timeStr)
+    if (!isNaN(d.getTime())) {
+      const beijingMs = d.getTime() + 8 * 3600 * 1000
+      const bj = new Date(beijingMs)
+      const hh = String(bj.getUTCHours()).padStart(2, '0')
+      const mm = String(bj.getUTCMinutes()).padStart(2, '0')
+      return hh + ':' + mm
+    }
+    return ''
+  }
+  // 非 ISO（HH:MM 或 HH:MM:SS）已经是本地时间
   const [h, m] = timeStr.split(':')
   if (!h || !m) return timeStr
   return h.padStart(2, '0') + ':' + m.padStart(2, '0')
@@ -2144,11 +2157,19 @@ function timeToMinutes(timeStr) {
   if (!timeStr) return 0
   // 兼容三种格式：
   //   "HH:MM"            （如 "08:32"）
-  //   "HH:MM:SS"         （如 "08:32:00"，补签退记录）
-  //   "YYYY-MM-DDTHH:MM:SS.sssZ"  （普通打卡存的是 now.toISOString()，如 "2026-06-01T08:32:00.000Z"）
-  // 2026-07-02 修复：之前只支持 HH:MM，导致普通签退的 ISO 时间解析失败 → 配对不上 → 误判"已签到未签退"
+  //   "HH:MM:SS"         （如 "08:32:00"，补签退记录，已经本地时间）
+  //   "YYYY-MM-DDTHH:MM:SS.sssZ"  （普通打卡存的是 now.toISOString()，UTC）
+  // 2026-07-02 修复：ISO 时间是 UTC，需 +8h 转 Beijing；非 ISO 已经是本地时间
   const isoIdx = timeStr.indexOf('T')
-  if (isoIdx >= 0) timeStr = timeStr.slice(isoIdx + 1)
+  if (isoIdx >= 0) {
+    const d = new Date(timeStr)
+    if (!isNaN(d.getTime())) {
+      const beijingMs = d.getTime() + 8 * 3600 * 1000
+      const bj = new Date(beijingMs)
+      return bj.getUTCHours() * 60 + bj.getUTCMinutes()
+    }
+    return 0
+  }
   const [h, m] = timeStr.split(':').map(Number)
   if (isNaN(h) || isNaN(m)) return 0
   return h * 60 + m
