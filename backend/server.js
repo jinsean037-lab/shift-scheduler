@@ -2082,36 +2082,21 @@ app.put('/api/member/profile', async (req, res) => {
   }
 })
 
-// v5.0：成员读自己的所有已获得荣誉（按月聚合，所有月份）
+// v5.0：成员读自己的所有已获得荣誉（v5.0.1：只显示当月，不再自动回溯 N 个月）
 app.get('/api/member/achievements', async (req, res) => {
   try {
     const name = req.query.name
     if (!name) return res.json({ ok: false, msg: '缺少姓名' })
     const store = await readStore()
-    // 遍历已开过的所有月份：wtc.year/month + 重新构建即可；简单起见取当前月 + 后推 6 个月
-    const allAchs = []
-    const seen = new Set()
-    // 当前 wtc
-    const curWt = store.workTimeClaim || {}
+    // 当前 wtc 申报的年月（用户所在月份的"当月"）
+    const wtc = store.workTimeClaim || {}
     const months = []
-    if (curWt.year && curWt.month) months.push({ year: curWt.year, month: curWt.month })
-    // 也加最近 6 个月
-    const d = new Date()
-    for (let i = 0; i < 6; i++) {
-      const y = d.getFullYear(), m = d.getMonth() + 1 - i
-      const my = m <= 0 ? y - 1 : y
-      const mm = m <= 0 ? 12 + m : m
-      months.push({ year: my, month: mm })
-    }
+    if (wtc.year && wtc.month) months.push({ year: wtc.year, month: wtc.month })
+    const allAchs = []
     months.forEach(({ year, month }) => {
       try {
         const achs = computeMemberMonthlyAchievements(store, name, year, month)
-        achs.forEach(a => {
-          const key = year + '-' + month + '-' + a.id
-          if (seen.has(key)) return
-          seen.add(key)
-          allAchs.push({ ...a, year, month })
-        })
+        achs.forEach(a => allAchs.push({ ...a, year, month }))
       } catch (_) {}
     })
     res.json({ ok: true, achievements: allAchs })
