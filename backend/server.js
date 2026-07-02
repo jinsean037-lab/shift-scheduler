@@ -1873,9 +1873,15 @@ app.get('/api/admin/worktime-claim/all', async (req, res) => {
 })
 
 // 辅助函数：计算成员在指定月份的工作时间
+// 返回：{ totalHours, totalPay, workByDate, workDays, daily }
+//   daily: 数组，按月内日期顺序，每项 { date, weekday, isToday, scheduled, checkinSlots,
+//          approvedOvertimes, pendingOvertimes, totalHours, status }
+//   status: 'completed'(已打卡) | 'overtime'(已补报/补报覆盖缺勤) | 'absent'(缺勤) | 'none'(无排班无工作)
+const SLOT_LABEL_MAP = { am1: '8:00-10:00', am2: '10:00-12:00', pm1: '14:30-16:00', pm2: '16:00-17:30' }
 function calculateMemberWorkTime(store, name, year, month) {
   const checkins = store.checkins || []
-  const overtimes = (store.overtimes || []).filter(ot => ot.status === 'approved')
+  const allOvertimes = store.overtimes || []
+  const overtimes = allOvertimes.filter(ot => ot.status === 'approved')
   
   // 月份范围
   const monthStart = new Date(year, month - 1, 1)
@@ -1966,8 +1972,9 @@ function calculateMemberWorkTime(store, name, year, month) {
         if (diffMinutes < 0) diffMinutes += 24 * 60
         const hours = Math.max(0, diffMinutes / 60)
         const rounded = Math.ceil(hours * 2) / 2
-        if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
+        if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
         workByDate[date].hours += rounded
+        workByDate[date].checkinHours += rounded
         workByDate[date].slots.push({
           merged: true,
           slotCount: mp.slots.length,
@@ -1978,8 +1985,9 @@ function calculateMemberWorkTime(store, name, year, month) {
       } else {
         // 无签退：按班次数 * 2h 估算
         const estHours = mp.slots.length * 2
-        if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
+        if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
         workByDate[date].hours += estHours
+        workByDate[date].checkinHours += estHours
         workByDate[date].slots.push({ estimated: true, slotCount: mp.slots.length, hours: estHours })
       }
     })
@@ -1988,9 +1996,10 @@ function calculateMemberWorkTime(store, name, year, month) {
   // 2. 已通过补报：按次累加，不限制每日一次
   overtimes.filter(ot => ot.name === name && ot.date >= monthStartStr && ot.date <= monthEndStr).forEach(ot => {
     const date = ot.date
-    if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [] }
+    if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
     const rounded = Math.ceil((ot.hours || 0) * 2) / 2
     workByDate[date].hours += rounded
+    workByDate[date].overtimeHours += rounded
     workByDate[date].slots.push({ overtime: true, hours: ot.hours, content: ot.content })
   })
   
@@ -2003,7 +2012,112 @@ function calculateMemberWorkTime(store, name, year, month) {
   
   const totalPay = parseFloat((totalHours * 25).toFixed(1))
   
-  return { totalHours, totalPay, workByDate, workDays: Object.keys(workByDate).length }
+  // ========== 构建每日明细（用于日历展示）==========
+  // 状态判定规则：
+  //   - 'completed' ✓ 已打卡（按班打卡，不论是否有补报）
+  //   - 'overtime'  📝 仅补报（无打卡但有通过补报，覆盖缺勤或额外工作）
+  //   - 'absent'    ⚠️ 缺勤（被排班且未打卡且无通过补报）
+  //   - 'none'      — 无排班无工作
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const todayStr = getBeijingDateString()
+  const daily = []
+  let absentCount = 0
+  let overtimeCount = 0
+  let completedCount = 0
+  
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    const weekday = dateToWeekday(dateStr)
+    
+    // 排班信息：检查该成员在指定日期的每个时段是否被排班
+    const scheduled = []
+    if (isDateInSchedulePeriod(store, dateStr) && ['周一','周二','周三','周四','周五'].includes(weekday)) {
+      for (const slotId of ['am1', 'am2', 'pm1', 'pm2']) {
+        const members = getEffectiveSlotMembers(store, dateStr, weekday, slotId)
+        if (members.includes(name)) {
+          scheduled.push({ slotId, label: SLOT_LABEL_MAP[slotId] || slotId })
+        }
+      }
+    }
+    
+    // 打卡时段明细（已配对的 in/out，按 in 时间升序）
+    const dayRecs = (byDate[dateStr] || []).slice().sort((a, b) => a.time.localeCompare(b.time))
+    const checkinSlots = dayRecs
+      .filter(r => r.type === 'in')
+      .map(iRec => {
+        // 找与该 in 配对的 out（同日，按已配对规则）
+        const dayOuts = dayRecs.filter(r => r.type === 'out')
+        const iMin = timeToMinutes(iRec.time)
+        let bestOut = null
+        for (const o of dayOuts) {
+          const oMin = timeToMinutes(o.time)
+          if (oMin >= iMin && (!bestOut || oMin < timeToMinutes(bestOut.time))) bestOut = o
+        }
+        if (!bestOut) {
+          for (const o of dayOuts) {
+            const oMin = timeToMinutes(o.time)
+            if (oMin < iMin && (!bestOut || oMin > timeToMinutes(bestOut.time))) bestOut = o
+          }
+        }
+        return {
+          in: iRec.time,
+          out: bestOut ? bestOut.time : null,
+          supp: !!(bestOut && bestOut.isSupp)
+        }
+      })
+    
+    // 补报记录（通过 / 待审核）
+    const dayApproved = allOvertimes.filter(ot => ot.name === name && ot.date === dateStr && ot.status === 'approved')
+    const dayPending  = allOvertimes.filter(ot => ot.name === name && ot.date === dateStr && ot.status === 'pending')
+    const approvedOvertimes = dayApproved.map(ot => ({ hours: ot.hours, content: ot.content }))
+    const pendingOvertimes  = dayPending.map(ot => ({ hours: ot.hours, content: ot.content }))
+    
+    const wbDate = workByDate[dateStr] || { hours: 0 }
+    const hasCheckin = checkinSlots.some(cs => cs.out)
+    const hasApprovedOt = approvedOvertimes.length > 0
+    const hasPendingOt = pendingOvertimes.length > 0
+    const isScheduled = scheduled.length > 0
+    
+    // 状态判定
+    let status = 'none'
+    if (hasCheckin) {
+      status = 'completed'
+      completedCount++
+    } else if (hasApprovedOt) {
+      // 规则：当天有通过的补报 → 算"补报"状态，不算缺勤
+      status = 'overtime'
+      overtimeCount++
+    } else if (hasPendingOt) {
+      // 有待审核补报：暂按"补报（待审）"展示
+      status = 'overtime-pending'
+    } else if (isScheduled) {
+      status = 'absent'
+      absentCount++
+    } else {
+      status = 'none'
+    }
+    
+    daily.push({
+      date: dateStr,
+      weekday,
+      isToday: dateStr === todayStr,
+      scheduled,
+      checkinSlots,
+      approvedOvertimes,
+      pendingOvertimes,
+      totalHours: wbDate.hours || 0,
+      status
+    })
+  }
+  
+  return {
+    totalHours,
+    totalPay,
+    workByDate,
+    workDays: Object.keys(workByDate).length,
+    daily,
+    monthSummary: { completedDays: completedCount, overtimeDays: overtimeCount, absentDays: absentCount, daysInMonth }
+  }
 }
 
 function timeToMinutes(timeStr) {
