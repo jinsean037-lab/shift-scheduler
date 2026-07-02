@@ -1217,6 +1217,15 @@ const SUPP_WINDOWS = {
   pm2: { start: '16:00', end: '18:30' }   // 17:30 + 60
 }
 
+// 各 slot 的标准时长（小时），用于"已签到未签退"时估算工时
+// 2026-07-02 修正：之前固定按 2h 估算，pm1/pm2 实际是 1.5h，导致重复计费
+const SLOT_HOURS = {
+  am1: 2,    // 8:00-10:00
+  am2: 2,    // 10:00-12:00
+  pm1: 1.5,  // 14:30-16:00
+  pm2: 1.5,  // 16:00-17:30
+}
+
 // 打卡地点围栏（中山大学南校园岭南行政中心）
 const CHECKIN_LOCATION = {
   name: '岭南行政中心（中山大学南校园）',
@@ -2009,12 +2018,20 @@ function calculateMemberWorkTime(store, name, year, month) {
           supp: !!mp.hasSupp
         })
       } else {
-        // 无签退：按班次数 * 2h 估算
-        const estHours = mp.slots.length * 2
+        // 无签退：按 slot 实际时长估算（pm1/pm2 是 1.5h 不是 2h）
+        let estHours = 0
+        const slotBreakdown = []
+        mp.slots.forEach(inRec => {
+          const sid = inRec.slotId
+          const h = (sid && SLOT_HOURS[sid]) || 2  // 未知 slotId 默认 2h
+          const rounded = Math.ceil(h * 2) / 2
+          estHours += rounded
+          slotBreakdown.push({ slotId: sid || 'unknown', hours: rounded })
+        })
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
         workByDate[date].hours += estHours
         workByDate[date].checkinHours += estHours
-        workByDate[date].slots.push({ estimated: true, slotCount: mp.slots.length, hours: estHours })
+        workByDate[date].slots.push({ estimated: true, slotCount: mp.slots.length, hours: estHours, slotBreakdown })
       }
     })
   })
