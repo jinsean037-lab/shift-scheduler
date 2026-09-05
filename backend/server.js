@@ -47,7 +47,7 @@ function defaultStore() {
       { id: 'pm2', label: '16:00-17:30', period: '下午' }
     ],
     days: ['周一', '周二', '周三', '周四', '周五'],
-    maxPerSlot: 2,
+    maxPerSlot: 1,
     startTime: null,
     scheduleStart: null,
     scheduleEnd: null,
@@ -206,7 +206,7 @@ function getDefaultStore() {
     startTime: null,
     scheduleStart: null,
     scheduleEnd: null,
-    maxPerSlot: 2,
+    maxPerSlot: 1,
     schedule: {
       '周一': { am1:[], am2:[], pm1:[], pm2:[] },
       '周二': { am1:[], am2:[], pm1:[], pm2:[] },
@@ -419,7 +419,7 @@ app.get('/api/schedule', async (req, res) => {
     res.json({
       timeSlots: store.timeSlots || defaultStore().timeSlots,
       days: store.days || defaultStore().days,
-      maxPerSlot: store.maxPerSlot || 2,
+      maxPerSlot: store.maxPerSlot || 1,
       schedule,
       members: store.members,
       waitlist: store.waitlist || [],
@@ -1146,6 +1146,23 @@ app.get('/api/admin/passwords', async (req, res) => {
   try {
     const store = await readStore()
     res.json({ passwords: store.passwords || {} })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：调整排班配置（v5.2：maxPerSlot 等可在线调）
+app.post('/api/admin/settings', async (req, res) => {
+  try {
+    const store = await readStore()
+    let changed = []
+    if (req.body && typeof req.body.maxPerSlot === 'number' && req.body.maxPerSlot >= 1 && req.body.maxPerSlot <= 10) {
+      store.maxPerSlot = Math.floor(req.body.maxPerSlot)
+      changed.push('maxPerSlot')
+    }
+    if (changed.length === 0) return res.json({ ok: false, msg: '没有可应用的设置项（maxPerSlot 必须是 1-10 的整数）' })
+    await writeStore({ maxPerSlot: store.maxPerSlot })
+    res.json({ ok: true, maxPerSlot: store.maxPerSlot, changed, msg: `已更新：${changed.join(', ')}` })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -3103,9 +3120,109 @@ start().catch(e => {
   process.exit(1)
 })
 
-// ========== v5.0 邮件模块 ==========
+// ========== v5.1 邮件模块（多 provider，自动 fallback）============
+// 设计：Render 平台出站 SMTP 端口被黑洞（ETIMEDOUT/ENETUNREACH）。
+//       改用 HTTP API（443 端口）可绕过。四个 provider 自动选择：
+//         1) SENDGRID_API_KEY 设置 → 走 SendGrid HTTP API（推荐，支持 163.com 等免费邮箱作为 Single Sender）
+//         2) BREVO_API_KEY 设置    → 走 Brevo HTTP API（需要自有域名，免费邮箱被拒）
+//         3) RESEND_API_KEY 设置   → 走 Resend HTTP API（需先 verify 域才能群发）
+//         4) 都没设                → 走 nodemailer/SMTP（兼容老配置，本地调试用）
+//       可用 MAIL_PROVIDER 强制指定，否则按 env 自动判定。
 
-// 创建并复用 transporter（懒加载）
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY  // SG.xxx（注意保密）
+const SENDGRID_FROM    = process.env.SENDGRID_FROM     // 'lnxyxgbss@163.com'（已通过 Single Sender Verification）
+const BREVO_API_KEY    = process.env.BREVO_API_KEY     // xkeysib-xxx
+const BREVO_FROM       = process.env.BREVO_FROM        // 已 verify 域的发件邮箱
+const RESEND_API_KEY   = process.env.RESEND_API_KEY    // re_xxx
+const RESEND_FROM      = process.env.RESEND_FROM       // 'noreply@yourdomain.com'
+
+function pickProvider() {
+  if (process.env.MAIL_PROVIDER === 'sendgrid' && SENDGRID_API_KEY) return 'sendgrid'
+  if (process.env.MAIL_PROVIDER === 'brevo'    && BREVO_API_KEY)    return 'brevo'
+  if (process.env.MAIL_PROVIDER === 'resend'   && RESEND_API_KEY)   return 'resend'
+  if (process.env.MAIL_PROVIDER === 'smtp')                         return 'smtp'
+  // auto: 优先 sendgrid > brevo > resend > smtp
+  if (SENDGRID_API_KEY) return 'sendgrid'
+  if (BREVO_API_KEY)    return 'brevo'
+  if (RESEND_API_KEY)   return 'resend'
+  return 'smtp'
+}
+
+// Brevo（原 Sendinblue）HTTP API — 免费 300 封/天，无需自有域名，只需 verify 发件邮箱
+// SendGrid HTTP API — 免费 100 封/天，支持 Single Sender Verification（可用 163.com 等免费邮箱）
+async function sendViaSendGrid(opts) {
+  const payload = {
+    personalizations: [{ to: [{ email: opts.to }] }],
+    from: { email: SENDGRID_FROM, name: MAIL_FROM_NAME },
+    subject: opts.subject || '',
+    content: [
+      { type: 'text/plain', value: opts.text || '' },
+      { type: 'text/html',  value: opts.html || '' }
+    ]
+  }
+  const r = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SENDGRID_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+  // SendGrid 成功时返回 202 + 空 body，不要 try parse JSON
+  if (r.status === 202) return { messageId: r.headers.get('x-message-id') || '' }
+  const body = await r.text()
+  throw new Error(`SendGrid HTTP ${r.status}: ${body}`)
+}
+
+async function sendViaBrevo(opts) {
+  const payload = {
+    sender: { name: MAIL_FROM_NAME, email: BREVO_FROM },
+    to: [{ email: opts.to }],
+    subject: opts.subject || '',
+    htmlContent: opts.html || '',
+    textContent: opts.text || ''
+  }
+  const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': BREVO_API_KEY,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+  if (!r.ok) {
+    const body = await r.text()
+    throw new Error(`Brevo HTTP ${r.status}: ${body}`)
+  }
+  return await r.json()
+}
+
+// Resend HTTP API — 免费 100/天 + 3000/月，免费测试域只发给账户持有人，需 verify 域才能群发
+async function sendViaResend(opts) {
+  const payload = {
+    from: `${MAIL_FROM_NAME} <${RESEND_FROM}>`,
+    to: opts.to,
+    subject: opts.subject || '',
+    html: opts.html || '',
+    text: opts.text || ''
+  }
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+  if (!r.ok) {
+    const body = await r.text()
+    throw new Error(`Resend HTTP ${r.status}: ${body}`)
+  }
+  return await r.json()
+}
+
+// 创建并复用 transporter（懒加载）—— 仅当 fallback 到 SMTP 时用到
 let _transporter = null
 function getMailer() {
   if (_transporter) return _transporter
@@ -3115,55 +3232,69 @@ function getMailer() {
     secure: SMTP_SECURE,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     // 显式设置超时，避免 SMTP 卡住让前端显示"发送中"挂死
-    connectionTimeout: 15000,   // TCP 连接超时 15s（Render 到 163 慢时也能失败快速）
-    greetingTimeout:  15000,   // SMTP 握手超时
-    socketTimeout:    30000,   // socket 读超时
+    connectionTimeout: 15000,
+    greetingTimeout:  15000,
+    socketTimeout:    30000,
   })
   return _transporter
 }
 
 // 核心发送：调用后阻塞异步发送，并把结果写入 store.emailLogs
 // opts: { to, subject, html, text, fromName? }
-// 返回: { ok, info?, error? }
+// 返回: { ok, info?, error?, provider? }
 async function sendEmail(opts) {
   const store = await readStore()
-  // 先看成员邮箱是否有效（只看 to 是已注册成员的情况）
   if (!opts || !opts.to) return { ok: false, error: '缺少收件人' }
+  const provider = pickProvider()
   const log = {
     at: getBeijingDateTimeString(),
     to: opts.to,
     subject: opts.subject || '',
     status: 'pending',
+    provider,
   }
   function appendLog(entry) {
     store.emailLogs = Array.isArray(store.emailLogs) ? store.emailLogs : []
     store.emailLogs.unshift(entry)
-    if (store.emailLogs.length > 200) store.emailLogs.length = 200  // 最多保留 200 条
+    if (store.emailLogs.length > 200) store.emailLogs.length = 200
     try { writeStore({ emailLogs: store.emailLogs }) } catch (_) {}
   }
   appendLog(log)
   try {
-    const mailer = getMailer()
-    const info = await mailer.sendMail({
-      from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
-      to: opts.to,
-      subject: opts.subject || '',
-      text: opts.text || '',
-      html: opts.html || '',
-    })
+    let info
+    if (provider === 'sendgrid') {
+      info = await sendViaSendGrid(opts)
+    } else if (provider === 'brevo') {
+      info = await sendViaBrevo(opts)
+    } else if (provider === 'resend') {
+      info = await sendViaResend(opts)
+    } else {
+      const mailer = getMailer()
+      info = await mailer.sendMail({
+        from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+        to: opts.to,
+        subject: opts.subject || '',
+        text: opts.text || '',
+        html: opts.html || '',
+      })
+    }
     log.status = 'ok'
-    log.messageId = info.messageId
+    log.messageId = (info && (info.messageId || info.id)) || ''
     appendLog(log)
-    return { ok: true, info }
+    return { ok: true, info, provider }
   } catch (e) {
     log.status = 'fail'
     log.error = (e && (e.message || String(e))) || '未知错误'
     // v5.0.2：ETIMEDOUT/ENETUNREACH 常见是部署平台到 SMTP 服务器的网络问题（不是配置问题），给运维提示
     if (e && (e.code === 'ETIMEDOUT' || e.code === 'ENETUNREACH' || e.code === 'ECONNREFUSED')) {
-      log.error = log.error + ' ｜ 诊断：部署平台（如 Render）到 ' + SMTP_HOST + ':' + SMTP_PORT + ' 的出站网络不通。建议换 SendGrid/Mailgun/Resend 等海外邮件服务，或切换到阿里云/腾讯云等大陆平台。'
+      log.error = log.error + ' ｜ 诊断：部署平台（如 Render）到 ' + SMTP_HOST + ':' + SMTP_PORT + ' 的出站网络不通。建议换 Brevo/Resend/SendGrid 等 HTTP API 服务。'
+    }
+    // Brevo/Resend 401/403 提示凭据问题
+    if (typeof log.error === 'string' && /\b(401|403)\b/.test(log.error)) {
+      log.error = log.error + ' ｜ 诊断：API Key 无效或发件邮箱未 verify。Brevo 需在 Brevo 控制台 verify 发件邮箱；Resend 免费 plan 需 verify 自有域。'
     }
     appendLog(log)
-    return { ok: false, error: log.error }
+    return { ok: false, error: log.error, provider }
   }
 }
 
