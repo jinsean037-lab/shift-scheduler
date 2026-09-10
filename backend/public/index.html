@@ -2999,6 +2999,9 @@ function renderMyShifts(shifts, forHome) {
       html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>';
       html += '<button class="cancel-btn" style="background:#4F46E5" onclick="openShiftSwapDialog(\'' + s.day + '\',\'' + s.slot + '\')">换班</button>';
       html += '</div>';
+    } else {
+      // v5.2.1：首页模式也加换班按钮（既然显示具体日期，可以直接定位换班）
+      html += '<button class="cancel-btn" style="background:#4F46E5;margin-top:6px;padding:3px 10px;font-size:11px" onclick="openShiftSwapDialog(\'' + s.day + '\',\'' + s.slot + '\')">换班</button>';
     }
     html += '</div>';
   });
@@ -4200,41 +4203,57 @@ async function loadMyCheckinHistory() {
 function renderPartners(allData, myShifts) {
   const container = document.getElementById('homePartners');
   if (!container) return;
-  
+
   // 收集本月所有排班数据，找出和当前用户同班次的人
   const dayNameMap = {'周一':1,'周二':2,'周三':3,'周四':4,'周五':5};
   const partnerMap = {}; // { '张三': [{day, slot, date, slotLabel}] }
-  
+
+  // v5.2.1：与 processScheduleSource 用同样的过滤规则
+  // - coverage 限制 5 个工作日（schedule 是单周快照）
+  // - 过滤上月（actualDate < monthStartDate）
+  // - 过滤下月（actualDate > monthEndDate）
+  // - 不过滤 today 之前（与左侧"本月我的排班"一致，让已完成的搭子也显示）
+  const _now = new Date();
+  const monthStartDate = new Date(_now.getFullYear(), _now.getMonth(), 1);
+  const monthEndDate   = new Date(_now.getFullYear(), _now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const ONE_WEEK_MS = 6 * 86400000;
+
   function scanSchedule(schedule, pStart, pEnd) {
     if (!schedule) return;
+    if (!pStart || !pEnd) return;
+    const startMs = pStart.getTime(), endMs = pEnd.getTime();
+    const coverageEndMs = Math.min(endMs, startMs + ONE_WEEK_MS);
     Object.keys(schedule).forEach(day => {
-      Object.keys(schedule[day]).forEach(slot => {
-        const names = schedule[day][slot];
-        if (!names || !names.includes(currentUser)) return;
-        // 找到同班次的其他人
-        names.forEach(n => {
-          if (n === currentUser) return;
-          if (!partnerMap[n]) partnerMap[n] = [];
-          let actualDate = null;
-          if (pStart && pEnd) {
-            const targetWd = dayNameMap[day];
-            if (targetWd !== undefined) {
-              for (let ms = pStart.getTime(); ms <= pEnd.getTime(); ms += 86400000) {
-                const td = new Date(ms);
-                if (td.getDay() === targetWd) { actualDate = td; break; }
-              }
+      const targetWd = dayNameMap[day];
+      if (targetWd === undefined) return;
+      for (let ms = startMs; ms <= coverageEndMs; ms += 86400000) {
+        const td = new Date(ms);
+        if (td.getDay() !== targetWd) continue;
+        const actualDate = td;
+        if (actualDate < monthStartDate) continue;
+        if (actualDate > monthEndDate) break;
+        const dateStr = formatLocalDate(actualDate);
+        Object.keys(schedule[day]).forEach(slot => {
+          const names = schedule[day][slot];
+          if (!names || !names.includes(currentUser)) return;
+          names.forEach(n => {
+            if (n === currentUser) return;
+            if (!partnerMap[n]) partnerMap[n] = [];
+            // v5.2.1：按 (日期+day+slot) 去重，避免跨周期同日同时段搭子重复
+            const _key = dateStr + '|' + day + '|' + slot;
+            if (!partnerMap[n].find(p => p._key === _key)) {
+              partnerMap[n].push({
+                _key, day, slot, slotId: slot,
+                date: dateStr,
+                slotLabel: SLOT_LABELS[slot] || slot
+              });
             }
-          }
-          partnerMap[n].push({
-            day, slot, slotId: slot,
-            date: actualDate ? formatLocalDate(actualDate) : day,
-            slotLabel: SLOT_LABELS[slot] || slot
           });
         });
-      });
+      }
     });
   }
-  
+
   // 扫描已归档 + 当前排班
   if (allData.confirmedPeriods) {
     allData.confirmedPeriods.forEach(period => {
@@ -4249,32 +4268,30 @@ function renderPartners(allData, myShifts) {
     const pe = cur.end ? parseLocalDate(cur.end) : null;
     scanSchedule(cur.schedule, ps, pe);
   }
-  
+
   const partners = Object.keys(partnerMap);
   if (partners.length === 0) {
     container.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0;font-size:13px">本月暂无值班搭子</p>';
     return;
   }
-  
+
   let html = '';
   partners.forEach(name => {
     const shifts = partnerMap[name];
-    const uniqueShifts = [];
-    const seen = new Set();
-    shifts.forEach(s => {
-      const key = s.day + '|' + s.slot;
-      if (!seen.has(key)) { seen.add(key); uniqueShifts.push(s); }
-    });
-    
+    // v5.2.1：每个搭子按 shift 升序展示（按日期）
+    shifts.sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot));
+
     html += '<div style="background:linear-gradient(135deg,#fef7f0,#fff5f5);border:1.5px solid #f0d9d0;border-radius:12px;padding:14px;margin-bottom:10px">';
     html += '  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
     html += '    <span style="font-size:22px">👥</span>';
     html += '    <span style="font-weight:700;font-size:15px;color:#8B1A1A">' + name + '</span>';
-    html += '    <span style="font-size:11px;color:#999;background:#f5f5f5;padding:2px 8px;border-radius:10px">共 ' + uniqueShifts.length + ' 班</span>';
+    html += '    <span style="font-size:11px;color:#999;background:#f5f5f5;padding:2px 8px;border-radius:10px">共 ' + shifts.length + ' 班</span>';
     html += '  </div>';
     html += '  <div style="font-size:12px;color:#666;line-height:1.8">';
-    uniqueShifts.forEach(s => {
-      html += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>' + s.day + '</span><span style="color:#8B1A1A;font-weight:600">' + s.slotLabel + '</span></div>';
+    shifts.forEach(s => {
+      // v5.2.1：搭子班次也带日期（MM-DD），与左侧一致
+      const dateShort = s.date && s.date.length >= 10 ? s.date.slice(5) : '';
+      html += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>' + dateShort + ' ' + s.day + '</span><span style="color:#8B1A1A;font-weight:600">' + s.slotLabel + '</span></div>';
     });
     html += '  </div>';
   // 快捷留言按钮
@@ -4291,13 +4308,13 @@ function renderPartners(allData, myShifts) {
     });
     html += '    </div>';
     // 自定义留言输入
-    html += '    <input type="text" id="msg_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_') + '" placeholder="给 ' + name + ' 留句话..." '; 
+    html += '    <input type="text" id="msg_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_') + '" placeholder="给 ' + name + ' 留句话..." ';
     html += 'style="width:100%;padding:6px 10px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:12px;box-sizing:border-box;background:#fff" />';
     html += '    <button onclick=\'sendPartnerMessage("' + name + '")\' ';
     html += 'style="margin-top:6px;width:100%;padding:6px 12px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer">📨 发送</button>';
     html += '  </div>';    html += '</div>';
   });
-  
+
   container.innerHTML = html;
 }
 
