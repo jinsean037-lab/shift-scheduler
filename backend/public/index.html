@@ -2983,8 +2983,14 @@ function renderMyShifts(shifts, forHome) {
     const displaySlot = (typeof slotLabel === 'function') ? (slotLabel(s.slotId || s.slot)) : (s.slotId || s.slot);
     // 首页模式：显示 日期（周X）格式（actualDate 可能是 Date 对象或字符串）
     const actualDateStr = (s.actualDate instanceof Date) ? formatLocalDate(s.actualDate) : (s.actualDate || s.date || '');
-    // 首页模式：只显示周次+时段，不显示日期
-    const displayDay = forHome ? (s.weekdayLabel || s.day) : ((s.actualDate) ? actualDateStr + ' (' + (s.weekdayLabel || s.day) + ')' : s.day);
+    // v5.2.1：首页模式也显示具体日期（MM-DD + 周X），避免跨周期同日 day+slot 看上去重复
+    const displayDay = (function() {
+      if (forHome) {
+        const dateShort = actualDateStr ? actualDateStr.slice(5) : ''; // MM-DD
+        return dateShort + ' ' + (s.weekdayLabel || s.day);
+      }
+      return (s.actualDate) ? actualDateStr + ' (' + (s.weekdayLabel || s.day) + ')' : s.day;
+    })();
     html += '<div class="' + cls + '">';
     html += '<div class="shift-day">' + displayDay + '</div>';
     html += '<div class="shift-slot">' + displaySlot + '</div>';
@@ -3556,44 +3562,60 @@ async function loadHomeStats() {
     const realWdNames = ['周日','周一','周二','周三','周四','周五','周六'];
     let displayShifts = [];   // 左边列表用
     const datePeriodMap = {}; // { '2026-05-27': { total, completed } } 日历用
-    
+
+    // v5.2.1：用于过滤"本月我的排班"列表
+    // - 跳过上月（actualDate < monthStart）：8/31 周期的 8/31 班次不进 9 月列表
+    // - 跳过下月（actualDate > monthEnd）：跨月不混
+    // - schedule 5×4 网格是单周快照，coverage 限制在 startMs+6 天（5 个工作日），
+    //   避免把 8/31 周期的"周一 am1"错位映射到 9/7 周一
+    // - 不跳过 actualDate < today：让已完成的班次也显示（与"已值班次数"统计保持一致）
+    const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEndDate   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const ONE_WEEK_MS = 6 * 86400000;
+
     // 辅助函数：处理一个排班数据源（confirmedPeriod 或 current schedule）
     const globalSeen = new Set();
     function processScheduleSource(schedule, pStart, pEnd, pEndTimeMs, periodId) {
       if (!schedule) return;
+      if (!pStart || !pEnd) return;
+      const startMs = pStart.getTime(), endMs = pEnd.getTime();
+      // schedule 是单周快照：只覆盖 period.start 起的 5 个工作日
+      const coverageEndMs = Math.min(endMs, startMs + ONE_WEEK_MS);
       Object.keys(schedule).forEach(day => {
         const targetWd = dayNameMap[day];
         if (targetWd === undefined) return;
-        let actualDate = null;
-        if (pStart && pEnd) {
-          const startMs = pStart.getTime(), endMs = pEnd.getTime();
-          for (let ms = startMs; ms <= endMs; ms += 86400000) {
-            const td = new Date(ms);
-            if (td.getDay() === targetWd) { actualDate = td; break; }
-          }
+        // 遍历 coverage 范围内每个匹配 targetWd 的日期
+        for (let ms = startMs; ms <= coverageEndMs; ms += 86400000) {
+          const td = new Date(ms);
+          if (td.getDay() !== targetWd) continue;
+          const actualDate = td;
+          // 过滤：上月 / 下月
+          if (actualDate < monthStartDate) continue;
+          if (actualDate > monthEndDate) break;
+          const dateStr = formatLocalDate(actualDate);
+          const realWdLabel = realWdNames[actualDate.getDay()];
+          Object.keys(schedule[day]).forEach(slot => {
+            const names = schedule[day][slot];
+            if (names && names.includes(currentUser)) {
+              // v5.2.1：去重 key 改为 (实际日期+day+slot)，避免跨周期重复
+              const uniqueKey = dateStr + '|' + day + '|' + slot;
+              if (globalSeen.has(uniqueKey)) return;
+              globalSeen.add(uniqueKey);
+              displayShifts.push({
+                day, slot, slotId: slot,
+                actualDate: actualDate,
+                weekdayLabel: realWdLabel,
+                dateStr: dateStr,
+                periodStart: pStart ? formatLocalDate(pStart) : null,
+                periodEnd: pEnd ? formatLocalDate(pEnd) : null
+              });
+              if (!datePeriodMap[dateStr]) datePeriodMap[dateStr] = { total: 0, completed: 0 };
+              datePeriodMap[dateStr].total++;
+              if (pEndTimeMs < nowTime) datePeriodMap[dateStr].completed++;
+            }
+          });
         }
-        if (!actualDate) return;
-        const dateStr = formatLocalDate(actualDate);
-        const realWdLabel = realWdNames[actualDate.getDay()];
-        Object.keys(schedule[day]).forEach(slot => {
-          const names = schedule[day][slot];
-          if (names && names.includes(currentUser)) {
-            // ✅ 去重：同一 periodId+day+slot 只计一次
-            const uniqueKey = (periodId || 'draft') + '|' + day + '|' + slot;
-            if (globalSeen.has(uniqueKey)) return;
-            globalSeen.add(uniqueKey);
-            displayShifts.push({
-              day, slot, slotId: slot,
-              actualDate: actualDate,
-              weekdayLabel: realWdLabel,
-              periodStart: pStart ? formatLocalDate(pStart) : null,
-              periodEnd: pEnd ? formatLocalDate(pEnd) : null
-            });
-            if (!datePeriodMap[dateStr]) datePeriodMap[dateStr] = { total: 0, completed: 0 };
-            datePeriodMap[dateStr].total++;
-            if (pEndTimeMs < nowTime) datePeriodMap[dateStr].completed++;
-          }
-        });
       });
     }
     
