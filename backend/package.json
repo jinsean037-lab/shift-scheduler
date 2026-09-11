@@ -1,0 +1,16 @@
+{
+  "name": "shift-scheduler-v4-backend",
+  "version": "6.0.0",
+  "description": "学工部助理排班系统 6.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "express": "^4.21.0",
+    "mongodb": "^7.2.0",
+    "nodemailer": "^9.0.3"
+  }
+}
