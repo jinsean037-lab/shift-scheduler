@@ -1,0 +1,5 @@
+[mongo] URI 为占位符，跳过 MongoDB
+[warn] MongoDB 连接失败，回退到文件存储模式
+[file] 已从 C:\Users\ASUS\.qclaw\workspace-agent-69d0291b\shift-scheduler-v3\backend\data\store.json 加载数据
+[db] 文件持久化已启用 (data/store.json)
+排班系统运行中: http://localhost:3000
