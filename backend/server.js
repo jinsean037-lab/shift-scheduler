@@ -364,6 +364,8 @@ app.post('/api/admin/schedule-archive', async (req, res) => {
     store.cancelRequests = []
     store.shiftSwapRequests = []
     store.shiftSwapOverrides = []
+    store.shiftSubstituteRequests = []
+    store.shiftSubstituteOverrides = []
     store.scheduleStart = null
     store.scheduleEnd = null
     await writeStore(store)
@@ -518,6 +520,30 @@ function getShiftSwapOverrides(store) {
   return store.shiftSwapOverrides
 }
 
+// v5.3：代班（substitute）— 单向 A → B
+function getShiftSubstituteList(store) {
+  if (!Array.isArray(store.shiftSubstituteRequests)) store.shiftSubstituteRequests = []
+  return store.shiftSubstituteRequests
+}
+function getShiftSubstituteOverrides(store) {
+  if (!Array.isArray(store.shiftSubstituteOverrides)) store.shiftSubstituteOverrides = []
+  return store.shiftSubstituteOverrides
+}
+function publicShiftSubstitute(item) {
+  return {
+    id: item.id,
+    from: item.from,
+    to: item.to,
+    date: item.date,
+    day: item.day,
+    slotId: item.slotId,
+    reason: item.reason || '',
+    status: item.status,
+    createdAt: item.createdAt,
+    reviewedAt: item.reviewedAt || null
+  }
+}
+
 function dateToWeekday(dateStr) {
   const d = new Date(`${dateStr}T12:00:00+08:00`)
   return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]
@@ -551,13 +577,21 @@ function cloneScheduleList(store, day, slotId) {
 
 function getEffectiveSlotMembers(store, dateStr, day, slotId) {
   let members = cloneScheduleList(store, day, slotId)
-  const overrides = getShiftSwapOverrides(store).filter(o => o.status === 'approved')
-  for (const item of overrides) {
+  // 1) 换班 overrides（双向互换 A 班 ↔ B 班）
+  const swapOverrides = getShiftSwapOverrides(store).filter(o => o.status === 'approved')
+  for (const item of swapOverrides) {
     if (item.fromDate === dateStr && item.fromDay === day && item.fromSlotId === slotId) {
       members = members.map(n => n === item.from ? item.to : n)
     }
     if (item.toDate === dateStr && item.toDay === day && item.toSlotId === slotId) {
       members = members.map(n => n === item.to ? item.from : n)
+    }
+  }
+  // 2) 代班 overrides（单向 A → B）：A 委托 B 替班
+  const subOverrides = getShiftSubstituteOverrides(store).filter(o => o.status === 'approved')
+  for (const item of subOverrides) {
+    if (item.date === dateStr && item.day === day && item.slotId === slotId) {
+      members = members.map(n => n === item.from ? item.to : n)
     }
   }
   return members
@@ -767,6 +801,126 @@ app.post('/api/shift-swap/revoke', async (req, res) => {
   }
 })
 
+// ========== v5.3 代班（substitute）API ==========
+// 成员发起代班：把自己的某一班次（具体日期）委托给另一成员。
+// 与换班的区别：代班是单向 A → B，对方不需要给回。
+// 对方接受后，effective slot members 会从 A 变为 B，打卡按新名单生效。
+
+// 成员：发起代班申请
+app.post('/api/shift-substitute/request', async (req, res) => {
+  try {
+    const { from, to, date, day, slotId, reason } = req.body
+    if (!from || !to || !date || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
+    if (from === to) return res.json({ ok: false, msg: '不能委托给自己' })
+    const store = await readStore()
+    if (!isDateInSchedulePeriod(store, date)) return res.json({ ok: false, msg: '代班日期不在当前排班生效周期内' })
+    if (dateToWeekday(date) !== day) return res.json({ ok: false, msg: '代班日期与周几不匹配' })
+    if (!store.members.includes(from) || !store.members.includes(to)) return res.json({ ok: false, msg: '成员不存在' })
+    // 检查发起人是否在该班次中（按 effective 算）
+    const fromList = getEffectiveSlotMembers(store, date, day, slotId)
+    if (!fromList.includes(from)) return res.json({ ok: false, msg: '你不在该班次中，无法发起代班' })
+    // 检查对方是否已在该班次中
+    if (fromList.includes(to)) return res.json({ ok: false, msg: '对方已在该班次中，无需代班' })
+    // 检查是否已有 pending 代班申请
+    const subs = getShiftSubstituteList(store)
+    const dup = subs.find(s => s.from === from && s.to === to && s.date === date && s.day === day && s.slotId === slotId && s.status === 'pending')
+    if (dup) return res.json({ ok: false, msg: '已存在待处理的代班申请' })
+    const record = {
+      id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      from, to, date, day, slotId,
+      reason: reason || '',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    }
+    subs.push(record)
+    await writeStore({ shiftSubstituteRequests: subs })
+    res.json({ ok: true, msg: '代班申请已发送，等待对方确认', request: publicShiftSubstitute(record) })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：接受/拒绝代班申请
+app.post('/api/shift-substitute/review', async (req, res) => {
+  try {
+    const { id, reviewer, action } = req.body
+    if (!id || !reviewer || !action) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const subs = getShiftSubstituteList(store)
+    const item = subs.find(s => s.id === id)
+    if (!item) return res.json({ ok: false, msg: '申请不存在' })
+    if (item.to !== reviewer) return res.json({ ok: false, msg: '只有被委托成员可以处理该申请' })
+    if (item.status !== 'pending') return res.json({ ok: false, msg: '该申请已处理' })
+    if (action !== 'approve' && action !== 'reject') return res.json({ ok: false, msg: '操作无效' })
+    if (action === 'reject') {
+      item.status = 'rejected'
+      item.reviewedAt = new Date().toISOString()
+      await writeStore({ shiftSubstituteRequests: subs })
+      return res.json({ ok: true, msg: '已拒绝代班申请', request: publicShiftSubstitute(item) })
+    }
+    // 接受前再次校验（避免对方在班次上发生变化）
+    if (!isDateInSchedulePeriod(store, item.date)) return res.json({ ok: false, msg: '代班日期已不在当前排班生效周期内' })
+    const fromList = getEffectiveSlotMembers(store, item.date, item.day, item.slotId)
+    if (!fromList.includes(item.from)) return res.json({ ok: false, msg: '发起人已不在该班次中，无法代班' })
+    if (fromList.includes(item.to)) return res.json({ ok: false, msg: '你已在该班次中，无需代班' })
+    item.status = 'approved'
+    item.reviewedAt = new Date().toISOString()
+    const overrides = getShiftSubstituteOverrides(store)
+    overrides.push({
+      id: item.id,
+      from: item.from,
+      to: item.to,
+      date: item.date,
+      day: item.day,
+      slotId: item.slotId,
+      status: 'approved',
+      createdAt: item.createdAt,
+      approvedAt: item.reviewedAt
+    })
+    await writeStore({ shiftSubstituteRequests: subs, shiftSubstituteOverrides: overrides })
+    res.json({ ok: true, msg: '代班成功，仅对所选日期生效', request: publicShiftSubstitute(item) })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：撤回自己发出的待确认代班申请
+app.post('/api/shift-substitute/revoke', async (req, res) => {
+  try {
+    const { id, name } = req.body
+    if (!id || !name) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const subs = getShiftSubstituteList(store)
+    const item = subs.find(s => s.id === id)
+    if (!item) return res.json({ ok: false, msg: '申请不存在' })
+    if (item.from !== name) return res.json({ ok: false, msg: '只能撤回自己发起的申请' })
+    if (item.status !== 'pending') return res.json({ ok: false, msg: '该申请已处理，无法撤回' })
+    item.status = 'revoked'
+    item.reviewedAt = new Date().toISOString()
+    await writeStore({ shiftSubstituteRequests: subs })
+    res.json({ ok: true, msg: '已撤回代班申请', request: publicShiftSubstitute(item) })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员：查看与自己相关的代班申请（发出 + 收到）
+app.get('/api/shift-substitutes', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: true, requests: [] })
+    const store = await readStore()
+    const subs = getShiftSubstituteList(store)
+    const requests = subs
+      .filter(s => s.from === name || s.to === name)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .map(publicShiftSubstitute)
+    res.json({ ok: true, requests })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 // 检查是否可3分钟内直接取消（不需要原因）
 app.post('/api/check-cancel-time', async (req, res) => {
   try {
@@ -961,6 +1115,8 @@ app.post('/api/admin/reset', async (req, res) => {
     store.cancelRequests = []
     store.shiftSwapRequests = []
     store.shiftSwapOverrides = []
+    store.shiftSubstituteRequests = []
+    store.shiftSubstituteOverrides = []
     store.confirmedPeriods = []
     store.scheduleStart = null
     store.scheduleEnd = null
@@ -1253,7 +1409,11 @@ app.get('/api/my-shifts', async (req, res) => {
       .filter(r => r.from === name || r.to === name)
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
       .map(publicShiftSwap)
-    res.json({ shifts, waitlist: wl, cancelRequests: cr, shiftSwapRequests: sr })
+    const su = getShiftSubstituteList(store)
+      .filter(r => r.from === name || r.to === name)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .map(publicShiftSubstitute)
+    res.json({ shifts, waitlist: wl, cancelRequests: cr, shiftSwapRequests: sr, shiftSubstituteRequests: su })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
