@@ -2062,6 +2062,17 @@ body {
           <h3>📊 当前排班状态</h3>
           <div id="scheduleStatusInfo" style="padding:16px;background:#f8f9fa;border-radius:8px;font-size:14px"></div>
         </div>
+
+        <!-- 设置每班人数上限 -->
+        <div class="admin-section">
+          <h3>👥 每班人数上限</h3>
+          <p style="color:#999;font-size:13px;margin-bottom:12px">设置每个时段最多可选择的人数。保存后会立即影响成员选班、候补和管理员手动分配。</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <input type="number" id="maxPerSlotInput" min="1" max="10" step="1" style="width:120px;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
+            <span id="maxPerSlotStatus" style="font-size:13px;color:#888"></span>
+          </div>
+          <button class="admin-btn primary" onclick="saveShiftCapacity()">💾 保存上限</button>
+        </div>
         
         <!-- 设置选班开始时间 -->
         <div class="admin-section">
@@ -2306,12 +2317,12 @@ body {
           <p class="page-subtitle">配置 SMTP 与通知触发。授权码已写在服务端 .env 或代码默认值中（前端不展示）。</p>
         </div>
         <div class="admin-section">
-          <h3>🔌 SMTP 当前生效</h3>
+          <h3>🔌 当前邮件通道</h3>
           <div id="adminEmailConfig" style="margin-top:8px"></div>
         </div>
         <div class="admin-section">
           <h3>📨 测试邮件</h3>
-          <p style="color:#666;font-size:13px">向指定地址发送测试邮件，验证 SMTP 可用性。</p>
+          <p style="color:#666;font-size:13px">向指定地址发送测试邮件，验证当前邮件通道是否可用。</p>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
             <input type="email" id="adminEmailTestTo" placeholder="收件人邮箱" style="flex:1;min-width:200px;padding:8px;border:1px solid #d4d4d8;border-radius:6px">
             <button class="admin-btn primary" onclick="adminSendTestEmail()">发送测试</button>
@@ -2345,6 +2356,7 @@ let currentRole = localStorage.getItem('userRole') || 'member';
 let adminToken = localStorage.getItem('adminToken') || '';
 let configData = {};
 let userShifts = [];
+let adminEmailRefreshTimer = null;
 
 const nativeFetch = window.fetch.bind(window);
 window.fetch = (input, init = {}) => {
@@ -2457,6 +2469,7 @@ function switchTab(tab) {
   try {
   // 切换页面时停止选班自动刷新（会在 schedule case 中重新启动）
   if (tab !== 'schedule') stopScheduleAutoRefresh();
+  if (tab !== 'admin-email') stopAdminEmailAutoRefresh();
   // 隐藏所有 page-view
   document.querySelectorAll('.page-view').forEach(v => v.classList.remove('active'));
   // 移除所有 nav 激活态
@@ -2526,6 +2539,7 @@ function switchTab(tab) {
     loadScheduleStatus();
     loadScheduleTimeRange();
     loadStartTime();
+    loadShiftCapacity();
     loadAdminSchedulePreview();
     loadMembers(); // for assign dropdown
   } else if (tab === 'admin-waitlist') {
@@ -2561,6 +2575,7 @@ function switchTab(tab) {
     document.getElementById('adminEmailView').classList.add('active');
     highlightAdminSub('admin-email');
     loadAdminEmail();
+    startAdminEmailAutoRefresh();
   }
   }
   catch(e) {
@@ -2685,7 +2700,7 @@ async function loadConfig() {
     const res = await fetch(API + '/config');
     configData = await res.json();
     const mh = document.getElementById('maxHint');
-    if (mh) mh.textContent = configData.maxPerSlot || 2;
+    if (mh) mh.textContent = configData.maxPerSlot || 1;
     if (configData.startTime) {
       const d = new Date(configData.startTime);
       const now = new Date();
@@ -2845,7 +2860,7 @@ function renderSchedule(data) {
       const assigned = data.schedule[d] && data.schedule[d][s.key] ? data.schedule[d][s.key] : [];
       const count = assigned.length;
       const isMe = assigned.includes(currentUser);
-      const max = (configData.maxPerSlot || 2);
+      const max = (configData.maxPerSlot || 1);
       let cls = 'cell';
       if (isMe) cls += ' mine';
       else if (count >= max) cls += ' full';
@@ -2917,7 +2932,7 @@ function renderSchedule(data) {
 // ========== 选/取消班次 ==========
 async function pickSlot(day, slot) {
   if (!currentUser) { alert('请先登录'); return; }
-  const max = configData.maxPerSlot || 2;
+  const max = configData.maxPerSlot || 1;
   const now = new Date();
   if (configData.startTime && now < new Date(configData.startTime)) {
     showToast('排班尚未开始'); return;
@@ -4899,6 +4914,44 @@ async function loadStartTime() {
     }
   } catch(e) {}
 }
+async function loadShiftCapacity() {
+  try {
+    const res = await fetch(API + '/config');
+    const data = await res.json();
+    const value = Number(data.maxPerSlot || 1);
+    const input = document.getElementById('maxPerSlotInput');
+    const status = document.getElementById('maxPerSlotStatus');
+    if (input) input.value = value;
+    if (status) status.textContent = '当前上限：每时段 ' + value + ' 人';
+  } catch(e) {}
+}
+async function saveShiftCapacity() {
+  const input = document.getElementById('maxPerSlotInput');
+  const value = Number(input && input.value);
+  const status = document.getElementById('maxPerSlotStatus');
+  if (!Number.isInteger(value) || value < 1 || value > 10) {
+    if (status) status.textContent = '请输入 1-10 的整数';
+    showToast('请输入 1-10 的整数');
+    return;
+  }
+  try {
+    const res = await fetch(API + '/admin/settings', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({maxPerSlot:value})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      configData.maxPerSlot = data.maxPerSlot || value;
+      showToast('保存成功：每班最多 ' + configData.maxPerSlot + ' 人');
+      loadShiftCapacity();
+      loadConfig();
+      loadAdminSchedulePreview();
+      loadScheduleStatus();
+    } else {
+      showToast(data.msg || '保存失败');
+    }
+  } catch(e) { showToast('网络错误'); }
+}
 async function saveStartTime() {
   const val = document.getElementById('startTimeInput').value;
   try {
@@ -4982,7 +5035,7 @@ async function loadAdminSchedulePreview() {
     if (!container) return;
     // 复用 renderSchedule 的逻辑渲染预览表格
     // 直接调用已有的 configData 和 renderSchedule 逻辑
-    configData = data.config || {};
+    configData = Object.assign({}, configData, { maxPerSlot: data.maxPerSlot || 1 });
     const grid = container;
     const days = ['周一','周二','周三','周四','周五'];
     const slots = [
@@ -4999,7 +5052,7 @@ async function loadAdminSchedulePreview() {
         const count = assigned.length;
         let cls = 'cell';
         if (count > 0) cls += ' mine';
-        const max = (data.config && data.config.maxPerSlot) || 2;
+        const max = data.maxPerSlot || configData.maxPerSlot || 1;
         if (count >= max) cls += ' full';
         let inner = '';
         if (assigned.length > 0) inner = '<div class="names">' + assigned.join('、') + '</div>';
@@ -5651,32 +5704,53 @@ async function sendMonthlySummary(name) {
 }
 
 // ========== v5.0 管理员邮件配置页 ==========
+async function loadAdminEmailLogs() {
+  try {
+    const logsRes = await fetch(API + '/admin/email/logs');
+    const logsData = await logsRes.json();
+    const logsEl = document.getElementById('adminEmailLogs');
+    if (!logsEl || !logsData.ok) return;
+    const logs = logsData.logs || [];
+    if (logs.length === 0) {
+      logsEl.innerHTML = '<p style="color:#999;font-size:13px;padding:14px;text-align:center">暂无发送记录</p>';
+      return;
+    }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f8f9fa;position:sticky;top:0"><th style="padding:6px 10px;text-align:left">时间</th><th style="padding:6px 10px;text-align:left">收件人</th><th style="padding:6px 10px;text-align:left">主题</th><th style="padding:6px 10px;text-align:center;width:80px">状态</th></tr></thead><tbody>';
+    logs.slice(0, 50).forEach(l => {
+      const okBg = l.status === 'ok' ? '#d1fae5' : l.status === 'fail' ? '#fee2e2' : '#fef9c3';
+      const okTxt = l.status === 'ok' ? '✅ 成功' : l.status === 'fail' ? '❌ 失败' : '⏳ 发送中';
+      html += '<tr style="border-bottom:1px solid #f0f0f0">';
+      html += '<td style="padding:6px 10px;color:#666">' + escapeText(l.at || '') + '</td>';
+      html += '<td style="padding:6px 10px">' + escapeText(l.to || '') + '</td>';
+      html += '<td style="padding:6px 10px;color:#444">' + escapeText((l.subject || '').slice(0, 40)) + '</td>';
+      html += '<td style="padding:6px 10px;text-align:center;background:' + okBg + '">' + okTxt + (l.error ? '<br><span style="color:#dc2626;font-size:11px">' + escapeText(l.error.slice(0, 40)) + '</span>' : '') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    logsEl.innerHTML = html;
+  } catch(e) {}
+}
+function startAdminEmailAutoRefresh() {
+  stopAdminEmailAutoRefresh();
+  adminEmailRefreshTimer = setInterval(() => {
+    const view = document.getElementById('adminEmailView');
+    if (!view || !view.classList.contains('active')) {
+      stopAdminEmailAutoRefresh();
+      return;
+    }
+    loadAdminEmailLogs();
+  }, 5000);
+}
+function stopAdminEmailAutoRefresh() {
+  if (adminEmailRefreshTimer) {
+    clearInterval(adminEmailRefreshTimer);
+    adminEmailRefreshTimer = null;
+  }
+}
 async function loadAdminEmail() {
   // 拉一次 logs 和所有成员邮箱
   try {
-    const logsRes = await fetch(API + '/admin/email/logs')
-    const logsData = await logsRes.json()
-    const logsEl = document.getElementById('adminEmailLogs')
-    if (logsEl && logsData.ok) {
-      const logs = logsData.logs || []
-      if (logs.length === 0) {
-        logsEl.innerHTML = '<p style="color:#999;font-size:13px;padding:14px;text-align:center">暂无发送记录</p>'
-      } else {
-        let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f8f9fa;position:sticky;top:0"><th style="padding:6px 10px;text-align:left">时间</th><th style="padding:6px 10px;text-align:left">收件人</th><th style="padding:6px 10px;text-align:left">主题</th><th style="padding:6px 10px;text-align:center;width:80px">状态</th></tr></thead><tbody>'
-        logs.slice(0, 50).forEach(l => {
-          const okBg = l.status === 'ok' ? '#d1fae5' : l.status === 'fail' ? '#fee2e2' : '#fef9c3'
-          const okTxt = l.status === 'ok' ? '✅ 成功' : l.status === 'fail' ? '❌ 失败' : '⏳ 发送中'
-          html += '<tr style="border-bottom:1px solid #f0f0f0">'
-          html += '<td style="padding:6px 10px;color:#666">' + escapeText(l.at || '') + '</td>'
-          html += '<td style="padding:6px 10px">' + escapeText(l.to || '') + '</td>'
-          html += '<td style="padding:6px 10px;color:#444">' + escapeText((l.subject || '').slice(0, 40)) + '</td>'
-          html += '<td style="padding:6px 10px;text-align:center;background:' + okBg + '">' + okTxt + (l.error ? '<br><span style="color:#dc2626;font-size:11px">' + escapeText(l.error.slice(0, 40)) + '</span>' : '') + '</td>'
-          html += '</tr>'
-        })
-        html += '</tbody></table>'
-        logsEl.innerHTML = html
-      }
-    }
+    await loadAdminEmailLogs()
     // 读 members + emails —— 通过 /api/schedule-all（含 confirmedPeriods/current.schedule）+ 全 member 列表
     // 为简化：直接拉成员邮件通过新接口（用 /api/members）—— 但项目没有该接口。复用 adminWorktime 那边抓的
     const statusRes = await fetch(API + '/worktime-claim/status')

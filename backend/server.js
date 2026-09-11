@@ -91,6 +91,14 @@ function defaultStore() {
   }
 }
 
+function normalizeMaxPerSlot(value, fallback = 1) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  const intValue = Math.floor(n)
+  if (intValue < 1 || intValue > 10) return fallback
+  return intValue
+}
+
 // ========== MongoDB 操作 ==========
 
 async function connectMongo() {
@@ -301,7 +309,7 @@ app.get('/api/config', async (req, res) => {
     res.json({
       timeSlots: store.timeSlots,
       days: store.days,
-      maxPerSlot: store.maxPerSlot,
+      maxPerSlot: normalizeMaxPerSlot(store.maxPerSlot),
       startTime: store.startTime,
       scheduleStart: store.scheduleStart,
       scheduleEnd: store.scheduleEnd,
@@ -464,7 +472,7 @@ app.get('/api/schedule', async (req, res) => {
     res.json({
       timeSlots: store.timeSlots || defaultStore().timeSlots,
       days: store.days || defaultStore().days,
-      maxPerSlot: store.maxPerSlot || 1,
+      maxPerSlot: normalizeMaxPerSlot(store.maxPerSlot),
       schedule,
       members: store.members,
       waitlist: store.waitlist || [],
@@ -498,8 +506,9 @@ app.post('/api/select', async (req, res) => {
     if (!store.schedule[day][slot]) store.schedule[day][slot] = []
     const list = store.schedule[day][slot]
     if (list.includes(name)) return res.json({ ok: true, action: 'none', schedule: store.schedule, msg: '已选择该时段' })
-    if (list.length >= store.maxPerSlot) {
-      return res.json({ ok: false, msg: `该时段已满（${store.maxPerSlot}/${store.maxPerSlot}），可申请候补` })
+    const maxPerSlot = normalizeMaxPerSlot(store.maxPerSlot)
+    if (list.length >= maxPerSlot) {
+      return res.json({ ok: false, msg: `该时段已满（${maxPerSlot}/${maxPerSlot}），可申请候补` })
     }
     list.push(name)
     store.scheduleTime[`${day}|${slot}|${name}`] = Date.now()
@@ -1474,8 +1483,9 @@ app.post('/api/admin/settings', async (req, res) => {
   try {
     const store = await readStore()
     let changed = []
-    if (req.body && typeof req.body.maxPerSlot === 'number' && req.body.maxPerSlot >= 1 && req.body.maxPerSlot <= 10) {
-      store.maxPerSlot = Math.floor(req.body.maxPerSlot)
+    const nextMaxPerSlot = req.body ? normalizeMaxPerSlot(req.body.maxPerSlot, null) : null
+    if (nextMaxPerSlot) {
+      store.maxPerSlot = nextMaxPerSlot
       changed.push('maxPerSlot')
     }
     if (changed.length === 0) return res.json({ ok: false, msg: '没有可应用的设置项（maxPerSlot 必须是 1-10 的整数）' })
@@ -1520,6 +1530,7 @@ app.get('/api/schedule-all', async (req, res) => {
         end: store.scheduleEnd,
         schedule: store.schedule
       },
+      maxPerSlot: normalizeMaxPerSlot(store.maxPerSlot),
       confirmedPeriods: store.confirmedPeriods || [],
       scheduleTime: store.scheduleTime
     })
@@ -3978,6 +3989,7 @@ module.exports = {
   calculateMemberWorkTime,
   defaultStore,
   removeMemberRelatedData,
+  normalizeMaxPerSlot,
   slotOverlapMinutes,
   timeToMinutes
 }

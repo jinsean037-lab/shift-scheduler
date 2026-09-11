@@ -5,6 +5,7 @@ const {
   addMemberToStore,
   calculateMemberWorkTime,
   defaultStore,
+  normalizeMaxPerSlot,
   removeMemberRelatedData,
   slotOverlapMinutes,
 } = require('../backend/server')
@@ -60,4 +61,12 @@ test('multi-slot work time is based on actual overlap, not any tiny intersection
   const data = calculateMemberWorkTime(store, '甲', 2026, 6)
 
   assert.equal(data.workByDate['2026-06-01'].checkinHours, 1)
+})
+
+test('shift capacity setting is normalized to a 1-10 integer', () => {
+  assert.equal(normalizeMaxPerSlot('3'), 3)
+  assert.equal(normalizeMaxPerSlot(2.8), 2)
+  assert.equal(normalizeMaxPerSlot(0), 1)
+  assert.equal(normalizeMaxPerSlot(11), 1)
+  assert.equal(normalizeMaxPerSlot('bad', 4), 4)
 })
