@@ -2002,7 +2002,7 @@ body {
         <div id="shiftMgmtSwapPane">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <span style="color:#666;font-size:13px">互换两个具体班次（A 班 ↔ B 班）</span>
-            <button class="btn-primary" onclick="openShiftSwapDialog(null,null)" style="padding:6px 14px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">+ 发起换班</button>
+            <button class="btn-primary" onclick="openShiftMgmtSwapStart()" style="padding:6px 14px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">+ 发起换班</button>
           </div>
           <div id="shiftMgmtSwapList"></div>
         </div>
@@ -3337,6 +3337,53 @@ async function revokeShiftSwap(id) {
 }
 
 // ========== v5.3 换班与代班管理 ==========
+// 从"换班与代班管理"模块点"+ 发起换班"：先让用户选一个自己的具体班次，再走 openShiftSwapDialog
+async function openShiftMgmtSwapStart() {
+  const swapData = await getSwapData();
+  const myShifts = getMemberScheduledShifts(swapData.schedule, currentUser);
+  if (!myShifts.length) { showToast('当前你没有任何可换班的班次'); return; }
+  // 收集每个 day+slot 在当前周期内的具体日期
+  const shiftOptions = [];
+  myShifts.forEach(function(s) {
+    const dates = datesForWeekday(swapData.scheduleStart, swapData.scheduleEnd, s.day);
+    dates.forEach(function(d) {
+      shiftOptions.push({ day: s.day, slotId: s.slotId, date: d, label: d + ' ' + s.day + ' ' + slotLabel(s.slotId) });
+    });
+  });
+  if (!shiftOptions.length) { showToast('当前生效周期内没有可换班的班次'); return; }
+
+  let overlay = document.getElementById('shiftSwapStartOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'shiftSwapStartOverlay';
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.cssText = 'display:flex;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
+  overlay.innerHTML = [
+    '<div class="modal" style="max-width:440px;width:100%;background:#fff;color:#222;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,.28);padding:24px;box-sizing:border-box">',
+    '<h3 style="color:var(--primary);font-size:18px;margin-bottom:12px;text-align:center">选择要换出的班次</h3>',
+    '<p style="font-size:13px;color:#666;margin-bottom:14px;text-align:center">先选一个你的具体班次，下一步再选互换对象</p>',
+    '<label style="display:block;font-size:13px;color:#333;margin-bottom:6px;font-weight:600">你的班次</label>',
+    '<select id="swapStartShiftSelect" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;margin-bottom:14px;color:#222">',
+    shiftOptions.map(function(o) { return '<option value="' + escapeText(o.day+'|'+o.slotId) + '">' + escapeText(o.label) + '</option>'; }).join(''),
+    '</select>',
+    '<div style="display:flex;gap:10px">',
+    '<button id="swapStartNextBtn" style="flex:1;padding:11px;background:#4F46E5;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">下一步</button>',
+    '<button id="swapStartCancelBtn" style="flex:1;padding:11px;background:#f5f5f5;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer">取消</button>',
+    '</div>',
+    '</div>'
+  ].join('');
+  document.getElementById('swapStartNextBtn').onclick = function() {
+    const v = document.getElementById('swapStartShiftSelect').value;
+    if (!v) return;
+    overlay.style.display = 'none';
+    const parts = v.split('|');
+    openShiftSwapDialog(parts[0], parts[1]);
+  };
+  document.getElementById('swapStartCancelBtn').onclick = function() { overlay.style.display = 'none'; };
+}
+
 function switchShiftMgmtTab(tab) {
   document.querySelectorAll('.shift-mgmt-tab').forEach(b => {
     if (b.dataset.subtab === tab) {
