@@ -1,2 +1,5 @@
 node_modules/
 data/store.json
+backend/data/store.json
+srv.*.log
+_add_debug_route.js

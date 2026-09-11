@@ -6247,16 +6247,29 @@ async function toggleWorkTimeClaim(isOpen) {
 }
 
 // 导出单个成员的考勤表 .docx
-function exportAttendanceDocx(name) {
+async function exportAttendanceDocx(name) {
   if (!name) { showToast('缺少成员姓名'); return; }
   const url = API + '/admin/worktime-claim/export/' + encodeURIComponent(name);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = '';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
   showToast('正在导出 ' + name + ' 的考勤表...');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.msg || '导出失败，请重新登录管理员账号');
+      return;
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = name + '_勤工助学考勤表.docx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(objectUrl);
+  } catch (e) {
+    showToast('网络错误');
+  }
 }
 
 // ========== 管理员：本月各成员值班情况 ==========
