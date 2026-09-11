@@ -5669,15 +5669,24 @@ async function loadAdminEmail() {
     // 为简化：直接拉成员邮件通过新接口（用 /api/members）—— 但项目没有该接口。复用 adminWorktime 那边抓的
     const statusRes = await fetch(API + '/worktime-claim/status')
     const statusData = await statusRes.json()
+    const cfgRes = await fetch(API + '/admin/email/config').catch(() => null)
+    const cfgData = cfgRes ? await cfgRes.json().catch(() => ({})) : {}
     const ccfgEl = document.getElementById('adminEmailConfig')
     const mbrEl = document.getElementById('adminEmailMembers')
     if (ccfgEl) {
-      ccfgEl.innerHTML = '<table style="font-size:13px"><tr><td style="padding:4px 12px;color:#666">SMTP 服务器</td><td style="padding:4px 12px"><code>smtp.163.com:465</code> （SSL）</td></tr>'
-        + '<tr><td style="padding:4px 12px;color:#666">发件人</td><td style="padding:4px 12px"><code>lnxyxgbss@163.com</code></td></tr>'
-        + '<tr><td style="padding:4px 12px;color:#666">授权码</td><td style="padding:4px 12px;color:#2e7d32"><code>●●●●●●●●●● (已配置，从服务端 .env 或默认值读取)</code></td></tr>'
-        + '<tr><td style="padding:4px 12px;color:#666">发件人名称</td><td style="padding:4px 12px">中山大学岭南学院学工办</td></tr>'
+      const cfg = cfgData.ok ? cfgData : {}
+      const smtp = cfg.smtp || {}
+      const provider = cfg.provider || 'smtp'
+      const hp = cfg.httpProviders || {}
+      ccfgEl.innerHTML = '<table style="font-size:13px">'
+        + '<tr><td style="padding:4px 12px;color:#666">当前通道</td><td style="padding:4px 12px"><b>' + escapeText(provider.toUpperCase()) + '</b></td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">SMTP 服务器</td><td style="padding:4px 12px"><code>' + escapeText(smtp.host || 'smtp.163.com') + ':' + escapeText(smtp.port || '465') + '</code> ' + (smtp.secure === false ? '' : '（SSL）') + '</td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">发件人</td><td style="padding:4px 12px"><code>' + escapeText(smtp.user || '') + '</code></td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">发件人名称</td><td style="padding:4px 12px">' + escapeText(smtp.fromName || '中山大学岭南学院学工办') + '</td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">HTTP 邮件服务</td><td style="padding:4px 12px">SendGrid ' + (hp.sendgrid ? '已配置' : '未配置') + ' · Brevo ' + (hp.brevo ? '已配置' : '未配置') + ' · Resend ' + (hp.resend ? '已配置' : '未配置') + '</td></tr>'
+        + '<tr><td style="padding:4px 12px;color:#666">批量发送间隔</td><td style="padding:4px 12px">' + escapeText(cfg.bulkDelayMs || 1200) + ' ms</td></tr>'
         + '<tr><td style="padding:4px 12px;color:#666">触发场景</td><td style="padding:4px 12px">密码重置 · 排班开启 · 申报开启 · 月度总结</td></tr></table>'
-        + '<p style="margin-top:8px;color:#888;font-size:12px">⚠️ 授权码只在服务端代码 / 环境变量中保存，前端无法修改。如需更换发件邮箱请修改 server.js 顶部 SMTP_* 常量并重启服务。</p>'
+        + '<p style="margin-top:8px;color:#888;font-size:12px">如果部署平台到 SMTP 端口不通，建议配置 SendGrid、Brevo 或 Resend 的 HTTP API 环境变量，批量发送会更稳定。</p>'
     }
     if (mbrEl) {
       const membersRes = await fetch(API + '/admin/email/members').catch(() => null)
@@ -6252,13 +6261,25 @@ async function exportAttendanceDocx(name) {
   const url = API + '/admin/worktime-claim/export/' + encodeURIComponent(name);
   showToast('正在导出 ' + name + ' 的考勤表...');
   try {
-    const res = await fetch(url);
+    const headers = {};
+    if (adminToken) headers['X-Admin-Token'] = adminToken;
+    const res = await fetch(url + (adminToken ? ('?adminToken=' + encodeURIComponent(adminToken)) : ''), { headers });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       showToast(data.msg || '导出失败，请重新登录管理员账号');
       return;
     }
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.msg || '导出失败，请重新登录管理员账号');
+      return;
+    }
     const blob = await res.blob();
+    if (!blob || blob.size === 0) {
+      showToast('导出失败：文件为空');
+      return;
+    }
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = objectUrl;

@@ -1,6 +1,7 @@
 const express = require('express')
 const path = require('path')
 const crypto = require('crypto')
+const dns = require('dns')
 const { MongoClient } = require('mongodb')
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
@@ -18,6 +19,10 @@ const SMTP_USER   = process.env.SMTP_USER   || 'lnxyxgbss@163.com'
 const SMTP_PASS   = process.env.SMTP_PASS   || 'VNvc3XzCUpBBsZBN'
 const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || '中山大学岭南学院学工办'
 const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || SMTP_FROM_NAME
+
+try {
+  dns.setDefaultResultOrder('ipv4first')
+} catch (_) {}
 
 // ========== MongoDB 连接 ==========
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://1327446407_db_user:<db_password>@ac-1pkoj3t-shard-00-00.mdoh4fq.mongodb.net:27017,ac-1pkoj3t-shard-00-01.mdoh4fq.mongodb.net:27017,ac-1pkoj3t-shard-00-02.mdoh4fq.mongodb.net:27017/?ssl=true&replicaSet=atlas-fvozf6-shard-0&authSource=admin&appName=Cluster0'
@@ -266,7 +271,8 @@ function isValidAdminToken(token) {
 }
 
 function requireAdmin(req, res, next) {
-  if (isValidAdminToken(req.get('X-Admin-Token'))) return next()
+  const token = req.get('X-Admin-Token') || req.query.adminToken || req.query.token
+  if (isValidAdminToken(token)) return next()
   return res.status(401).json({ ok: false, msg: '管理员登录已失效，请重新登录' })
 }
 
@@ -2288,6 +2294,7 @@ app.post('/api/admin/email/monthly-summary', async (req, res) => {
       const r = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text })
       results.push({ name: n, ok: r.ok, error: r.error })
       if (r.ok) sentCount++; else failCount++
+      if (name === 'all') await wait(parseInt(process.env.BULK_EMAIL_DELAY_MS || '1200', 10))
     }
     res.json({ ok: true, sentCount, failCount, results })
   } catch (e) {
@@ -2319,6 +2326,30 @@ app.get('/api/admin/email/logs', async (req, res) => {
     const store = await readStore()
     const logs = (store.emailLogs || []).slice(0, 100)
     res.json({ ok: true, logs })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+app.get('/api/admin/email/config', async (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      provider: pickProvider(),
+      smtp: {
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        secure: SMTP_SECURE,
+        user: SMTP_USER,
+        fromName: SMTP_FROM_NAME
+      },
+      httpProviders: {
+        sendgrid: !!SENDGRID_API_KEY,
+        brevo: !!BREVO_API_KEY,
+        resend: !!RESEND_API_KEY
+      },
+      bulkDelayMs: parseInt(process.env.BULK_EMAIL_DELAY_MS || '1200', 10)
+    })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -3562,6 +3593,8 @@ function getMailer() {
     host: SMTP_HOST,
     port: SMTP_PORT,
     secure: SMTP_SECURE,
+    family: 4,
+    pool: false,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     // 显式设置超时，避免 SMTP 卡住让前端显示"发送中"挂死
     connectionTimeout: 15000,
@@ -3569,6 +3602,16 @@ function getMailer() {
     socketTimeout:    30000,
   })
   return _transporter
+}
+
+function resetMailer() {
+  if (!_transporter) return
+  try { _transporter.close() } catch (_) {}
+  _transporter = null
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 // 核心发送：调用后阻塞异步发送，并把结果写入 store.emailLogs
@@ -3615,6 +3658,7 @@ async function sendEmail(opts) {
     appendLog(log)
     return { ok: true, info, provider }
   } catch (e) {
+    if (provider === 'smtp') resetMailer()
     log.status = 'fail'
     log.error = (e && (e.message || String(e))) || '未知错误'
     // v5.0.2：ETIMEDOUT/ENETUNREACH 常见是部署平台到 SMTP 服务器的网络问题（不是配置问题），给运维提示
