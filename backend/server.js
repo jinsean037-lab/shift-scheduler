@@ -2285,6 +2285,7 @@ app.post('/api/admin/email/monthly-summary', async (req, res) => {
     const targets = (name && name !== 'all') ? [name] : (Object.keys(store.memberEmails || {}))
     let sentCount = 0
     let failCount = 0
+    let stoppedReason = ''
     const results = []
     for (const n of targets) {
       const email = (store.memberEmails || {})[n]
@@ -2294,9 +2295,13 @@ app.post('/api/admin/email/monthly-summary', async (req, res) => {
       const r = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text })
       results.push({ name: n, ok: r.ok, error: r.error })
       if (r.ok) sentCount++; else failCount++
+      if (name === 'all' && !r.ok && r.provider === 'smtp' && isMailNetworkError(r.error)) {
+        stoppedReason = 'SMTP 邮件服务器网络不可达，已停止批量发送。建议配置 SendGrid/Brevo/Resend HTTP API 后再重试。'
+        break
+      }
       if (name === 'all') await wait(parseInt(process.env.BULK_EMAIL_DELAY_MS || '1200', 10))
     }
-    res.json({ ok: true, sentCount, failCount, results })
+    res.json({ ok: true, sentCount, failCount, stoppedReason, results })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -2310,8 +2315,8 @@ app.post('/api/admin/email/test', async (req, res) => {
     const result = await sendEmail({
       to,
       subject: '【测试】排班系统邮件连通性测试',
-      text: '这是一封测试邮件，证明 SMTP 配置正确。\n如果你收到这封邮件说明 163 SMTP 已配置成功。',
-      html: '<div style="font-family:Arial,sans-serif;padding:24px;background:#f9fafb;border-radius:8px"><h2 style="color:#8B1A1A">📧 邮件测试</h2><p>这是一封来自 <b>学工办助理排班管理系统</b> 的连通性测试邮件。</p><p style="color:#888;font-size:13px">如果你看到这封邮件，说明 SMTP 配置已生效。</p></div>',
+      text: '这是一封测试邮件，用于验证排班系统当前邮件通道是否可用。',
+      html: '<div style="font-family:Arial,sans-serif;padding:24px;background:#f9fafb;border-radius:8px"><h2 style="color:#8B1A1A">📧 邮件测试</h2><p>这是一封来自 <b>学工办助理排班管理系统</b> 的连通性测试邮件。</p><p style="color:#888;font-size:13px">如果你看到这封邮件，说明当前邮件通道已生效。</p></div>',
     })
     if (result.ok) res.json({ ok: true, info: result.info })
     else res.json({ ok: false, error: result.error })
@@ -2324,7 +2329,15 @@ app.post('/api/admin/email/test', async (req, res) => {
 app.get('/api/admin/email/logs', async (req, res) => {
   try {
     const store = await readStore()
-    const logs = (store.emailLogs || []).slice(0, 100)
+    const logs = []
+    const seen = new Set()
+    for (const item of (store.emailLogs || [])) {
+      const key = item.id || [item.at, item.to, item.subject, item.status, item.error || ''].join('|')
+      if (seen.has(key)) continue
+      seen.add(key)
+      logs.push(item)
+      if (logs.length >= 100) break
+    }
     res.json({ ok: true, logs })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
@@ -3585,33 +3598,48 @@ async function sendViaResend(opts) {
   return await r.json()
 }
 
-// 创建并复用 transporter（懒加载）—— 仅当 fallback 到 SMTP 时用到
-let _transporter = null
-function getMailer() {
-  if (_transporter) return _transporter
-  _transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
+async function resolveSmtpHost() {
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(SMTP_HOST)) return SMTP_HOST
+  try {
+    const addresses = await dns.promises.resolve4(SMTP_HOST)
+    if (addresses && addresses.length > 0) return addresses[0]
+  } catch (_) {}
+  return SMTP_HOST
+}
+
+async function sendViaSmtp(opts) {
+  const connectHost = await resolveSmtpHost()
+  const mailer = nodemailer.createTransport({
+    host: connectHost,
     port: SMTP_PORT,
     secure: SMTP_SECURE,
     family: 4,
     pool: false,
+    tls: { servername: SMTP_HOST },
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    // 显式设置超时，避免 SMTP 卡住让前端显示"发送中"挂死
     connectionTimeout: 15000,
     greetingTimeout:  15000,
     socketTimeout:    30000,
   })
-  return _transporter
-}
-
-function resetMailer() {
-  if (!_transporter) return
-  try { _transporter.close() } catch (_) {}
-  _transporter = null
+  try {
+    return await mailer.sendMail({
+      from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+      to: opts.to,
+      subject: opts.subject || '',
+      text: opts.text || '',
+      html: opts.html || '',
+    })
+  } finally {
+    try { mailer.close() } catch (_) {}
+  }
 }
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function isMailNetworkError(errorText) {
+  return /ENETUNREACH|ETIMEDOUT|ECONNREFUSED|ECONNRESET|network|timeout/i.test(String(errorText || ''))
 }
 
 // 核心发送：调用后阻塞异步发送，并把结果写入 store.emailLogs
@@ -3622,19 +3650,23 @@ async function sendEmail(opts) {
   if (!opts || !opts.to) return { ok: false, error: '缺少收件人' }
   const provider = pickProvider()
   const log = {
+    id: `mail_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     at: getBeijingDateTimeString(),
     to: opts.to,
     subject: opts.subject || '',
     status: 'pending',
     provider,
   }
-  function appendLog(entry) {
+  async function saveLog(entry) {
     store.emailLogs = Array.isArray(store.emailLogs) ? store.emailLogs : []
-    store.emailLogs.unshift(entry)
+    const cleanEntry = { ...entry }
+    const idx = store.emailLogs.findIndex(l => l && l.id === cleanEntry.id)
+    if (idx >= 0) store.emailLogs[idx] = cleanEntry
+    else store.emailLogs.unshift(cleanEntry)
     if (store.emailLogs.length > 200) store.emailLogs.length = 200
-    try { writeStore({ emailLogs: store.emailLogs }) } catch (_) {}
+    await writeStore({ emailLogs: store.emailLogs })
   }
-  appendLog(log)
+  await saveLog(log)
   try {
     let info
     if (provider === 'sendgrid') {
@@ -3644,21 +3676,13 @@ async function sendEmail(opts) {
     } else if (provider === 'resend') {
       info = await sendViaResend(opts)
     } else {
-      const mailer = getMailer()
-      info = await mailer.sendMail({
-        from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
-        to: opts.to,
-        subject: opts.subject || '',
-        text: opts.text || '',
-        html: opts.html || '',
-      })
+      info = await sendViaSmtp(opts)
     }
     log.status = 'ok'
     log.messageId = (info && (info.messageId || info.id)) || ''
-    appendLog(log)
+    await saveLog(log)
     return { ok: true, info, provider }
   } catch (e) {
-    if (provider === 'smtp') resetMailer()
     log.status = 'fail'
     log.error = (e && (e.message || String(e))) || '未知错误'
     // v5.0.2：ETIMEDOUT/ENETUNREACH 常见是部署平台到 SMTP 服务器的网络问题（不是配置问题），给运维提示
@@ -3669,7 +3693,7 @@ async function sendEmail(opts) {
     if (typeof log.error === 'string' && /\b(401|403)\b/.test(log.error)) {
       log.error = log.error + ' ｜ 诊断：API Key 无效或发件邮箱未 verify。Brevo 需在 Brevo 控制台 verify 发件邮箱；Resend 免费 plan 需 verify 自有域。'
     }
-    appendLog(log)
+    await saveLog(log)
     return { ok: false, error: log.error, provider }
   }
 }

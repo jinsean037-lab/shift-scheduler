@@ -5628,8 +5628,20 @@ async function sendMonthlySummary(name) {
     })
     const data = await res.json()
     if (data.ok) {
+      if (data.stoppedReason) {
+        showToast('❌ ' + data.stoppedReason, 5200)
+        loadAdminEmail()
+        return
+      }
+      if ((data.sentCount || 0) === 0 && (data.failCount || 0) > 0) {
+        const firstError = (data.results || []).find(r => r && r.error)
+        showToast('❌ 发送失败：' + escapeText((firstError && firstError.error) || '请查看发送日志'), 5200)
+        loadAdminEmail()
+        return
+      }
       const f = data.failCount > 0 ? '（' + data.failCount + ' 失败）' : ''
       showToast('✅ ' + (isAll ? '全发完成' : '已发送') + '：成功 ' + data.sentCount + ' 封' + f)
+      loadAdminEmail()
     } else {
       showToast('❌ ' + (data.msg || '发送失败'))
     }
