@@ -1,0 +1,30 @@
+.login-page {
+  min-height: 100vh;
+  padding: 84rpx 34rpx;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #fff 0%, #f6f7f9 100%);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+  margin-bottom: 48rpx;
+}
+
+.brand-mark {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: #8B1A1A;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 38rpx;
+}
+
+.login-btn {
+  margin-top: 18rpx;
+}

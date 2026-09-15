@@ -1,0 +1,21 @@
+<view class="login-page">
+  <view class="brand">
+    <view class="brand-mark">岭</view>
+    <view>
+      <view class="title">学工办助理排班</view>
+      <view class="subtitle">成员端小程序</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="field">
+      <view class="label">姓名</view>
+      <input class="input" placeholder="请输入姓名" value="{{name}}" bindinput="onNameInput" />
+    </view>
+    <view class="field">
+      <view class="label">密码</view>
+      <input class="input" password placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" />
+    </view>
+    <button class="btn login-btn" loading="{{loading}}" bindtap="login">登录</button>
+  </view>
+</view>
