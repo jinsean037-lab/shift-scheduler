@@ -1,0 +1,46 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/index/index",
+    "pages/shifts/shifts",
+    "pages/exchange/exchange",
+    "pages/profile/profile",
+    "pages/subscribe/subscribe"
+  ],
+  "window": {
+    "navigationBarTitleText": "学工办助理排班",
+    "navigationBarBackgroundColor": "#8B1A1A",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f6f7f9"
+  },
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#8B1A1A",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "打卡"
+      },
+      {
+        "pagePath": "pages/shifts/shifts",
+        "text": "班次"
+      },
+      {
+        "pagePath": "pages/exchange/exchange",
+        "text": "换代班"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于确认你是否在允许的签到签退范围内"
+    }
+  },
+  "sitemapLocation": "sitemap.json"
+}
