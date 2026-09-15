@@ -15,10 +15,12 @@ const nodemailer = require('nodemailer')
 const SMTP_HOST   = process.env.SMTP_HOST   || 'smtp.163.com'
 const SMTP_PORT   = parseInt(process.env.SMTP_PORT || '465', 10)
 const SMTP_SECURE = process.env.SMTP_SECURE !== 'false'  // 默认 SSL
-const SMTP_USER   = process.env.SMTP_USER   || 'lnxyxgbss@163.com'
-const SMTP_PASS   = process.env.SMTP_PASS   || 'VNvc3XzCUpBBsZBN'
+const SMTP_USER   = process.env.SMTP_USER   || ''
+const SMTP_PASS   = process.env.SMTP_PASS   || ''
 const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || '中山大学岭南学院学工办'
 const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || SMTP_FROM_NAME
+const WECHAT_MINI_APPID = process.env.WECHAT_MINI_APPID || ''
+const WECHAT_MINI_SECRET = process.env.WECHAT_MINI_SECRET || ''
 
 try {
   dns.setDefaultResultOrder('ipv4first')
@@ -87,7 +89,8 @@ function defaultStore() {
     partnerMessages: [],
     suppCheckouts: [],
     memberEmails: {},
-    memberProfiles: {}
+    memberProfiles: {},
+    wechatSubscriptions: {}
   }
 }
 
@@ -1724,6 +1727,55 @@ function getTodaySlots(store, name) {
   return result
 }
 
+function getMemberTodayStatus(store, name, nowDate) {
+  const today = nowDate || getBeijingDateString()
+  const todayWeekday = dateToWeekday(today)
+  const nowHHMM = getBeijingTimeHHMM()
+  const shifts = getEffectiveShiftsForMember(store, name)
+    .filter(s => s.date === today)
+    .map(s => {
+      const slotId = s.slotId || s.slot
+      const records = (store.checkins || [])
+        .filter(c => c.name === name && c.date === today && c.slotId === slotId)
+        .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')))
+      let latestIn = null
+      let latestOut = null
+      for (const record of records) {
+        if (record.type === 'in') latestIn = record
+        if (record.type === 'out' && latestIn) latestOut = record
+      }
+      let status = 'pending'
+      if (latestIn && latestOut) status = 'completed'
+      else if (latestIn) status = 'in_progress'
+      const win = SLOT_WINDOWS[slotId]
+      const inWindow = !!(win && nowHHMM >= win.start && nowHHMM <= win.end)
+      return {
+        ...s,
+        day: s.day || todayWeekday,
+        slotId,
+        status,
+        statusText: status === 'completed' ? '已签退' : status === 'in_progress' ? '值班中' : '未签到',
+        checkinAt: latestIn ? latestIn.time : null,
+        checkoutAt: latestOut ? latestOut.time : null,
+        canCheckin: status === 'pending' && inWindow,
+        canCheckout: status === 'in_progress' && inWindow
+      }
+    })
+  return { date: today, weekday: todayWeekday, shifts }
+}
+
+app.get('/api/member/today-status', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    res.json({ ok: true, ...getMemberTodayStatus(store, name) })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 // POST /api/checkin — 签到（必须在排班时间窗口内）
 app.post('/api/checkin', async (req, res) => {
   try {
@@ -2473,6 +2525,81 @@ app.put('/api/member/profile', async (req, res) => {
     store.memberProfiles[name] = clean
     await writeStore({ memberProfiles: store.memberProfiles })
     res.json({ ok: true, msg: '个人信息已保存', profile: clean })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 小程序成员端：保存微信订阅提醒偏好。
+// 真正发送订阅消息还需要配置小程序 AppID/Secret、模板 ID，并在成员授权后记录 openid。
+app.get('/api/member/wechat-subscription', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const store = await readStore()
+    const settings = ((store.wechatSubscriptions || {})[name]) || {}
+    res.json({ ok: true, name, settings })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+app.put('/api/member/wechat-subscription', async (req, res) => {
+  try {
+    const { name, settings } = req.body || {}
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    const input = settings && typeof settings === 'object' ? settings : {}
+    const clean = {
+      beforeShift: !!input.beforeShift,
+      missedCheckin: !!input.missedCheckin,
+      missedCheckout: !!input.missedCheckout,
+      exchangeNotice: !!input.exchangeNotice,
+      worktimeNotice: !!input.worktimeNotice,
+      subscribeResult: input.subscribeResult && typeof input.subscribeResult === 'object' ? input.subscribeResult : {},
+      updatedAt: new Date().toISOString()
+    }
+    if (!store.wechatSubscriptions) store.wechatSubscriptions = {}
+    store.wechatSubscriptions[name] = clean
+    await writeStore({ wechatSubscriptions: store.wechatSubscriptions })
+    res.json({ ok: true, msg: '订阅提醒设置已保存', settings: clean })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+async function fetchWechatMiniOpenid(code) {
+  if (!WECHAT_MINI_APPID || !WECHAT_MINI_SECRET) return { ok: false, msg: '未配置小程序 AppID/Secret' }
+  const url = 'https://api.weixin.qq.com/sns/jscode2session'
+    + '?appid=' + encodeURIComponent(WECHAT_MINI_APPID)
+    + '&secret=' + encodeURIComponent(WECHAT_MINI_SECRET)
+    + '&js_code=' + encodeURIComponent(code)
+    + '&grant_type=authorization_code'
+  const r = await fetch(url)
+  const data = await r.json()
+  if (!data.openid) return { ok: false, msg: data.errmsg || '微信登录失败' }
+  return { ok: true, openid: data.openid, unionid: data.unionid || '' }
+}
+
+app.post('/api/member/wechat-bind', async (req, res) => {
+  try {
+    const { name, code } = req.body || {}
+    if (!name || !code) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    const wxData = await fetchWechatMiniOpenid(code)
+    if (!wxData.ok) return res.json(wxData)
+    if (!store.wechatSubscriptions) store.wechatSubscriptions = {}
+    const current = store.wechatSubscriptions[name] || {}
+    store.wechatSubscriptions[name] = {
+      ...current,
+      openid: wxData.openid,
+      unionid: wxData.unionid || current.unionid || '',
+      boundAt: new Date().toISOString()
+    }
+    await writeStore({ wechatSubscriptions: store.wechatSubscriptions })
+    res.json({ ok: true, msg: '微信已绑定' })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -3517,7 +3644,7 @@ if (require.main === module) {
 //       可用 MAIL_PROVIDER 强制指定，否则按 env 自动判定。
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY  // SG.xxx（注意保密）
-const SENDGRID_FROM    = process.env.SENDGRID_FROM     // 'lnxyxgbss@163.com'（已通过 Single Sender Verification）
+const SENDGRID_FROM    = process.env.SENDGRID_FROM     // 已验证的发件邮箱
 const BREVO_API_KEY    = process.env.BREVO_API_KEY     // xkeysib-xxx
 const BREVO_FROM       = process.env.BREVO_FROM        // 已 verify 域的发件邮箱
 const RESEND_API_KEY   = process.env.RESEND_API_KEY    // re_xxx
@@ -3619,6 +3746,9 @@ async function resolveSmtpHost() {
 }
 
 async function sendViaSmtp(opts) {
+  if (!SMTP_USER || !SMTP_PASS) {
+    throw new Error('未配置 SMTP_USER/SMTP_PASS。建议使用 Brevo/SendGrid/Resend HTTP API。')
+  }
   const connectHost = await resolveSmtpHost()
   const mailer = nodemailer.createTransport({
     host: connectHost,
@@ -3988,6 +4118,7 @@ module.exports = {
   addMemberToStore,
   calculateMemberWorkTime,
   defaultStore,
+  getMemberTodayStatus,
   removeMemberRelatedData,
   normalizeMaxPerSlot,
   slotOverlapMinutes,
