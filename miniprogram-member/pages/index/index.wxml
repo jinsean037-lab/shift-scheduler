@@ -1,0 +1,35 @@
+<view class="page">
+  <view class="card hero">
+    <view>
+      <view class="title">{{userName || '成员'}}</view>
+      <view class="subtitle">{{todayText}}</view>
+    </view>
+    <view class="pill">成员端</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">今日班次</view>
+    <block wx:if="{{todayShifts.length}}">
+      <view class="list-item" wx:for="{{todayShifts}}" wx:key="key">
+        <view class="row">
+          <view>
+            <view class="shift-main">{{item.day}} {{item.slotLabel}}</view>
+            <view class="muted">{{item.date || '当前周期'}}</view>
+          </view>
+          <view class="pill {{item.status}}">{{item.statusText}}</view>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty">今天暂无排班</view>
+  </view>
+
+  <view class="action-grid">
+    <button class="btn" loading="{{checkingIn}}" bindtap="checkin">签到</button>
+    <button class="btn secondary" loading="{{checkingOut}}" bindtap="checkout">签退</button>
+  </view>
+
+  <view class="card">
+    <view class="section-title">提示</view>
+    <view class="muted">状态来自同一个网页后台和 MongoDB；网页端完成打卡后，小程序下拉刷新即可同步。</view>
+  </view>
+</view>

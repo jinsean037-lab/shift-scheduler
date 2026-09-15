@@ -1,0 +1,33 @@
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.shift-main {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+  margin-bottom: 24rpx;
+}
+
+.pill.completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pill.in_progress {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pill.pending {
+  background: #fee2e2;
+  color: #8B1A1A;
+}
