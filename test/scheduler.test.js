@@ -5,6 +5,7 @@ const {
   addMemberToStore,
   calculateMemberWorkTime,
   defaultStore,
+  getMemberTodayStatus,
   normalizeMaxPerSlot,
   removeMemberRelatedData,
   slotOverlapMinutes,
@@ -69,4 +70,22 @@ test('shift capacity setting is normalized to a 1-10 integer', () => {
   assert.equal(normalizeMaxPerSlot(0), 1)
   assert.equal(normalizeMaxPerSlot(11), 1)
   assert.equal(normalizeMaxPerSlot('bad', 4), 4)
+})
+
+test('member today status reflects shared checkin records', () => {
+  const store = defaultStore()
+  store.members = ['甲']
+  store.scheduleStart = '2026-09-14T00:00:00+08:00'
+  store.scheduleEnd = '2026-09-20T23:59:59+08:00'
+  store.schedule = { '周二': { am1: ['甲'] } }
+  store.checkins = [
+    { id: 'in1', name: '甲', date: '2026-09-15', time: '2026-09-15T00:05:00.000Z', type: 'in', slotId: 'am1' },
+  ]
+
+  let status = getMemberTodayStatus(store, '甲', '2026-09-15')
+  assert.equal(status.shifts[0].status, 'in_progress')
+
+  store.checkins.push({ id: 'out1', name: '甲', date: '2026-09-15', time: '2026-09-15T02:00:00.000Z', type: 'out', slotId: 'am1' })
+  status = getMemberTodayStatus(store, '甲', '2026-09-15')
+  assert.equal(status.shifts[0].status, 'completed')
 })
