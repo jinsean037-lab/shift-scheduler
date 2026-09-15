@@ -1,0 +1,43 @@
+<view class="page">
+  <view class="card">
+    <view class="title">订阅提醒</view>
+    <view class="subtitle">微信订阅消息需要成员主动授权</view>
+  </view>
+
+  <view class="card">
+    <view class="list-item row">
+      <view>
+        <view class="item-title">值班前提醒</view>
+        <view class="muted">值班开始前提醒准备到岗</view>
+      </view>
+      <switch checked="{{settings.beforeShift}}" data-key="beforeShift" bindchange="onSwitch" />
+    </view>
+    <view class="list-item row">
+      <view>
+        <view class="item-title">未签到提醒</view>
+        <view class="muted">值班开始后仍未签到时提醒</view>
+      </view>
+      <switch checked="{{settings.missedCheckin}}" data-key="missedCheckin" bindchange="onSwitch" />
+    </view>
+    <view class="list-item row">
+      <view>
+        <view class="item-title">未签退提醒</view>
+        <view class="muted">班次结束后仍未签退时提醒</view>
+      </view>
+      <switch checked="{{settings.missedCheckout}}" data-key="missedCheckout" bindchange="onSwitch" />
+    </view>
+    <view class="list-item row">
+      <view>
+        <view class="item-title">换班代班提醒</view>
+        <view class="muted">收到申请或申请被处理时提醒</view>
+      </view>
+      <switch checked="{{settings.exchangeNotice}}" data-key="exchangeNotice" bindchange="onSwitch" />
+    </view>
+  </view>
+
+  <view class="card">
+    <button class="btn" loading="{{saving}}" bindtap="save">保存设置</button>
+    <button class="btn secondary subscribe-btn" loading="{{requesting}}" bindtap="requestSubscribe">授权微信提醒</button>
+    <view class="muted note">如果暂未配置模板 ID，系统会先保存偏好；正式上线后再开启微信授权弹窗。</view>
+  </view>
+</view>

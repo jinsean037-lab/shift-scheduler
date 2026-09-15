@@ -1,0 +1,15 @@
+.item-title {
+  font-size: 29rpx;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 6rpx;
+}
+
+.subscribe-btn {
+  margin-top: 18rpx;
+}
+
+.note {
+  margin-top: 18rpx;
+  line-height: 1.6;
+}
