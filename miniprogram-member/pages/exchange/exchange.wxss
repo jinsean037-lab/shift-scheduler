@@ -1,0 +1,35 @@
+.request-main {
+  font-size: 29rpx;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8rpx;
+}
+
+.request-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.actions {
+  display: flex;
+  gap: 10rpx;
+}
+
+.pill.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pill.rejected,
+.pill.revoked {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.pill.pending {
+  background: #fef3c7;
+  color: #92400e;
+}

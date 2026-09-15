@@ -1,0 +1,58 @@
+<view class="page">
+  <view class="card">
+    <view class="title">换班代班</view>
+    <view class="subtitle">申请会直接进入现有网页后台同一套数据</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">发起申请</view>
+    <view class="field">
+      <view class="label">申请类型</view>
+      <picker class="picker" range="{{modes}}" range-key="label" value="{{modeIndex}}" bindchange="onModeChange">
+        <view>{{modes[modeIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="label">我的班次</view>
+      <picker class="picker" range="{{myShifts}}" range-key="label" value="{{myShiftIndex}}" bindchange="onMyShiftChange">
+        <view>{{myShifts[myShiftIndex].label || '请选择'}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="label">对方成员</view>
+      <picker class="picker" range="{{members}}" value="{{memberIndex}}" bindchange="onMemberChange">
+        <view>{{members[memberIndex] || '请选择'}}</view>
+      </picker>
+    </view>
+    <view class="field" wx:if="{{isSwap}}">
+      <view class="label">对方班次</view>
+      <picker class="picker" range="{{targetShifts}}" range-key="label" value="{{targetShiftIndex}}" bindchange="onTargetShiftChange">
+        <view>{{targetShifts[targetShiftIndex].label || '请选择'}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="label">原因</view>
+      <textarea class="textarea" maxlength="200" placeholder="简单说明原因" value="{{reason}}" bindinput="onReasonInput" />
+    </view>
+    <button class="btn" loading="{{submitting}}" bindtap="submitRequest">提交申请</button>
+  </view>
+
+  <view class="card">
+    <view class="section-title">我的申请</view>
+    <block wx:if="{{requests.length}}">
+      <view class="list-item" wx:for="{{requests}}" wx:key="key">
+        <view class="request-main">{{item.title}}</view>
+        <view class="muted">{{item.detail}}</view>
+        <view class="request-footer">
+          <view class="pill {{item.status}}">{{item.statusText}}</view>
+          <view class="actions" wx:if="{{item.status === 'pending'}}">
+            <button wx:if="{{item.canReview}}" size="mini" class="btn" data-type="{{item.type}}" data-id="{{item.id}}" data-action="approve" bindtap="reviewRequest">同意</button>
+            <button wx:if="{{item.canReview}}" size="mini" class="btn ghost" data-type="{{item.type}}" data-id="{{item.id}}" data-action="reject" bindtap="reviewRequest">拒绝</button>
+            <button wx:if="{{item.canRevoke}}" size="mini" class="btn ghost" data-type="{{item.type}}" data-id="{{item.id}}" bindtap="revokeRequest">撤回</button>
+          </view>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty">暂无换班或代班申请</view>
+  </view>
+</view>
