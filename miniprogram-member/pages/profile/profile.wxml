@@ -1,5 +1,5 @@
 <view class="page">
-  <view class="card row">
+  <view class="card row profile-header">
     <view>
       <view class="title">{{userName}}</view>
       <view class="subtitle">个人信息维护</view>
@@ -11,7 +11,7 @@
     <view class="section-title">联系方式</view>
     <view class="field">
       <view class="label">邮箱</view>
-      <input class="input" value="{{email}}" placeholder="用于邮件兜底提醒" bindinput="onEmailInput" />
+      <input class="input" type="text" placeholder-class="input-placeholder" value="{{email}}" placeholder="用于邮件兜底提醒" bindinput="onEmailInput" />
     </view>
   </view>
 
@@ -19,29 +19,29 @@
     <view class="section-title">基础信息</view>
     <view class="field">
       <view class="label">院系</view>
-      <input class="input" value="{{profile.department}}" placeholder="岭南学院" data-key="department" bindinput="onProfileInput" />
+      <input class="input" type="text" placeholder-class="input-placeholder" value="{{profile.department}}" placeholder="岭南学院" data-key="department" bindinput="onProfileInput" />
     </view>
     <view class="field">
       <view class="label">学号</view>
-      <input class="input" value="{{profile.studentId}}" placeholder="请输入学号" data-key="studentId" bindinput="onProfileInput" />
+      <input class="input" type="number" placeholder-class="input-placeholder" value="{{profile.studentId}}" placeholder="请输入学号" data-key="studentId" bindinput="onProfileInput" />
     </view>
     <view class="field">
       <view class="label">电话</view>
-      <input class="input" value="{{profile.phone}}" placeholder="请输入手机号" data-key="phone" bindinput="onProfileInput" />
+      <input class="input" type="number" placeholder-class="input-placeholder" value="{{profile.phone}}" placeholder="请输入手机号" data-key="phone" bindinput="onProfileInput" />
     </view>
     <view class="field">
       <view class="label">宿舍</view>
-      <input class="input" value="{{profile.dorm}}" placeholder="宿舍楼/房号" data-key="dorm" bindinput="onProfileInput" />
+      <input class="input" type="text" placeholder-class="input-placeholder" value="{{profile.dorm}}" placeholder="宿舍楼/房号" data-key="dorm" bindinput="onProfileInput" />
     </view>
     <view class="field">
       <view class="label">银行卡号</view>
-      <input class="input" value="{{profile.bankAccount}}" placeholder="工时申报使用" data-key="bankAccount" bindinput="onProfileInput" />
+      <input class="input" type="number" placeholder-class="input-placeholder" value="{{profile.bankAccount}}" placeholder="工时申报使用" data-key="bankAccount" bindinput="onProfileInput" />
     </view>
     <button class="btn" loading="{{saving}}" bindtap="saveProfile">保存信息</button>
   </view>
 
-  <view class="card row" bindtap="goSubscribe">
-    <view>
+  <view class="card row subscribe-card" bindtap="goSubscribe">
+    <view class="subscribe-text">
       <view class="section-title compact">订阅提醒</view>
       <view class="muted">值班前、未签到、未签退等微信提醒</view>
     </view>
