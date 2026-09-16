@@ -1,6 +1,6 @@
 App({
   globalData: {
-    apiBase: 'https://shift-scheduler-9316.onrender.com/api',
+    apiBase: 'https://shift-scheduler-93l6.onrender.com/api',
     user: null,
     subscribeTemplateIds: {
       beforeShift: '',
