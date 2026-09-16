@@ -4,6 +4,7 @@ const assert = require('node:assert/strict')
 const {
   addMemberToStore,
   calculateMemberWorkTime,
+  calculateAutoOvertimeHours,
   defaultStore,
   getMemberTodayStatus,
   normalizeMaxPerSlot,
@@ -70,6 +71,12 @@ test('shift capacity setting is normalized to a 1-10 integer', () => {
   assert.equal(normalizeMaxPerSlot(0), 1)
   assert.equal(normalizeMaxPerSlot(11), 1)
   assert.equal(normalizeMaxPerSlot('bad', 4), 4)
+})
+
+test('auto overtime rounds excess checkout duration to half hours', () => {
+  assert.equal(calculateAutoOvertimeHours('am1', '07:45:00', '10:30:00'), 1)
+  assert.equal(calculateAutoOvertimeHours('am1', '08:00:00', '10:20:00'), 0.5)
+  assert.equal(calculateAutoOvertimeHours('pm1', '14:30:00', '16:00:00'), 0)
 })
 
 test('member today status reflects shared checkin records', () => {
