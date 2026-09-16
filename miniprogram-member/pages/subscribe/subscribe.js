@@ -9,8 +9,7 @@ Page({
       shiftSubstitute: true
     },
     saving: false,
-    requestingAttendance: false,
-    requestingExchange: false,
+    requestingKey: '',
     subscribeResult: {}
   },
   onLoad() {
@@ -30,25 +29,22 @@ Page({
     const key = e.currentTarget.dataset.key
     this.setData({ ['settings.' + key]: e.detail.value })
   },
-  async requestAttendanceSubscribe() {
-    await this.requestSubscribeGroup('attendance', ['missedCheckin', 'missedCheckout'])
+  async requestOneSubscribe(e) {
+    const key = e.currentTarget.dataset.key
+    await this.requestSubscribeByKey(key)
   },
-  async requestExchangeSubscribe() {
-    await this.requestSubscribeGroup('exchange', ['shiftSwap', 'shiftSubstitute'])
-  },
-  async requestSubscribeGroup(group, keys) {
+  async requestSubscribeByKey(key) {
     const allIds = getApp().globalData.subscribeTemplateIds || {}
-    const ids = keys.map(key => allIds[key]).filter(Boolean)
-    if (!ids.length) {
+    const templateId = allIds[key]
+    if (!templateId) {
       toast('模板 ID 尚未配置')
       return
     }
-    const loadingKey = group === 'attendance' ? 'requestingAttendance' : 'requestingExchange'
-    this.setData({ [loadingKey]: true })
+    this.setData({ requestingKey: key })
     try {
       const result = await new Promise((resolve, reject) => {
         wx.requestSubscribeMessage({
-          tmplIds: ids,
+          tmplIds: [templateId],
           success: resolve,
           fail: reject
         })
@@ -60,9 +56,13 @@ Page({
       await this.save()
     } catch (e) {
       const msg = e && (e.errMsg || e.message)
-      toast(msg ? msg.slice(0, 28) : '授权未完成')
+      wx.showModal({
+        title: '授权未完成',
+        content: msg || '微信未返回具体原因，请稍后重试',
+        showCancel: false
+      })
     } finally {
-      this.setData({ [loadingKey]: false })
+      this.setData({ requestingKey: '' })
     }
   },
   async save() {
