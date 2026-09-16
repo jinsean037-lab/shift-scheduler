@@ -3,10 +3,10 @@ App({
     apiBase: 'https://shift-scheduler-93l6.onrender.com/api',
     user: null,
     subscribeTemplateIds: {
-      beforeShift: '',
-      missedCheckin: '',
-      missedCheckout: '',
-      exchangeNotice: ''
+      shiftSwap: 'sUpPazzV67bnvZAaeHMOYznai9GOZ_TRLL2dJYrfBuM',
+      shiftSubstitute: '6hP43mHFnHj9yHLgClg8YMIDFW31YqTtBxYf7CUxkW8',
+      missedCheckout: 'tAPP0R-7ZnsS5NshiCLGfKEgpN6YXlguQBl494uo7_w',
+      missedCheckin: 'Fq6xyq1ox9ils8xo8LCbql9Ek-2wC_sZryVOrY3XWaI'
     }
   },
   onLaunch() {
