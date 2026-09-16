@@ -1,8 +1,0 @@
-.compact {
-  margin-bottom: 6rpx;
-}
-
-.arrow {
-  color: #9ca3af;
-  font-size: 48rpx;
-}
