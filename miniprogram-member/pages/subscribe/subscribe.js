@@ -3,11 +3,10 @@ const { request, requireUser, toast } = require('../../utils/api')
 Page({
   data: {
     settings: {
-      beforeShift: true,
       missedCheckin: true,
       missedCheckout: true,
-      exchangeNotice: true,
-      worktimeNotice: false
+      shiftSwap: true,
+      shiftSubstitute: true
     },
     saving: false,
     requesting: false,
