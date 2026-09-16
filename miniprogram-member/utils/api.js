@@ -2,7 +2,11 @@ const app = getApp()
 let warmupPromise = null
 
 function baseUrl() {
-  return (app.globalData && app.globalData.apiBase) || 'https://shift-scheduler-9316.onrender.com/api'
+  return (app.globalData && app.globalData.apiBase) || 'https://shift-scheduler-93l6.onrender.com/api'
+}
+
+function serviceOrigin() {
+  return baseUrl().replace(/\/api\/?$/, '')
 }
 
 function delay(ms) {
@@ -10,9 +14,10 @@ function delay(ms) {
 }
 
 function rawRequest(path, options = {}) {
+  const url = /^https?:\/\//.test(path) ? path : baseUrl() + path
   return new Promise((resolve, reject) => {
     wx.request({
-      url: baseUrl() + path,
+      url,
       method: options.method || 'GET',
       data: options.data || {},
       header: Object.assign({ 'Content-Type': 'application/json' }, options.header || {}),
@@ -36,17 +41,17 @@ function rawRequest(path, options = {}) {
 
 function isWakeupError(err) {
   const msg = (err && err.message) || ''
-  return err && (err.isNetworkError || /timeout|超时|fail|ERR_NAME_NOT_RESOLVED|socket|TLS/i.test(msg))
+  return err && (err.isNetworkError || err.statusCode === 404 || /timeout|超时|fail|ERR_NAME_NOT_RESOLVED|socket|TLS/i.test(msg))
 }
 
 async function warmupService(options = {}) {
-  const retries = options.retries || 4
+  const retries = options.retries || 6
   const showTip = options.showTip !== false
   let lastError = null
 
   for (let i = 0; i < retries; i += 1) {
     try {
-      await rawRequest('/config', { timeout: i === 0 ? 12000 : 20000 })
+      await rawRequest(serviceOrigin() + '/', { timeout: i === 0 ? 15000 : 25000 })
       return true
     } catch (err) {
       lastError = err
@@ -54,7 +59,7 @@ async function warmupService(options = {}) {
       if (showTip && i === 0) {
         wx.showLoading({ title: '服务唤醒中', mask: true })
       }
-      await delay(1800 + i * 1200)
+      await delay(2500 + i * 1500)
     }
   }
 
