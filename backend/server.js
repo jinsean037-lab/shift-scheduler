@@ -27,6 +27,7 @@ const WECHAT_TEMPLATE_IDS = {
   missedCheckout: process.env.WECHAT_TEMPLATE_MISSED_CHECKOUT || 'tAPP0R-7ZnsS5NshiCLGfKEgpN6YXlguQBI494uo7_w',
   missedCheckin: process.env.WECHAT_TEMPLATE_MISSED_CHECKIN || 'Fq6xyq1ox9iIs8xo8LCbql9Ek-2wC_sZryVOrY3XWaI'
 }
+const WECHAT_MINIPROGRAM_STATE = process.env.WECHAT_MINIPROGRAM_STATE || 'trial'
 
 let wechatAccessToken = ''
 let wechatAccessTokenExpiresAt = 0
@@ -2663,6 +2664,8 @@ async function sendWechatSubscribeMessage(store, name, templateKey, page, data) 
       body: JSON.stringify({
         touser: settings.openid,
         template_id: templateId,
+        miniprogram_state: WECHAT_MINIPROGRAM_STATE,
+        lang: 'zh_CN',
         page,
         data
       })
@@ -2676,7 +2679,8 @@ async function sendWechatSubscribeMessage(store, name, templateKey, page, data) 
 function logWechatSubscribeResult(type, to, promise) {
   promise
     .then(result => {
-      if (!result.ok) console.warn(`[wechat-subscribe] ${type} -> ${to} 未发送: ${result.msg}`, result.result || '')
+      if (result.ok) console.log(`[wechat-subscribe] ${type} -> ${to} 已发送`)
+      else console.warn(`[wechat-subscribe] ${type} -> ${to} 未发送: ${result.msg}`, result.result || '')
     })
     .catch(e => {
       console.warn(`[wechat-subscribe] ${type} -> ${to} 发送异常:`, e.message || e)
