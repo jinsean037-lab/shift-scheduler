@@ -4382,7 +4382,7 @@ function sendCheckout(lat, lng) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) { showToast('✅ 签退成功'); loadCheckinStatus(); }
+    if (data.ok) { showToast('✅ ' + (data.msg || '签退成功')); loadCheckinStatus(); }
     else { showCheckinError(data.msg || '签退失败'); }
   })
   .catch(() => { showCheckinError('网络错误'); });
