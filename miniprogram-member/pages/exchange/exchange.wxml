@@ -32,7 +32,7 @@
     </view>
     <view class="field">
       <view class="label">原因</view>
-      <textarea class="textarea" maxlength="200" placeholder="简单说明原因" value="{{reason}}" bindinput="onReasonInput" />
+      <textarea class="textarea" maxlength="200" placeholder-class="textarea-placeholder" placeholder="简单说明原因" value="{{reason}}" bindinput="onReasonInput" />
     </view>
     <button class="btn" loading="{{submitting}}" bindtap="submitRequest">提交申请</button>
   </view>
