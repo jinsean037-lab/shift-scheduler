@@ -52,8 +52,14 @@ Page({
       this.setData({
         subscribeResult: Object.assign({}, this.data.subscribeResult, result)
       })
-      toast('授权结果已记录')
       await this.save()
+      wx.showModal({
+        title: result[templateId] === 'accept' ? '消息订阅成功' : '订阅授权已保存',
+        content: result[templateId] === 'accept'
+          ? '你已开启该项提醒，后续系统会按设置发送通知。'
+          : '该项提醒未授权成功，系统已保存当前设置。',
+        showCancel: false
+      })
     } catch (e) {
       const msg = e && (e.errMsg || e.message)
       wx.showModal({
@@ -77,7 +83,7 @@ Page({
           settings: Object.assign({}, this.data.settings, { subscribeResult: this.data.subscribeResult })
         }
       })
-      toast(data.ok ? '已保存' : '保存失败', data.ok ? 'success' : 'none')
+      if (!this.data.requestingKey) toast(data.ok ? '已保存' : '保存失败', data.ok ? 'success' : 'none')
     } catch (e) {
       toast(e.message || '保存失败')
     } finally {
