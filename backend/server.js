@@ -21,6 +21,15 @@ const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || '中山大学岭南学院�
 const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || SMTP_FROM_NAME
 const WECHAT_MINI_APPID = process.env.WECHAT_MINI_APPID || ''
 const WECHAT_MINI_SECRET = process.env.WECHAT_MINI_SECRET || ''
+const WECHAT_TEMPLATE_IDS = {
+  shiftSwap: process.env.WECHAT_TEMPLATE_SHIFT_SWAP || 'sUpPazzV67bnvZAaeHMOYznai9GOZ_TRLL2dJYrfBuM',
+  shiftSubstitute: process.env.WECHAT_TEMPLATE_SHIFT_SUBSTITUTE || '6hP43mHFnHj9yHLgClg8YMlDFW31YqTtBxYf7CUxkW8',
+  missedCheckout: process.env.WECHAT_TEMPLATE_MISSED_CHECKOUT || 'tAPP0R-7ZnsS5NshiCLGfKEgpN6YXlguQBI494uo7_w',
+  missedCheckin: process.env.WECHAT_TEMPLATE_MISSED_CHECKIN || 'Fq6xyq1ox9iIs8xo8LCbql9Ek-2wC_sZryVOrY3XWaI'
+}
+
+let wechatAccessToken = ''
+let wechatAccessTokenExpiresAt = 0
 
 try {
   dns.setDefaultResultOrder('ipv4first')
@@ -764,6 +773,36 @@ function publicShiftSwap(item) {
   }
 }
 
+function getSlotLabel(store, slotId) {
+  const slot = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
+  return slot ? slot.label : slotId
+}
+
+function truncateWechatValue(value, max = 20) {
+  return String(value || '').trim().slice(0, max) || '请查看详情'
+}
+
+function formatWechatDate(dateStr) {
+  const m = String(dateStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (!m) return truncateWechatValue(dateStr, 20)
+  return `${m[1]}年${Number(m[2])}月${Number(m[3])}日`
+}
+
+function normalizeWechatSubscriptionSettings(input, current = {}) {
+  return {
+    ...current,
+    beforeShift: !!input.beforeShift,
+    missedCheckin: !!input.missedCheckin,
+    missedCheckout: !!input.missedCheckout,
+    shiftSwap: !!input.shiftSwap,
+    shiftSubstitute: !!input.shiftSubstitute,
+    exchangeNotice: !!input.exchangeNotice,
+    worktimeNotice: !!input.worktimeNotice,
+    subscribeResult: input.subscribeResult && typeof input.subscribeResult === 'object' ? input.subscribeResult : {},
+    updatedAt: new Date().toISOString()
+  }
+}
+
 // 成员：发起换班申请。仅允许在已确认排班的生效期内，将自己的一个班次和对方的一个班次互换。
 app.post('/api/shift-swap/request', async (req, res) => {
   try {
@@ -816,6 +855,12 @@ app.post('/api/shift-swap/request', async (req, res) => {
     }
     swaps.push(record)
     await writeStore({ shiftSwapRequests: swaps })
+    logWechatSubscribeResult('换班申请提醒', to, sendWechatSubscribeMessage(store, to, 'shiftSwap', 'pages/exchange/exchange', {
+      short_thing1: { value: truncateWechatValue(from) },
+      time2: { value: formatWechatDate(fromDate) },
+      short_thing4: { value: truncateWechatValue(to) },
+      thing5: { value: truncateWechatValue(reason || `${fromDay} ${getSlotLabel(store, fromSlotId)}`) }
+    }))
     res.json({ ok: true, msg: '换班申请已发送，等待对方确认', request: publicShiftSwap(record) })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
@@ -947,6 +992,10 @@ app.post('/api/shift-substitute/request', async (req, res) => {
     }
     subs.push(record)
     await writeStore({ shiftSubstituteRequests: subs })
+    logWechatSubscribeResult('替班通知', to, sendWechatSubscribeMessage(store, to, 'shiftSubstitute', 'pages/exchange/exchange', {
+      thing2: { value: truncateWechatValue(from) },
+      time4: { value: formatWechatDate(date) }
+    }))
     res.json({ ok: true, msg: '代班申请已发送，等待对方确认', request: publicShiftSubstitute(record) })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
@@ -2551,16 +2600,9 @@ app.put('/api/member/wechat-subscription', async (req, res) => {
     const store = await readStore()
     if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
     const input = settings && typeof settings === 'object' ? settings : {}
-    const clean = {
-      beforeShift: !!input.beforeShift,
-      missedCheckin: !!input.missedCheckin,
-      missedCheckout: !!input.missedCheckout,
-      exchangeNotice: !!input.exchangeNotice,
-      worktimeNotice: !!input.worktimeNotice,
-      subscribeResult: input.subscribeResult && typeof input.subscribeResult === 'object' ? input.subscribeResult : {},
-      updatedAt: new Date().toISOString()
-    }
     if (!store.wechatSubscriptions) store.wechatSubscriptions = {}
+    const current = store.wechatSubscriptions[name] || {}
+    const clean = normalizeWechatSubscriptionSettings(input, current)
     store.wechatSubscriptions[name] = clean
     await writeStore({ wechatSubscriptions: store.wechatSubscriptions })
     res.json({ ok: true, msg: '订阅提醒设置已保存', settings: clean })
@@ -2580,6 +2622,65 @@ async function fetchWechatMiniOpenid(code) {
   const data = await r.json()
   if (!data.openid) return { ok: false, msg: data.errmsg || '微信登录失败' }
   return { ok: true, openid: data.openid, unionid: data.unionid || '' }
+}
+
+async function getWechatAccessToken() {
+  if (!WECHAT_MINI_APPID || !WECHAT_MINI_SECRET) {
+    return { ok: false, msg: '未配置小程序 AppID/Secret' }
+  }
+  const now = Date.now()
+  if (wechatAccessToken && wechatAccessTokenExpiresAt > now + 60 * 1000) {
+    return { ok: true, accessToken: wechatAccessToken }
+  }
+  const url = 'https://api.weixin.qq.com/cgi-bin/token'
+    + '?grant_type=client_credential'
+    + '&appid=' + encodeURIComponent(WECHAT_MINI_APPID)
+    + '&secret=' + encodeURIComponent(WECHAT_MINI_SECRET)
+  const r = await fetch(url)
+  const data = await r.json()
+  if (!data.access_token) return { ok: false, msg: data.errmsg || '获取微信 access_token 失败' }
+  wechatAccessToken = data.access_token
+  wechatAccessTokenExpiresAt = now + Math.max(Number(data.expires_in || 7200) - 300, 60) * 1000
+  return { ok: true, accessToken: wechatAccessToken }
+}
+
+async function sendWechatSubscribeMessage(store, name, templateKey, page, data) {
+  const templateId = WECHAT_TEMPLATE_IDS[templateKey]
+  if (!templateId) return { ok: false, msg: `未配置模板 ${templateKey}` }
+  const subscriptions = store.wechatSubscriptions || {}
+  const settings = subscriptions[name] || {}
+  if (!settings.openid) return { ok: false, msg: `${name} 未绑定微信 openid` }
+  if (settings[templateKey] === false) return { ok: false, msg: `${name} 未开启 ${templateKey}` }
+
+  const token = await getWechatAccessToken()
+  if (!token.ok) return token
+
+  const r = await fetch(
+    'https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=' + encodeURIComponent(token.accessToken),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        touser: settings.openid,
+        template_id: templateId,
+        page,
+        data
+      })
+    }
+  )
+  const result = await r.json()
+  if (result.errcode) return { ok: false, msg: result.errmsg || '微信订阅消息发送失败', result }
+  return { ok: true, result }
+}
+
+function logWechatSubscribeResult(type, to, promise) {
+  promise
+    .then(result => {
+      if (!result.ok) console.warn(`[wechat-subscribe] ${type} -> ${to} 未发送: ${result.msg}`, result.result || '')
+    })
+    .catch(e => {
+      console.warn(`[wechat-subscribe] ${type} -> ${to} 发送异常:`, e.message || e)
+    })
 }
 
 app.post('/api/member/wechat-bind', async (req, res) => {
@@ -4120,6 +4221,7 @@ module.exports = {
   defaultStore,
   getMemberTodayStatus,
   removeMemberRelatedData,
+  normalizeWechatSubscriptionSettings,
   normalizeMaxPerSlot,
   slotOverlapMinutes,
   timeToMinutes
