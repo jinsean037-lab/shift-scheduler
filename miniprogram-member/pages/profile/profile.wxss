@@ -1,0 +1,30 @@
+.compact {
+  margin-bottom: 6rpx;
+}
+
+.profile-header {
+  align-items: flex-start;
+}
+
+.profile-header .title {
+  max-width: 460rpx;
+  word-break: break-all;
+}
+
+.subscribe-card {
+  align-items: flex-start;
+}
+
+.subscribe-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.subscribe-card .muted {
+  line-height: 1.55;
+}
+
+.arrow {
+  color: #9ca3af;
+  font-size: 48rpx;
+}
