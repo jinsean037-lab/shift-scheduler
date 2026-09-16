@@ -70,7 +70,15 @@ Page({
         method: 'POST',
         data: { name: user.name, lat: loc.latitude, lng: loc.longitude }
       })
-      toast(data.msg || (data.ok ? '签退成功' : '签退失败'), data.ok ? 'success' : 'none')
+      if (data.ok && data.autoOvertime) {
+        wx.showModal({
+          title: '已自动申请补报',
+          content: data.msg || '超出标准班次的工时已按加班自动提交补报申请',
+          showCancel: false
+        })
+      } else {
+        toast(data.msg || (data.ok ? '签退成功' : '签退失败'), data.ok ? 'success' : 'none')
+      }
       this.loadToday()
     } catch (e) {
       toast(e.message || '签退失败')
