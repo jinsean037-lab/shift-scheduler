@@ -1,0 +1,143 @@
+page {
+  background: #f5f6f8;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 28rpx;
+  box-sizing: border-box;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
+}
+
+.title {
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #7f1d1d;
+  margin-bottom: 10rpx;
+}
+
+.subtitle {
+  font-size: 26rpx;
+  color: #6b7280;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  margin-bottom: 18rpx;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 26rpx;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.btn {
+  border-radius: 10rpx;
+  border: 0;
+  background: #8B1A1A;
+  color: #fff;
+  font-weight: 700;
+  font-size: 28rpx;
+}
+
+.btn.secondary {
+  background: #374151;
+}
+
+.btn.ghost {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn.warn {
+  background: #b45309;
+}
+
+.input,
+.textarea,
+.picker {
+  background: #fff;
+  border: 1rpx solid #d1d5db;
+  border-radius: 10rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.input,
+.picker {
+  min-height: 88rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 24rpx;
+}
+
+.textarea {
+  min-height: 180rpx;
+  line-height: 1.55;
+  padding: 22rpx 24rpx;
+}
+
+.input-placeholder {
+  color: #9ca3af;
+  font-size: 26rpx;
+}
+
+.textarea-placeholder {
+  color: #9ca3af;
+  font-size: 26rpx;
+}
+
+.field {
+  margin-bottom: 22rpx;
+}
+
+.label {
+  color: #374151;
+  font-size: 25rpx;
+  font-weight: 700;
+  margin-bottom: 10rpx;
+}
+
+.pill {
+  display: inline-block;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fee2e2;
+  color: #8B1A1A;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.list-item {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #edf0f2;
+}
+
+.list-item:last-child {
+  border-bottom: 0;
+}
+
+.empty {
+  text-align: center;
+  padding: 48rpx 20rpx;
+  color: #9ca3af;
+  font-size: 27rpx;
+}
