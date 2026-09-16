@@ -37,8 +37,10 @@
 
   <view class="card">
     <button class="btn" loading="{{saving}}" bindtap="save">保存设置</button>
-    <button class="btn secondary subscribe-btn" loading="{{requestingAttendance}}" bindtap="requestAttendanceSubscribe">授权签到签退提醒</button>
-    <button class="btn secondary subscribe-btn" loading="{{requestingExchange}}" bindtap="requestExchangeSubscribe">授权换班替班提醒</button>
-    <view class="muted note">微信订阅消息需要成员主动授权。请分别授权两组提醒，授权后系统会保存你的提醒偏好。</view>
+    <button class="btn secondary subscribe-btn" data-key="missedCheckin" loading="{{requestingKey === 'missedCheckin'}}" bindtap="requestOneSubscribe">授权签到提醒</button>
+    <button class="btn secondary subscribe-btn" data-key="missedCheckout" loading="{{requestingKey === 'missedCheckout'}}" bindtap="requestOneSubscribe">授权签退提醒</button>
+    <button class="btn secondary subscribe-btn" data-key="shiftSwap" loading="{{requestingKey === 'shiftSwap'}}" bindtap="requestOneSubscribe">授权换班申请提醒</button>
+    <button class="btn secondary subscribe-btn" data-key="shiftSubstitute" loading="{{requestingKey === 'shiftSubstitute'}}" bindtap="requestOneSubscribe">授权替班通知</button>
+    <view class="muted note">微信订阅消息需要成员主动授权。请逐项授权需要的提醒，授权后系统会保存你的提醒偏好。</view>
   </view>
 </view>
