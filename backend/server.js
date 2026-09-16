@@ -1647,13 +1647,24 @@ app.get('/api/my-shifts', async (req, res) => {
 
 // ========== 打卡功能 (v4.0) ==========
 
-// 班次时间窗口（北京时间，±15分钟）
-const SLOT_WINDOWS = {
-  am1: { start: '07:45', end: '10:15' },
-  am2: { start: '09:45', end: '12:15' },
-  pm1: { start: '14:15', end: '16:15' },
-  pm2: { start: '15:45', end: '17:45' }
+// 签到窗口：班次开始前 15 分钟至班次结束。
+const SLOT_CHECKIN_WINDOWS = {
+  am1: { start: '07:45', end: '10:00' },
+  am2: { start: '09:45', end: '12:00' },
+  pm1: { start: '14:15', end: '16:00' },
+  pm2: { start: '15:45', end: '17:30' }
 }
+
+// 签退窗口：班次开始后 15 分钟至班次结束后 1 小时。
+const SLOT_CHECKOUT_WINDOWS = {
+  am1: { start: '08:15', end: '11:00' },
+  am2: { start: '10:15', end: '13:00' },
+  pm1: { start: '14:45', end: '17:00' },
+  pm2: { start: '16:15', end: '18:30' }
+}
+
+// 兼容旧逻辑命名：默认代表签到窗口。
+const SLOT_WINDOWS = SLOT_CHECKIN_WINDOWS
 
 // 补签退时间窗：slot 实际时段 + 60 分钟加班容忍
 // 补签退可能晚于 slot 结束时间（成员实际下班时间），所以单独定义一个更宽的窗口
@@ -1728,6 +1739,21 @@ function getMemberScheduledSlots(store, dateStr, name) {
   return slotIds
 }
 
+function roundedHalfHourFromMinutes(minutes) {
+  return Math.ceil((Math.max(0, minutes) / 60) * 2) / 2
+}
+
+function calculateAutoOvertimeHours(slotId, inTime, outTime) {
+  const standardHours = SLOT_HOURS[slotId]
+  if (!standardHours) return 0
+  const inMin = timeToMinutes(inTime)
+  const outMin = timeToMinutes(outTime)
+  let diffMinutes = outMin - inMin
+  if (diffMinutes < 0) diffMinutes += 24 * 60
+  const roundedActual = roundedHalfHourFromMinutes(diffMinutes)
+  return Math.max(0, roundedActual - standardHours)
+}
+
 // 打卡地点围栏（中山大学南校园岭南行政中心）
 const CHECKIN_LOCATION = {
   name: '岭南行政中心（中山大学南校园）',
@@ -1768,7 +1794,7 @@ function getTodaySlots(store, name) {
   for (const slotId of Object.keys(daySchedule)) {
     const members = getEffectiveSlotMembers(store, today, todayWeekday, slotId)
     if (Array.isArray(members) && members.includes(name)) {
-      const win = SLOT_WINDOWS[slotId]
+      const win = SLOT_CHECKIN_WINDOWS[slotId]
       if (win && nowHHMM >= win.start && nowHHMM <= win.end) {
         result.push({ slotId, date: today, ...win })
       }
@@ -1797,8 +1823,10 @@ function getMemberTodayStatus(store, name, nowDate) {
       let status = 'pending'
       if (latestIn && latestOut) status = 'completed'
       else if (latestIn) status = 'in_progress'
-      const win = SLOT_WINDOWS[slotId]
-      const inWindow = !!(win && nowHHMM >= win.start && nowHHMM <= win.end)
+      const checkinWin = SLOT_CHECKIN_WINDOWS[slotId]
+      const checkoutWin = SLOT_CHECKOUT_WINDOWS[slotId]
+      const inWindow = !!(checkinWin && nowHHMM >= checkinWin.start && nowHHMM <= checkinWin.end)
+      const outWindow = !!(checkoutWin && nowHHMM >= checkoutWin.start && nowHHMM <= checkoutWin.end)
       return {
         ...s,
         day: s.day || todayWeekday,
@@ -1808,7 +1836,7 @@ function getMemberTodayStatus(store, name, nowDate) {
         checkinAt: latestIn ? latestIn.time : null,
         checkoutAt: latestOut ? latestOut.time : null,
         canCheckin: status === 'pending' && inWindow,
-        canCheckout: status === 'in_progress' && inWindow
+        canCheckout: status === 'in_progress' && outWindow
       }
     })
   return { date: today, weekday: todayWeekday, shifts }
@@ -1840,7 +1868,7 @@ app.post('/api/checkin', async (req, res) => {
     if (pendingIn) return res.json({ ok: false, msg: '当前处于值班中状态，请先签退后再签到下一班次' })
     // 检查是否在排班时间窗口内（北京时间）
     const slots = getTodaySlots(store, name)
-    if (slots.length === 0) return res.json({ ok: false, msg: '当前不在你的值班时间段内（需在班次前后15分钟内），无法打卡' })
+    if (slots.length === 0) return res.json({ ok: false, msg: '当前不在签到时间内（班次开始前15分钟至班次结束），无法签到' })
     // 地点围栏校验
     if (lat != null && lng != null) {
       const dist = haversineDistance(lat, lng, CHECKIN_LOCATION.lat, CHECKIN_LOCATION.lng)
@@ -1877,11 +1905,11 @@ app.post('/api/checkout', async (req, res) => {
       if (!hasOut) { checkinRecord = inRec; break; }
     }
     if (!checkinRecord) return res.json({ ok: false, msg: '请先签到' })
-    // 检查是否仍在时间窗口内（北京时间）
-    const slotWin = SLOT_WINDOWS[checkinRecord.slotId]
+    // 检查是否仍在签退时间窗口内（北京时间）
+    const slotWin = SLOT_CHECKOUT_WINDOWS[checkinRecord.slotId]
     const nowHHMM = getBeijingTimeHHMM()
     if (slotWin && (nowHHMM < slotWin.start || nowHHMM > slotWin.end)) {
-      return res.json({ ok: false, msg: '已超出该班次打卡时间窗口（前后15分钟），无法签退' })
+      return res.json({ ok: false, msg: '当前不在签退时间内（班次开始后15分钟至结束后1小时），无法签退' })
     }
     // 地点围栏校验
     if (lat != null && lng != null) {
@@ -1896,8 +1924,31 @@ app.post('/api/checkout', async (req, res) => {
     const record = { id: `ck_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, name, date: today, time: now.toISOString(), type: 'out', slotId: checkinRecord.slotId, lat: lat || null, lng: lng || null }
     const checkins = store.checkins || []
     checkins.push(record)
-    await writeStore({ checkins })
-    res.json({ ok: true, msg: '签退成功', record })
+    const updates = { checkins }
+    let autoOvertime = null
+    const overtimeHours = calculateAutoOvertimeHours(checkinRecord.slotId, checkinRecord.time, record.time)
+    if (overtimeHours > 0) {
+      const overtimes = store.overtimes || []
+      autoOvertime = {
+        id: `auto_ot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+        name,
+        date: today,
+        hours: overtimeHours,
+        content: `加班：${getSlotLabel(store, checkinRecord.slotId)}签退超出标准班次，系统自动补报${overtimeHours}小时`,
+        status: 'pending',
+        source: 'auto_checkout_overtime',
+        checkinId: checkinRecord.id || '',
+        checkoutId: record.id,
+        createdAt: new Date().toISOString()
+      }
+      overtimes.push(autoOvertime)
+      updates.overtimes = overtimes
+    }
+    await writeStore(updates)
+    const msg = autoOvertime
+      ? `签退成功，超出标准班次的${autoOvertime.hours}小时已自动申请补报`
+      : '签退成功'
+    res.json({ ok: true, msg, record, autoOvertime })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -4221,6 +4272,7 @@ function formatMonth(d) {
 
 module.exports = {
   addMemberToStore,
+  calculateAutoOvertimeHours,
   calculateMemberWorkTime,
   defaultStore,
   getMemberTodayStatus,
