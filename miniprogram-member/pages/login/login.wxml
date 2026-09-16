@@ -10,11 +10,11 @@
   <view class="card">
     <view class="field">
       <view class="label">姓名</view>
-      <input class="input" placeholder="请输入姓名" value="{{name}}" bindinput="onNameInput" />
+      <input class="input" placeholder-class="input-placeholder" placeholder="请输入姓名" value="{{name}}" bindinput="onNameInput" />
     </view>
     <view class="field">
       <view class="label">密码</view>
-      <input class="input" password placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" />
+      <input class="input" password placeholder-class="input-placeholder" placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" />
     </view>
     <button class="btn login-btn" loading="{{loading}}" bindtap="login">登录</button>
   </view>
