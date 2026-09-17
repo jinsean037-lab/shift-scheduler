@@ -7,9 +7,11 @@ const {
   calculateAutoOvertimeHours,
   defaultStore,
   getMemberTodayStatus,
+  checkinDistanceMeters,
   normalizeMaxPerSlot,
   removeMemberRelatedData,
   slotOverlapMinutes,
+  wgs84ToGcj02,
 } = require('../backend/server')
 
 test('adding a member preserves existing passwords and creates only the new account', () => {
@@ -77,6 +79,14 @@ test('auto overtime rounds excess checkout duration to half hours', () => {
   assert.equal(calculateAutoOvertimeHours('am1', '07:45:00', '10:30:00'), 1)
   assert.equal(calculateAutoOvertimeHours('am1', '08:00:00', '10:20:00'), 0.5)
   assert.equal(calculateAutoOvertimeHours('pm1', '14:30:00', '16:00:00'), 0)
+})
+
+test('checkin distance accepts both web and mini program coordinate systems', () => {
+  const center = { lat: 23.1036, lng: 113.2936 }
+  const miniProgramCenter = wgs84ToGcj02(center.lat, center.lng)
+
+  assert.ok(checkinDistanceMeters(center.lat, center.lng) < 1)
+  assert.ok(checkinDistanceMeters(miniProgramCenter.lat, miniProgramCenter.lng) < 1)
 })
 
 test('member today status reflects shared checkin records', () => {
