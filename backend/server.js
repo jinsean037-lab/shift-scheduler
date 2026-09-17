@@ -756,6 +756,55 @@ function getEffectiveShiftsForMember(store, name) {
   return shifts
 }
 
+function addDaysString(dateStr, days) {
+  const d = new Date(`${dateStr}T12:00:00+08:00`)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function getWeekStartMonday(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00+08:00`)
+  const day = d.getDay()
+  const offset = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + offset)
+  return d.toISOString().slice(0, 10)
+}
+
+function buildMemberWeekSchedule(store, baseDate) {
+  const today = baseDate || getBeijingDateString()
+  const weekStart = getWeekStartMonday(today)
+  const slots = store.timeSlots || defaultStore().timeSlots
+  const slotIds = slots.map(s => s.id)
+  const days = []
+  for (let i = 0; i < 5; i++) {
+    const date = addDaysString(weekStart, i)
+    const weekday = dateToWeekday(date)
+    const daySlots = []
+    if (isDateInSchedulePeriod(store, date)) {
+      for (const slotId of slotIds) {
+        const slotMembers = getEffectiveSlotMembers(store, date, weekday, slotId)
+        if (slotMembers.length) {
+          const slotInfo = slots.find(s => s.id === slotId)
+          daySlots.push({
+            slotId,
+            label: slotInfo ? slotInfo.label : slotId,
+            period: slotInfo ? slotInfo.period : '',
+            members: slotMembers
+          })
+        }
+      }
+    }
+    days.push({
+      date,
+      weekday,
+      shortDate: date.slice(5).replace('-', '/'),
+      isToday: date === today,
+      slots: daySlots
+    })
+  }
+  return { weekStart, weekEnd: addDaysString(weekStart, 4), days }
+}
+
 function publicShiftSwap(item) {
   return {
     id: item.id,
@@ -1640,6 +1689,19 @@ app.get('/api/my-shifts', async (req, res) => {
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
       .map(publicShiftSubstitute)
     res.json({ shifts, waitlist: wl, cancelRequests: cr, shiftSwapRequests: sr, shiftSubstituteRequests: su })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 成员端：本周排班表（已应用换班/代班后的实际生效名单）
+app.get('/api/member/week-schedule', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    res.json({ ok: true, ...buildMemberWeekSchedule(store) })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -4317,6 +4379,7 @@ module.exports = {
   calculateAutoOvertimeHours,
   calculateMemberWorkTime,
   checkinDistanceMeters,
+  buildMemberWeekSchedule,
   defaultStore,
   getMemberTodayStatus,
   removeMemberRelatedData,
