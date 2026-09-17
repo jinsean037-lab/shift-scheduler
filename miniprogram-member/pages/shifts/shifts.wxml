@@ -1,0 +1,40 @@
+<view class="page shifts-page">
+  <view class="card header-card">
+    <view class="title">本周排班</view>
+    <view class="subtitle">{{weekRange}} · 当前生效排班</view>
+  </view>
+
+  <view class="week-board">
+    <view class="day-panel {{item.isToday ? 'today' : ''}}" wx:for="{{weekDays}}" wx:key="date">
+      <view class="day-head">
+        <view>
+          <view class="day-name">{{item.weekday}}</view>
+          <view class="day-date">{{item.shortDate}}</view>
+        </view>
+        <view wx:if="{{item.isToday}}" class="today-tag">今天</view>
+      </view>
+
+      <block wx:if="{{item.slots.length}}">
+        <view class="slot-line" wx:for="{{item.slots}}" wx:key="key">
+          <view class="slot-time">{{item.slotLabel}}</view>
+          <view class="slot-members">{{item.membersText}}</view>
+        </view>
+      </block>
+      <view wx:else class="slot-empty">无班</view>
+    </view>
+  </view>
+
+  <view class="card mine-card">
+    <view class="section-row">
+      <view class="section-title">我的班次</view>
+      <view class="muted">{{shifts.length}} 个</view>
+    </view>
+    <block wx:if="{{shifts.length}}">
+      <view class="mine-line" wx:for="{{shifts}}" wx:key="key">
+        <view class="mine-date">{{item.date || item.day}}</view>
+        <view class="mine-slot">{{item.slotLabel}}</view>
+      </view>
+    </block>
+    <view wx:else class="empty compact-empty">暂无已确认班次</view>
+  </view>
+</view>
