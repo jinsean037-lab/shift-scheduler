@@ -77,9 +77,13 @@ test('shift capacity setting is normalized to a 1-10 integer', () => {
   assert.equal(normalizeMaxPerSlot('bad', 4), 4)
 })
 
-test('auto overtime rounds excess checkout duration to half hours', () => {
-  assert.equal(calculateAutoOvertimeHours('am1', '07:45:00', '10:30:00'), 1)
-  assert.equal(calculateAutoOvertimeHours('am1', '08:00:00', '10:20:00'), 0.5)
+test('auto overtime allows 15 minutes grace after slot end then rounds by half-hour bands', () => {
+  assert.equal(calculateAutoOvertimeHours('am1', '07:45:00', '10:15:00'), 0)
+  assert.equal(calculateAutoOvertimeHours('am1', '08:00:00', '10:16:00'), 0.5)
+  assert.equal(calculateAutoOvertimeHours('am1', '07:45:00', '10:45:00'), 0.5)
+  assert.equal(calculateAutoOvertimeHours('am1', '08:00:00', '10:46:00'), 1)
+  assert.equal(calculateAutoOvertimeHours('am1', '08:00:00', '11:15:00'), 1)
+  assert.equal(calculateAutoOvertimeHours('am1', '08:00:00', '11:16:00'), 1.5)
   assert.equal(calculateAutoOvertimeHours('pm1', '14:30:00', '16:00:00'), 0)
 })
 
