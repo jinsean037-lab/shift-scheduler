@@ -1806,14 +1806,14 @@ function roundedHalfHourFromMinutes(minutes) {
 }
 
 function calculateAutoOvertimeHours(slotId, inTime, outTime) {
-  const standardHours = SLOT_HOURS[slotId]
-  if (!standardHours) return 0
-  const inMin = timeToMinutes(inTime)
+  const standardWin = SLOT_STANDARD_WINDOWS[slotId]
+  if (!standardWin) return 0
   const outMin = timeToMinutes(outTime)
-  let diffMinutes = outMin - inMin
-  if (diffMinutes < 0) diffMinutes += 24 * 60
-  const roundedActual = roundedHalfHourFromMinutes(diffMinutes)
-  return Math.max(0, roundedActual - standardHours)
+  let adjustedOut = outMin
+  if (adjustedOut < standardWin.startMin) adjustedOut += 24 * 60
+  const excessMinutes = adjustedOut - standardWin.endMin
+  if (excessMinutes <= 15) return 0
+  return Math.ceil((excessMinutes - 15) / 30) * 0.5
 }
 
 function beijingDateMinutesToIso(dateStr, minutes) {
@@ -2191,15 +2191,49 @@ app.post('/api/admin/overtime/approve', async (req, res) => {
   try {
     const { id, action } = req.body  // action: approve | reject
     if (!id || !action) return res.json({ ok: false, msg: '参数缺失' })
+    if (action !== 'approve' && action !== 'reject') return res.json({ ok: false, msg: '操作无效' })
     const store = await readStore()
     const overtimes = store.overtimes || []
     const item = overtimes.find(o => o.id === id)
     if (!item) return res.json({ ok: false, msg: '记录不存在' })
     if (item.status !== 'pending') return res.json({ ok: false, msg: '该申请已处理过' })
+    item.reviewHistory = item.reviewHistory || []
+    item.reviewHistory.push({
+      from: item.status,
+      to: action === 'approve' ? 'approved' : 'rejected',
+      at: new Date().toISOString()
+    })
     item.status = action === 'approve' ? 'approved' : 'rejected'
     item.reviewedAt = new Date().toISOString()
     await writeStore({ overtimes })
     res.json({ ok: true, msg: action === 'approve' ? '已批准补报' : '已拒绝补报' })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// POST /api/admin/overtime/reopen — 撤回已处理补报，重新进入待审核
+app.post('/api/admin/overtime/reopen', async (req, res) => {
+  try {
+    const { id } = req.body || {}
+    if (!id) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    const overtimes = store.overtimes || []
+    const item = overtimes.find(o => o.id === id)
+    if (!item) return res.json({ ok: false, msg: '记录不存在' })
+    if (item.status === 'pending') return res.json({ ok: false, msg: '该申请已是待审核状态' })
+    item.reviewHistory = item.reviewHistory || []
+    item.reviewHistory.push({
+      from: item.status,
+      to: 'pending',
+      at: new Date().toISOString(),
+      action: 'reopen'
+    })
+    item.status = 'pending'
+    item.reopenedAt = new Date().toISOString()
+    delete item.reviewedAt
+    await writeStore({ overtimes })
+    res.json({ ok: true, msg: '已撤回处理，可重新审核' })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
