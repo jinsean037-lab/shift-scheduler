@@ -3,6 +3,8 @@ const assert = require('node:assert/strict')
 
 const {
   addMemberToStore,
+  autoCloseExpiredCheckins,
+  buildMemberWeekSchedule,
   calculateMemberWorkTime,
   calculateAutoOvertimeHours,
   defaultStore,
@@ -105,4 +107,46 @@ test('member today status reflects shared checkin records', () => {
   store.checkins.push({ id: 'out1', name: '甲', date: '2026-09-15', time: '2026-09-15T02:00:00.000Z', type: 'out', slotId: 'am1' })
   status = getMemberTodayStatus(store, '甲', '2026-09-15')
   assert.equal(status.shifts[0].status, 'completed')
+})
+
+test('weekly schedule uses approved substitute overrides', () => {
+  const store = defaultStore()
+  store.members = ['甲', '乙']
+  store.scheduleStart = '2026-09-14T00:00:00+08:00'
+  store.scheduleEnd = '2026-09-20T23:59:59+08:00'
+  store.schedule = { '周一': { am1: ['甲'] } }
+  store.shiftSubstituteOverrides = [{
+    id: 'sub1',
+    from: '甲',
+    to: '乙',
+    date: '2026-09-14',
+    day: '周一',
+    slotId: 'am1',
+    status: 'approved'
+  }]
+
+  const week = buildMemberWeekSchedule(store, '2026-09-16')
+
+  assert.equal(week.weekStart, '2026-09-14')
+  assert.deepEqual(week.days[0].slots[0].members, ['乙'])
+})
+
+test('expired open checkin is auto checked out at slot end', () => {
+  const store = defaultStore()
+  store.checkins = [{
+    id: 'in1',
+    name: '甲',
+    date: '2026-09-17',
+    time: '2026-09-17T00:00:00.000Z',
+    type: 'in',
+    slotId: 'am1'
+  }]
+
+  const changed = autoCloseExpiredCheckins(store, new Date('2026-09-18T00:00:00.000Z'))
+  const autoOut = store.checkins.find(c => c.type === 'out')
+
+  assert.equal(changed, true)
+  assert.equal(autoOut.autoCheckout, true)
+  assert.equal(autoOut.slotId, 'am1')
+  assert.equal(autoOut.time, '2026-09-17T02:00:00.000Z')
 })
