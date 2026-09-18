@@ -5301,13 +5301,15 @@ function loadAdminOvertime() {
   fetch(API + '/overtime')
     .then(r => r.json())
     .then(data => {
-      const list = (data.list || []).filter(o => o.status === 'pending');
-      if (list.length === 0) {
-        listEl.innerHTML = '<div style="text-align:center;padding:40px 20px"><div style="font-size:48px;margin-bottom:12px">📋</div><p style="color:#999;font-size:14px;margin-bottom:6px">暂无待审核的补报申请</p><p style="color:#bbb;font-size:12px">当成员提交补签退申请后，会在此处显示</p></div>';
-        return;
-      }
+      const all = data.list || [];
+      const pending = all.filter(o => o.status === 'pending');
+      const processed = all.filter(o => o.status === 'approved' || o.status === 'rejected');
       let html = '';
-      list.forEach(o => {
+      html += '<div style="font-size:14px;font-weight:700;color:#8B1A1A;margin:4px 0 10px">待审核</div>';
+      if (pending.length === 0) {
+        html += '<div style="text-align:center;padding:28px 20px;background:#fafafa;border-radius:10px;margin-bottom:16px"><div style="font-size:34px;margin-bottom:8px">📋</div><p style="color:#999;font-size:14px;margin-bottom:4px">暂无待审核的补报申请</p><p style="color:#bbb;font-size:12px">当成员提交补报申请后，会在此处显示</p></div>';
+      }
+      pending.forEach(o => {
         html += '<div class="req-card" style="margin-bottom:8px">';
         html += '<div class="req-info">';
         html += '<div class="req-name">' + o.name + '</div>';
@@ -5316,6 +5318,23 @@ function loadAdminOvertime() {
         html += '<div class="req-actions">';
         html += '<button class="admin-btn primary" style="margin-right:4px" onclick="approveOt(\'' + o.id + '\',\'approve\')">✅ 批准</button>';
         html += '<button class="admin-btn danger" onclick="approveOt(\'' + o.id + '\',\'reject\')">❌ 拒绝</button>';
+        html += '</div></div>';
+      });
+      html += '<div style="font-size:14px;font-weight:700;color:#555;margin:18px 0 10px">已处理</div>';
+      if (processed.length === 0) {
+        html += '<div style="color:#999;font-size:13px;padding:14px 0">暂无已处理记录</div>';
+      }
+      processed.forEach(o => {
+        const statusText = o.status === 'approved' ? '已批准' : '已拒绝';
+        const statusColor = o.status === 'approved' ? '#2e7d32' : '#c41230';
+        html += '<div class="req-card" style="margin-bottom:8px;opacity:.92">';
+        html += '<div class="req-info">';
+        html += '<div class="req-name">' + o.name + ' <span style="font-size:12px;color:' + statusColor + ';font-weight:600">· ' + statusText + '</span></div>';
+        html += '<div class="req-detail">' + o.date + ' · ' + o.hours + '小时 · ' + o.content + '</div>';
+        html += '<div style="font-size:11px;color:#999;margin-top:4px">处理时间：' + (o.reviewedAt ? formatTime(o.reviewedAt) : '—') + '</div>';
+        html += '</div>';
+        html += '<div class="req-actions">';
+        html += '<button class="admin-btn" onclick="reopenOt(\'' + o.id + '\')">↩️ 撤回重审</button>';
         html += '</div></div>';
       });
       listEl.innerHTML = html;
@@ -5328,6 +5347,21 @@ function approveOt(id, action) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, action })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) { showToast('✅ ' + data.msg); loadAdminOvertime(); }
+    else { showToast(data.msg || '操作失败'); }
+  })
+  .catch(() => { showToast('网络错误'); });
+}
+
+function reopenOt(id) {
+  if (!confirm('确定撤回这条补报的处理结果，并重新放回待审核吗？')) return;
+  fetch(API + '/admin/overtime/reopen', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id })
   })
   .then(r => r.json())
   .then(data => {
