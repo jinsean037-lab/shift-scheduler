@@ -1816,6 +1816,65 @@ function calculateAutoOvertimeHours(slotId, inTime, outTime) {
   return Math.max(0, roundedActual - standardHours)
 }
 
+function beijingDateMinutesToIso(dateStr, minutes) {
+  const [year, month, day] = String(dateStr).split('-').map(Number)
+  const utcMs = Date.UTC(year, month - 1, day, 0, minutes, 0) - 8 * 3600 * 1000
+  return new Date(utcMs).toISOString()
+}
+
+function hasCheckoutForCheckin(checkins, checkinRecord) {
+  const inMin = timeToMinutes(checkinRecord.time)
+  return checkins.some(c => {
+    if (c.name !== checkinRecord.name || c.date !== checkinRecord.date || c.type !== 'out') return false
+    if ((c.slotId || '') !== (checkinRecord.slotId || '')) return false
+    return timeToMinutes(c.time) >= inMin
+  })
+}
+
+function findOpenCheckin(checkins, name, date, slotId) {
+  return checkins
+    .filter(c => c.name === name && c.date === date && c.type === 'in' && (!slotId || c.slotId === slotId))
+    .sort((a, b) => String(b.time || '').localeCompare(String(a.time || '')))
+    .find(c => !hasCheckoutForCheckin(checkins, c)) || null
+}
+
+function hasCheckinForSlot(checkins, name, date, slotId) {
+  return checkins.some(c => c.name === name && c.date === date && c.type === 'in' && c.slotId === slotId)
+}
+
+function autoCloseExpiredCheckins(store, nowDate) {
+  const checkins = store.checkins || []
+  const today = getBeijingDateString()
+  const nowHHMM = getBeijingTimeHHMM()
+  let changed = false
+  for (const record of checkins.slice()) {
+    if (record.type !== 'in' || !record.slotId || hasCheckoutForCheckin(checkins, record)) continue
+    const checkoutWin = SLOT_CHECKOUT_WINDOWS[record.slotId]
+    const standardWin = SLOT_STANDARD_WINDOWS[record.slotId]
+    if (!checkoutWin || !standardWin) continue
+    const expired = record.date < today || (record.date === today && nowHHMM > checkoutWin.end)
+    if (!expired) continue
+    const autoTime = beijingDateMinutesToIso(record.date, standardWin.endMin)
+    checkins.push({
+      id: `auto_out_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      name: record.name,
+      date: record.date,
+      time: autoTime,
+      type: 'out',
+      slotId: record.slotId,
+      lat: null,
+      lng: null,
+      autoCheckout: true,
+      source: 'auto_checkout',
+      checkinId: record.id || '',
+      createdAt: (nowDate || new Date()).toISOString()
+    })
+    changed = true
+  }
+  store.checkins = checkins
+  return changed
+}
+
 // 打卡地点围栏（中山大学南校园岭南行政中心）
 const CHECKIN_LOCATION = {
   name: '岭南行政中心（中山大学南校园）',
@@ -1951,6 +2010,7 @@ app.get('/api/member/today-status', async (req, res) => {
     const name = req.query.name
     if (!name) return res.json({ ok: false, msg: '缺少姓名' })
     const store = await readStore()
+    if (autoCloseExpiredCheckins(store)) await writeStore({ checkins: store.checkins })
     if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
     res.json({ ok: true, ...getMemberTodayStatus(store, name) })
   } catch (e) {
@@ -1966,13 +2026,22 @@ app.post('/api/checkin', async (req, res) => {
     const store = await readStore()
     const now = new Date()
     const today = getBeijingDateString()
-    // 检查今天是否已有未签退的签到
-    const pendingIn = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'in'
-      && !(store.checkins || []).find(o => o.name === name && o.date === today && o.type === 'out'))
-    if (pendingIn) return res.json({ ok: false, msg: '当前处于值班中状态，请先签退后再签到下一班次' })
+    const autoChanged = autoCloseExpiredCheckins(store, now)
+    if (autoChanged) await writeStore({ checkins: store.checkins })
     // 检查是否在排班时间窗口内（北京时间）
     const slots = getTodaySlots(store, name)
     if (slots.length === 0) return res.json({ ok: false, msg: '当前不在签到时间内（班次开始前15分钟至班次结束），无法签到' })
+    const checkins = store.checkins || []
+    const openInCurrentWindow = slots
+      .map(slot => findOpenCheckin(checkins, name, today, slot.slotId))
+      .find(Boolean)
+    if (openInCurrentWindow) {
+      return res.json({ ok: true, msg: '已签到，请勿重复点击', record: openInCurrentWindow, duplicate: true, slotLabel: openInCurrentWindow.slotId })
+    }
+    const slot = slots.find(s => !hasCheckinForSlot(checkins, name, today, s.slotId))
+    if (!slot) {
+      return res.json({ ok: true, msg: '该班次已签到，请勿重复点击', duplicate: true })
+    }
     // 地点围栏校验
     if (lat != null && lng != null) {
       const dist = checkinDistanceMeters(lat, lng)
@@ -1983,11 +2052,10 @@ app.post('/api/checkin', async (req, res) => {
       return res.json({ ok: false, msg: '无法获取你的位置，请在岭南行政中心附近重新尝试并允许定位' })
     }
 
-    const record = { id: `ck_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, name, date: today, time: now.toISOString(), type: 'in', slotId: slots[0].slotId, lat: lat || null, lng: lng || null }
-    const checkins = store.checkins || []
+    const record = { id: `ck_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, name, date: today, time: now.toISOString(), type: 'in', slotId: slot.slotId, lat: lat || null, lng: lng || null }
     checkins.push(record)
     await writeStore({ checkins })
-    res.json({ ok: true, msg: '签到成功', record, slotLabel: slots[0].slotId })
+    res.json({ ok: true, msg: '签到成功', record, slotLabel: slot.slotId })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -2001,14 +2069,13 @@ app.post('/api/checkout', async (req, res) => {
     const store = await readStore()
     const now = new Date()
     const today = getBeijingDateString()
+    const autoChanged = autoCloseExpiredCheckins(store, now)
+    if (autoChanged) await writeStore({ checkins: store.checkins })
     // 找到最近一次未签退的签到记录
-    const allIns = (store.checkins || []).filter(c => c.name === name && c.date === today && c.type === 'in').sort((a,b)=>b.time.localeCompare(a.time))
-    let checkinRecord = null
-    for (const inRec of allIns) {
-      const hasOut = (store.checkins || []).find(c => c.name === name && c.date === today && c.type === 'out' && timeToMinutes(c.time) > timeToMinutes(inRec.time))
-      if (!hasOut) { checkinRecord = inRec; break; }
+    const checkinRecord = findOpenCheckin(store.checkins || [], name, today)
+    if (!checkinRecord) {
+      return res.json({ ok: false, msg: '请先签到' })
     }
-    if (!checkinRecord) return res.json({ ok: false, msg: '请先签到' })
     // 检查是否仍在签退时间窗口内（北京时间）
     const slotWin = SLOT_CHECKOUT_WINDOWS[checkinRecord.slotId]
     const nowHHMM = getBeijingTimeHHMM()
@@ -2169,6 +2236,7 @@ app.get('/api/my-checkins', async (req, res) => {
     const name = req.query.name
     if (!name) return res.json({ checkins: [], stats: {} })
     const store = await readStore()
+    if (autoCloseExpiredCheckins(store)) await writeStore({ checkins: store.checkins })
     const checkins = (store.checkins || []).filter(c => c.name === name).sort((a, b) => a.time.localeCompare(b.time))
 
     // 统计：使用与 calculateMemberWorkTime 相同的精确配对逻辑
@@ -2240,6 +2308,7 @@ app.get('/api/my-checkins', async (req, res) => {
 app.get('/api/admin/checkins', async (req, res) => {
   try {
     const store = await readStore()
+    if (autoCloseExpiredCheckins(store)) await writeStore({ checkins: store.checkins })
     let checkins = store.checkins || []
     if (req.query.date) {
       checkins = checkins.filter(c => c.date === req.query.date)
@@ -2259,6 +2328,7 @@ app.get('/api/admin/checkins', async (req, res) => {
 app.get('/api/admin/monthly-shifts', async (req, res) => {
   try {
     const store = await readStore()
+    if (autoCloseExpiredCheckins(store)) await writeStore({ checkins: store.checkins })
     // 默认本月（北京时间）
     const beijingMs = Date.now() + 8 * 3600 * 1000
     const beijingNow = new Date(beijingMs)
@@ -4376,6 +4446,7 @@ function formatMonth(d) {
 
 module.exports = {
   addMemberToStore,
+  autoCloseExpiredCheckins,
   calculateAutoOvertimeHours,
   calculateMemberWorkTime,
   checkinDistanceMeters,
