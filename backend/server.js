@@ -672,6 +672,21 @@ function dateToWeekday(dateStr) {
   return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]
 }
 
+// 临时调休覆盖：后续可替换为正式节假日配置。
+const SPECIAL_WORKDAY_WEEKDAYS = {
+  '2026-09-20': '周五'
+}
+const SPECIAL_NO_SHIFT_DATES = new Set([
+  '2026-09-25'
+])
+
+function getScheduleWeekday(dateStr) {
+  if (!dateStr) return null
+  const day = String(dateStr).slice(0, 10)
+  if (SPECIAL_NO_SHIFT_DATES.has(day)) return null
+  return SPECIAL_WORKDAY_WEEKDAYS[day] || dateToWeekday(day)
+}
+
 function getBeijingDateString() {
   const now = new Date()
   const beijingMs = now.getTime() + 8 * 3600 * 1000
@@ -691,6 +706,10 @@ function isDateInSchedulePeriod(store, dateStr) {
   const start = String(store.scheduleStart).slice(0, 10)
   const end = String(store.scheduleEnd).slice(0, 10)
   return dateStr >= start && dateStr <= end
+}
+
+function isScheduledDateInPeriod(store, dateStr) {
+  return isDateInSchedulePeriod(store, dateStr) && !!getScheduleWeekday(dateStr)
 }
 
 function cloneScheduleList(store, day, slotId) {
@@ -733,6 +752,19 @@ function listDatesForWeekday(startDate, endDate, weekday) {
   return result
 }
 
+function listScheduleDatesForWeekday(startDate, endDate, weekday) {
+  const result = []
+  if (!startDate || !endDate || !weekday) return result
+  let current = new Date(`${startDate}T12:00:00+08:00`)
+  const end = new Date(`${endDate}T12:00:00+08:00`)
+  while (current <= end) {
+    const dateStr = current.toISOString().slice(0, 10)
+    if (getScheduleWeekday(dateStr) === weekday) result.push(dateStr)
+    current.setDate(current.getDate() + 1)
+  }
+  return result
+}
+
 function getEffectiveShiftsForMember(store, name) {
   const shifts = []
   const start = store.scheduleStart ? String(store.scheduleStart).slice(0, 10) : null
@@ -742,7 +774,7 @@ function getEffectiveShiftsForMember(store, name) {
   for (const day of ['周一','周二','周三','周四','周五']) {
     const dayData = sched[day]
     if (!dayData || typeof dayData !== 'object') continue
-    for (const date of listDatesForWeekday(start, end, day)) {
+    for (const date of listScheduleDatesForWeekday(start, end, day)) {
       for (const slotId of Object.keys(dayData)) {
         const members = getEffectiveSlotMembers(store, date, day, slotId)
         if (members.includes(name)) {
@@ -778,9 +810,9 @@ function buildMemberWeekSchedule(store, baseDate) {
   const days = []
   for (let i = 0; i < 5; i++) {
     const date = addDaysString(weekStart, i)
-    const weekday = dateToWeekday(date)
+    const weekday = getScheduleWeekday(date)
     const daySlots = []
-    if (isDateInSchedulePeriod(store, date)) {
+    if (weekday && isDateInSchedulePeriod(store, date)) {
       for (const slotId of slotIds) {
         const slotMembers = getEffectiveSlotMembers(store, date, weekday, slotId)
         if (slotMembers.length) {
@@ -868,8 +900,8 @@ app.post('/api/shift-swap/request', async (req, res) => {
     if (fromDate === toDate && fromDay === toDay && fromSlotId === toSlotId) return res.json({ ok: false, msg: '不能选择同一个班次互换' })
     const store = await readStore()
     if (!isScheduleActive(store)) return res.json({ ok: false, msg: '当前不在排班表生效期间，暂不能换班' })
-    if (!isDateInSchedulePeriod(store, fromDate) || !isDateInSchedulePeriod(store, toDate)) return res.json({ ok: false, msg: '换班日期不在当前排班生效周期内' })
-    if (dateToWeekday(fromDate) !== fromDay || dateToWeekday(toDate) !== toDay) return res.json({ ok: false, msg: '换班日期与周几不匹配' })
+    if (!isScheduledDateInPeriod(store, fromDate) || !isScheduledDateInPeriod(store, toDate)) return res.json({ ok: false, msg: '换班日期不在当前排班生效周期内' })
+    if (getScheduleWeekday(fromDate) !== fromDay || getScheduleWeekday(toDate) !== toDay) return res.json({ ok: false, msg: '换班日期与周几不匹配' })
     if (!store.members.includes(from) || !store.members.includes(to)) return res.json({ ok: false, msg: '成员不存在' })
     const fromList = getEffectiveSlotMembers(store, fromDate, fromDay, fromSlotId)
     const toList = getEffectiveSlotMembers(store, toDate, toDay, toSlotId)
@@ -959,7 +991,7 @@ app.post('/api/shift-swap/review', async (req, res) => {
     const toDay = item.toDay || item.day
     const toSlotId = item.toSlotId || item.slotId
     if (!fromDate || !toDate) return res.json({ ok: false, msg: '该申请缺少具体日期，请重新发起换班' })
-    if (!isDateInSchedulePeriod(store, fromDate) || !isDateInSchedulePeriod(store, toDate)) return res.json({ ok: false, msg: '换班日期已不在当前排班生效周期内' })
+    if (!isScheduledDateInPeriod(store, fromDate) || !isScheduledDateInPeriod(store, toDate)) return res.json({ ok: false, msg: '换班日期已不在当前排班生效周期内' })
     const fromList = getEffectiveSlotMembers(store, fromDate, fromDay, fromSlotId)
     const toList = getEffectiveSlotMembers(store, toDate, toDay, toSlotId)
     if (!fromList || !fromList.includes(item.from)) return res.json({ ok: false, msg: '发起人的原班次已变化，无法确认换班' })
@@ -1021,8 +1053,8 @@ app.post('/api/shift-substitute/request', async (req, res) => {
     if (!from || !to || !date || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
     if (from === to) return res.json({ ok: false, msg: '不能委托给自己' })
     const store = await readStore()
-    if (!isDateInSchedulePeriod(store, date)) return res.json({ ok: false, msg: '代班日期不在当前排班生效周期内' })
-    if (dateToWeekday(date) !== day) return res.json({ ok: false, msg: '代班日期与周几不匹配' })
+    if (!isScheduledDateInPeriod(store, date)) return res.json({ ok: false, msg: '代班日期不在当前排班生效周期内' })
+    if (getScheduleWeekday(date) !== day) return res.json({ ok: false, msg: '代班日期与周几不匹配' })
     if (!store.members.includes(from) || !store.members.includes(to)) return res.json({ ok: false, msg: '成员不存在' })
     // 检查发起人是否在该班次中（按 effective 算）
     const fromList = getEffectiveSlotMembers(store, date, day, slotId)
@@ -1071,7 +1103,7 @@ app.post('/api/shift-substitute/review', async (req, res) => {
       return res.json({ ok: true, msg: '已拒绝代班申请', request: publicShiftSubstitute(item) })
     }
     // 接受前再次校验（避免对方在班次上发生变化）
-    if (!isDateInSchedulePeriod(store, item.date)) return res.json({ ok: false, msg: '代班日期已不在当前排班生效周期内' })
+    if (!isScheduledDateInPeriod(store, item.date)) return res.json({ ok: false, msg: '代班日期已不在当前排班生效周期内' })
     const fromList = getEffectiveSlotMembers(store, item.date, item.day, item.slotId)
     if (!fromList.includes(item.from)) return res.json({ ok: false, msg: '发起人已不在该班次中，无法代班' })
     if (fromList.includes(item.to)) return res.json({ ok: false, msg: '你已在该班次中，无需代班' })
@@ -1790,10 +1822,10 @@ function slotByInTime(timeStr) {
 
 // 2026-07-02 v3：获取某成员在指定日期实际排班的所有 slot（合并换班覆盖）
 function getMemberScheduledSlots(store, dateStr, name) {
-  const weekday = dateToWeekday(dateStr)
+  const weekday = getScheduleWeekday(dateStr)
   const slotIds = []
   if (!weekday || !['周一','周二','周三','周四','周五'].includes(weekday)) return slotIds
-  if (!isDateInSchedulePeriod(store, dateStr)) return slotIds
+  if (!isScheduledDateInPeriod(store, dateStr)) return slotIds
   for (const slotId of ['am1', 'am2', 'pm1', 'pm2']) {
     const members = getEffectiveSlotMembers(store, dateStr, weekday, slotId)
     if (members.includes(name)) slotIds.push(slotId)
@@ -1949,7 +1981,8 @@ function getBeijingTimeHHMM() {
 function getTodaySlots(store, name) {
   const schedule = store.schedule || {}
   const today = getBeijingDateString()
-  const todayWeekday = dateToWeekday(today)
+  const todayWeekday = getScheduleWeekday(today)
+  if (!todayWeekday) return []
   const daySchedule = schedule[todayWeekday]
   if (!daySchedule) return []
   const nowHHMM = getBeijingTimeHHMM()
@@ -1968,7 +2001,7 @@ function getTodaySlots(store, name) {
 
 function getMemberTodayStatus(store, name, nowDate) {
   const today = nowDate || getBeijingDateString()
-  const todayWeekday = dateToWeekday(today)
+  const todayWeekday = getScheduleWeekday(today)
   const nowHHMM = getBeijingTimeHHMM()
   const shifts = getEffectiveShiftsForMember(store, name)
     .filter(s => s.date === today)
@@ -1992,7 +2025,7 @@ function getMemberTodayStatus(store, name, nowDate) {
       const outWindow = !!(checkoutWin && nowHHMM >= checkoutWin.start && nowHHMM <= checkoutWin.end)
       return {
         ...s,
-        day: s.day || todayWeekday,
+        day: s.day || todayWeekday || dateToWeekday(today),
         slotId,
         status,
         statusText: status === 'completed' ? '已签退' : status === 'in_progress' ? '值班中' : '未签到',
@@ -2405,7 +2438,7 @@ app.get('/api/admin/monthly-shifts', async (req, res) => {
         const dayData = schedule[day]
         if (!dayData || typeof dayData !== 'object') continue
         // 本月内本星期对应的所有日期
-        const dates = listDatesForWeekday(effStart, effEnd, day)
+        const dates = listScheduleDatesForWeekday(effStart, effEnd, day)
         for (const date of dates) {
           for (const slotId of slotIds) {
             const list = dayData[slotId]
@@ -3420,11 +3453,11 @@ function calculateMemberWorkTime(store, name, year, month) {
   
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    const weekday = dateToWeekday(dateStr)
+    const weekday = getScheduleWeekday(dateStr)
     
     // 排班信息：检查该成员在指定日期的每个时段是否被排班
     const scheduled = []
-    if (isDateInSchedulePeriod(store, dateStr) && ['周一','周二','周三','周四','周五'].includes(weekday)) {
+    if (isScheduledDateInPeriod(store, dateStr) && ['周一','周二','周三','周四','周五'].includes(weekday)) {
       for (const slotId of ['am1', 'am2', 'pm1', 'pm2']) {
         const members = getEffectiveSlotMembers(store, dateStr, weekday, slotId)
         if (members.includes(name)) {
