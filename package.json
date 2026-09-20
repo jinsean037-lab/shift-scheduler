@@ -1,7 +1,7 @@
 {
   "name": "shift-scheduler-v4",
-  "version": "6.0.0",
-  "description": "学工部助理排班系统 6.0",
+  "version": "7.0.0",
+  "description": "学工部助理排班系统 7.0",
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
