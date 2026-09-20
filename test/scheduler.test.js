@@ -8,6 +8,7 @@ const {
   calculateMemberWorkTime,
   calculateAutoOvertimeHours,
   defaultStore,
+  getEffectiveShiftsForMember,
   getMemberTodayStatus,
   checkinDistanceMeters,
   normalizeMaxPerSlot,
@@ -135,6 +136,40 @@ test('weekly schedule uses approved substitute overrides', () => {
   assert.deepEqual(week.days[0].slots[0].members, ['乙'])
 })
 
+test('member shifts expose adjusted sources for homepage badges', () => {
+  const store = defaultStore()
+  store.members = ['甲', '乙', '丙']
+  store.scheduleStart = '2026-09-14T00:00:00+08:00'
+  store.scheduleEnd = '2026-09-20T23:59:59+08:00'
+  store.schedule = { '周一': { am1: ['甲'], am2: ['乙'], pm1: ['丙'] } }
+  store.shiftSwapOverrides = [{
+    id: 'swap1',
+    from: '甲',
+    to: '乙',
+    fromDate: '2026-09-14',
+    fromDay: '周一',
+    fromSlotId: 'am1',
+    toDate: '2026-09-14',
+    toDay: '周一',
+    toSlotId: 'am2',
+    status: 'approved'
+  }]
+  store.shiftSubstituteOverrides = [{
+    id: 'sub1',
+    from: '丙',
+    to: '乙',
+    date: '2026-09-14',
+    day: '周一',
+    slotId: 'pm1',
+    status: 'approved'
+  }]
+
+  const shifts = getEffectiveShiftsForMember(store, '乙')
+
+  assert.equal(shifts.find(s => s.slotId === 'am1').source.type, 'swap')
+  assert.equal(shifts.find(s => s.slotId === 'pm1').source.type, 'substitute')
+})
+
 test('expired open checkin is auto checked out at slot end', () => {
   const store = defaultStore()
   store.checkins = [{
@@ -153,4 +188,57 @@ test('expired open checkin is auto checked out at slot end', () => {
   assert.equal(autoOut.autoCheckout, true)
   assert.equal(autoOut.slotId, 'am1')
   assert.equal(autoOut.time, '2026-09-17T02:00:00.000Z')
+})
+
+test('approved supplemental checkout prevents duplicate auto checkout', () => {
+  const store = defaultStore()
+  store.checkins = [
+    {
+      id: 'in1',
+      name: '甲',
+      date: '2026-09-17',
+      time: '2026-09-17T00:00:00.000Z',
+      type: 'in',
+      slotId: 'am1'
+    },
+    {
+      id: 'supp1',
+      name: '甲',
+      date: '2026-09-17',
+      time: '10:05:00',
+      type: 'out',
+      isSupp: true
+    }
+  ]
+
+  const changed = autoCloseExpiredCheckins(store, new Date('2026-09-18T00:00:00.000Z'))
+
+  assert.equal(changed, false)
+  assert.equal(store.checkins.filter(c => c.autoCheckout).length, 0)
+})
+
+test('removing a member also clears delegated admin permission', () => {
+  const store = defaultStore()
+  store.members = ['甲', '乙']
+  store.adminMembers = ['甲', '乙']
+
+  removeMemberRelatedData(store, '甲')
+
+  assert.deepEqual(store.adminMembers, ['乙'])
+})
+
+test('temporary holiday overrides treat 2026-09-20 as Friday and 2026-09-25 as no shift', () => {
+  const store = defaultStore()
+  store.members = ['甲']
+  store.scheduleStart = '2026-09-14T00:00:00+08:00'
+  store.scheduleEnd = '2026-09-30T23:59:59+08:00'
+  store.schedule = { '周五': { am1: ['甲'] } }
+
+  const makeUpSunday = getMemberTodayStatus(store, '甲', '2026-09-20')
+  const holidayFriday = getMemberTodayStatus(store, '甲', '2026-09-25')
+
+  assert.equal(makeUpSunday.shifts.length, 1)
+  assert.equal(makeUpSunday.shifts[0].day, '周五')
+  assert.equal(makeUpSunday.shifts[0].date, '2026-09-20')
+  assert.deepEqual(holidayFriday.shifts, [])
 })
