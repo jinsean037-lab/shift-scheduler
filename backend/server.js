@@ -101,6 +101,7 @@ function defaultStore() {
     memberEmails: {},
     memberProfiles: {},
     wechatSubscriptions: {},
+    adminMembers: [],
     holidaySettings: {
       noShiftDates: ['2026-09-25'],
       workdayOverrides: {
@@ -465,7 +466,8 @@ app.post('/api/login', async (req, res) => {
     if (store.passwords[trimmed] !== password.trim()) {
       return res.json({ ok: false, msg: '密码错误' })
     }
-    res.json({ ok: true, name: trimmed })
+    const isAdmin = (store.adminMembers || []).includes(trimmed)
+    res.json({ ok: true, name: trimmed, isAdmin, memberAdmin: isAdmin, adminToken: isAdmin ? createAdminToken() : '' })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -659,6 +661,7 @@ function removeMemberRelatedData(store, name) {
   store.shiftSubstituteRequests = (store.shiftSubstituteRequests || []).filter(r => r.from !== name && r.to !== name)
   store.shiftSubstituteOverrides = (store.shiftSubstituteOverrides || []).filter(r => r.from !== name && r.to !== name)
   store.partnerMessages = (store.partnerMessages || []).filter(m => m.from !== name && m.to !== name)
+  store.adminMembers = (store.adminMembers || []).filter(n => n !== name)
   if (store.passwords) delete store.passwords[name]
   if (store.memberEmails) delete store.memberEmails[name]
   if (store.memberProfiles) delete store.memberProfiles[name]
@@ -1388,6 +1391,7 @@ app.post('/api/admin/member/remove', async (req, res) => {
     if (idx < 0) return res.json({ ok: false, msg: '成员不存在' })
     store.members.splice(idx, 1)
     removeMemberRelatedData(store, name)
+    store.adminMembers = (store.adminMembers || []).filter(n => n !== name)
     await writeStore({
       members: store.members,
       passwords: store.passwords,
@@ -1401,7 +1405,8 @@ app.post('/api/admin/member/remove', async (req, res) => {
       shiftSubstituteOverrides: store.shiftSubstituteOverrides,
       partnerMessages: store.partnerMessages,
       memberEmails: store.memberEmails,
-      memberProfiles: store.memberProfiles
+      memberProfiles: store.memberProfiles,
+      adminMembers: store.adminMembers
     })
     res.json({ ok: true, members: store.members, schedule: store.schedule })
   } catch (e) {
@@ -1417,6 +1422,7 @@ app.post('/api/admin/remove-member', async (req, res) => {
     if (idx < 0) return res.json({ ok: false, msg: '成员不存在' })
     store.members.splice(idx, 1)
     removeMemberRelatedData(store, name)
+    store.adminMembers = (store.adminMembers || []).filter(n => n !== name)
     await writeStore({
       members: store.members,
       passwords: store.passwords,
@@ -1430,7 +1436,8 @@ app.post('/api/admin/remove-member', async (req, res) => {
       shiftSubstituteOverrides: store.shiftSubstituteOverrides,
       partnerMessages: store.partnerMessages,
       memberEmails: store.memberEmails,
-      memberProfiles: store.memberProfiles
+      memberProfiles: store.memberProfiles,
+      adminMembers: store.adminMembers
     })
     res.json({ ok: true, members: store.members, schedule: store.schedule })
   } catch (e) {
@@ -1465,7 +1472,22 @@ app.post('/api/admin/reset', async (req, res) => {
 app.get('/api/admin/members', async (req, res) => {
   try {
     const store = await readStore()
-    res.json({ members: store.members })
+    res.json({ members: store.members, adminMembers: store.adminMembers || [] })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// 管理员：设置哪些成员拥有后台管理权限
+app.put('/api/admin/member-admins', async (req, res) => {
+  try {
+    const store = await readStore()
+    const input = Array.isArray(req.body && req.body.adminMembers) ? req.body.adminMembers : []
+    const memberSet = new Set(store.members || [])
+    const adminMembers = [...new Set(input.map(n => String(n || '').trim()).filter(n => memberSet.has(n)))]
+    store.adminMembers = adminMembers
+    await writeStore({ adminMembers })
+    res.json({ ok: true, adminMembers })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
@@ -1911,6 +1933,7 @@ function hasCheckoutForCheckin(checkins, checkinRecord) {
   const inMin = timeToMinutes(checkinRecord.time)
   return checkins.some(c => {
     if (c.name !== checkinRecord.name || c.date !== checkinRecord.date || c.type !== 'out') return false
+    if (c.isSupp) return timeToMinutes(c.time) >= inMin
     if ((c.slotId || '') !== (checkinRecord.slotId || '')) return false
     return timeToMinutes(c.time) >= inMin
   })
@@ -3938,6 +3961,7 @@ app.put('/api/supp-checkout/:id/review', async (req, res) => {
     item.comment = comment || ''
     if (action === 'approve') {
       if (!store.checkins) store.checkins = []
+      store.checkins = store.checkins.filter(c => !(c.name === item.name && c.date === item.date && c.autoCheckout))
       store.checkins.push({
         id: 'supp_' + item.id,
         name: item.name,
