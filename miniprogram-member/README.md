@@ -1,6 +1,6 @@
 # 学工办助理排班成员端小程序
 
-这是 `v6.0` 的成员端微信小程序第一版，管理员后台仍使用现有网页。
+这是 `v7.0` 的成员端微信小程序版本，管理员后台仍使用现有网页。
 
 ## 当前已包含
 
@@ -18,7 +18,7 @@
 小程序直接访问现有后端：
 
 ```text
-https://shift-scheduler-9316.onrender.com/api
+https://shift-scheduler-93l6.onrender.com/api
 ```
 
 网页端和小程序端共用同一个 MongoDB 数据源。网页端完成签到、签退、换班、代班后，小程序下拉刷新即可看到最新状态。
@@ -36,7 +36,7 @@ https://shift-scheduler-9316.onrender.com/api
 1. 在微信公众平台小程序后台配置 request 合法域名：
 
 ```text
-https://shift-scheduler-9316.onrender.com
+https://shift-scheduler-93l6.onrender.com
 ```
 
 2. 在小程序后台申请订阅消息模板。
