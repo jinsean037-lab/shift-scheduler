@@ -2393,6 +2393,7 @@ const API = '/api';
 let currentUser = localStorage.getItem('userName') || '';
 let currentRole = localStorage.getItem('userRole') || 'member';
 let adminToken = localStorage.getItem('adminToken') || '';
+let memberAdmin = localStorage.getItem('memberAdmin') === 'true';
 let configData = {};
 let userShifts = [];
 let adminEmailRefreshTimer = null;
@@ -2646,23 +2647,29 @@ async function doLogin() {
     if (data.ok) {
       currentUser = data.name;
       currentRole = data.isAdmin ? 'admin' : 'member';
+      memberAdmin = !!data.memberAdmin;
+      adminToken = data.adminToken || '';
       localStorage.setItem('userName', currentUser);
       localStorage.setItem('userRole', currentRole);
+      localStorage.setItem('memberAdmin', memberAdmin ? 'true' : 'false');
+      if (adminToken) localStorage.setItem('adminToken', adminToken);
+      else localStorage.removeItem('adminToken');
       // 填充 UI
       document.getElementById('headerUserName').textContent = currentUser;
       document.getElementById('sidebarAvatar').textContent = currentUser.charAt(0);
       document.getElementById('sidebarName').textContent = currentUser;
       document.getElementById('sidebarRole').textContent = currentRole === 'admin' ? '管理员' : '助理';
       // userName/userRole 已移除（sidebar替代），跳过
-      // 显示/隐藏导航：管理员隐藏成员功能入口
+      // 显示/隐藏导航：总管理员隐藏成员功能；被授权成员保留成员功能并显示管理中心
       if (currentRole === 'admin') {
         document.getElementById('adminNavGroupTitle').style.display = '';
         document.getElementById('adminNavItem').style.display = '';
-        // 管理员：隐藏成员端导航项
-        ['navCheckin','navStats','navWorktime'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.style.display = 'none';
-        });
+        if (!memberAdmin) {
+          ['navCheckin','navStats','navWorktime'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+          });
+        }
       } else {
         document.getElementById('adminNavGroupTitle').style.display = 'none';
         document.getElementById('adminNavItem').style.display = 'none';
@@ -2698,9 +2705,11 @@ async function doAdminLogin() {
       currentUser = data.name || '管理员';
       currentRole = 'admin';
       adminToken = data.adminToken || '';
+      memberAdmin = false;
       localStorage.setItem('userName', currentUser);
       localStorage.setItem('userRole', currentRole);
       localStorage.setItem('adminToken', adminToken);
+      localStorage.setItem('memberAdmin', 'false');
       document.getElementById('headerUserName').textContent = currentUser;
       document.getElementById('sidebarAvatar').textContent = '⚙';
       document.getElementById('sidebarName').textContent = currentUser;
@@ -2730,6 +2739,7 @@ function doLogout() {
   currentUser = '';
   currentRole = 'member';
   adminToken = '';
+  memberAdmin = false;
   localStorage.clear();
   document.getElementById('mainPage').style.display = 'none';
   document.getElementById('loginPage').style.display = '';
@@ -4870,6 +4880,7 @@ async function loadMembers() {
     if (!ul) return;
     ul.innerHTML = '';
     const members = data.members || [];
+    const adminMembers = data.adminMembers || [];
     if (members.length === 0) {
       ul.innerHTML = '<li style="justify-content:center;color:#999">暂无成员</li>';
     }
@@ -4877,9 +4888,13 @@ async function loadMembers() {
       const li = document.createElement('li');
       const safeName = escapeHtml(m);
       const actionName = safeName.replace(/'/g, "\\'");
+      const checked = adminMembers.includes(m) ? 'checked' : '';
       li.innerHTML = '<span class="name">' + safeName + '</span>'
         + '<span style="color:#999;font-size:12px;margin-left:8px">在职成员</span>'
-        + '<button class="admin-btn warning" style="padding:5px 12px;font-size:12px;margin-left:auto" onclick="resetPassword(\'' + actionName + '\')">重置密码</button>'
+        + '<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555;margin-left:auto;white-space:nowrap">'
+        + '<input type="checkbox" ' + checked + ' onchange="toggleMemberAdmin(\'' + actionName + '\', this.checked)" style="width:16px;height:16px"> 管理员'
+        + '</label>'
+        + '<button class="admin-btn warning" style="padding:5px 12px;font-size:12px" onclick="resetPassword(\'' + actionName + '\')">重置密码</button>'
         + '<button class="admin-btn danger" style="padding:5px 12px;font-size:12px" onclick="removeMember(\'' + actionName + '\')">删除</button>';
       ul.appendChild(li);
     });
@@ -4890,6 +4905,30 @@ async function loadMembers() {
       members.forEach(m => { sel.innerHTML += '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>'; });
     }
   } catch(e) {}
+}
+
+async function toggleMemberAdmin(name, checked) {
+  try {
+    const res = await fetch(API + '/admin/members');
+    const data = await res.json();
+    const list = new Set(data.adminMembers || []);
+    if (checked) list.add(name);
+    else list.delete(name);
+    const save = await fetch(API + '/admin/member-admins', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ adminMembers: Array.from(list) })
+    });
+    const saved = await save.json();
+    if (saved.ok) showToast(checked ? '已授予管理员权限' : '已取消管理员权限');
+    else {
+      showToast(saved.msg || '保存失败');
+      loadMembers();
+    }
+  } catch(e) {
+    showToast('网络错误');
+    loadMembers();
+  }
 }
 async function addMember() {
   const input = document.getElementById('newMemberInput');
@@ -6820,16 +6859,17 @@ window.addEventListener('DOMContentLoaded', () => {
     if (currentRole==='admin') {
       document.getElementById('adminNavGroupTitle').style.display = '';
       document.getElementById('adminNavItem').style.display = '';
-      // 管理员隐藏所有成员端导航项（含 v5.0 新增的「我的荣誉」「我的信息」，以及原有「搭子消息」）
-      ['navSchedule','navCheckin','navStats','navWorktime','navAchievements','navProfile'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-      });
-      // 搭子消息：按 data-page='messages' 匹配（原代码用 id='navMessages'，统一按 data-page 隐藏更稳）
-      document.querySelectorAll('.nav-item').forEach(el => {
-        const page = el.getAttribute('data-page');
-        if (page === 'messages') el.style.display = 'none';
-      });
+      if (!memberAdmin) {
+        // 总管理员隐藏所有成员端导航项；被授权成员保留成员端功能。
+        ['navSchedule','navCheckin','navStats','navWorktime','navAchievements','navProfile'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+        document.querySelectorAll('.nav-item').forEach(el => {
+          const page = el.getAttribute('data-page');
+          if (page === 'messages') el.style.display = 'none';
+        });
+      }
     }
     switchTab('home');
     loadConfig();
