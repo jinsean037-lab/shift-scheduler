@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
-<title>学工办助理排班管理系统 6.0</title>
+<title>学工办助理排班管理系统 7.0</title>
 <style>
 /* ========== 全局 ========== */
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -16,18 +16,23 @@
   --primary-dark: #6B0F0F;
   --accent: #c4a35a;        /* 岭南金 */
   --gold: #c4a35a;
-  --bg: #f0f2f5;
-  --card: #ffffff;
-  --text: #2c3e50;
-  --text-light: #7f8c8d;
-  --border: #e2e8f0;
+  --bg: #f4f1ed;
+  --card: rgba(255,255,255,0.78);
+  --text: #18212f;
+  --text-light: #6b7280;
+  --border: rgba(139,26,26,0.10);
+  --glass-border: rgba(255,255,255,0.72);
+  --shadow-soft: 0 18px 48px rgba(39,31,25,0.08);
   --success: #27ae60;
   --danger: #e74c3c;
   --warn: #f39c12;
 }
 body {
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(196,163,90,0.18), transparent 28%),
+    radial-gradient(circle at 82% 14%, rgba(139,26,26,0.12), transparent 30%),
+    linear-gradient(135deg, #f7f3ee 0%, #f5f7fb 54%, #f0eee9 100%);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.6;
@@ -317,7 +322,7 @@ body {
 .modal-box .back-link a { color: var(--text-light); font-size: 13px; text-decoration: none; }
 
 /* ========== 确认弹窗 ========== */
-/* Toast 提示 */
+/* Toast提示 */
 .toast {
   position: fixed;
   top: 20px;
@@ -487,7 +492,7 @@ body {
 .tab:hover { color: var(--primary-light); background: #fdf2f2; }
 .tab.active { color: var(--primary); border-bottom-color: var(--accent); background: #fdf2f2; }
 
-/* 提示条 */
+/*提示条 */
 .tip-bar {
   background: #fffbea;
   border: 1px solid #ffe58f;
@@ -643,11 +648,14 @@ body {
 
 /* 我的班次 */
 .section-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--card);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
   padding: 20px;
   margin-bottom: 14px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  box-shadow: var(--shadow-soft);
 }
 .section-card h3 {
   font-size: 15px;
@@ -658,7 +666,7 @@ body {
   align-items: center;
   gap: 6px;
   padding-bottom: 10px;
-  border-bottom: 2px solid #f0f2f5;
+  border-bottom: 1px solid rgba(139,26,26,0.10);
 }
 
 /* ========== 工时申报日历 (v4.2) ========== */
@@ -975,13 +983,17 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
-  background: linear-gradient(135deg, #fdf2f2, #fff);
-  border: 1.5px solid #f0e0e0;
+  background: rgba(255,255,255,0.62);
+  border: 1px solid rgba(139,26,26,0.10);
   border-radius: 12px;
   padding: 16px 20px;
   transition: all 0.2s;
 }
 .shift-card:hover { border-color: var(--primary-light); box-shadow: 0 3px 12px rgba(139,26,26,0.1); }
+.shift-card.is-adjusted {
+  background: linear-gradient(135deg, rgba(196,163,90,0.16), rgba(255,255,255,0.72));
+  border-color: rgba(196,163,90,0.42);
+}
 .shift-day {
   min-width: 56px;
   font-size: 17px;
@@ -991,6 +1003,20 @@ body {
   border-radius: 8px;
   padding: 8px 14px;
   text-align: center;
+}
+.shift-source-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  min-width: 42px;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7c4a03;
+  background: rgba(196,163,90,0.18);
+  border: 1px solid rgba(196,163,90,0.30);
 }
 .shift-slot {
   font-size: 15px;
@@ -1240,8 +1266,10 @@ body {
 /* 左侧导航栏 */
 .sidebar {
   width: 220px;
-  background: #fff;
-  border-right: 1px solid #eee;
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1258,7 +1286,7 @@ body {
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid #f0f0f0;
-  background: linear-gradient(135deg, var(--primary) 0%, #9B1B1B 100%);
+  background: linear-gradient(145deg, rgba(139,26,26,0.96) 0%, rgba(98,18,18,0.94) 100%);
   color: white;
 }
 .sidebar-avatar {
@@ -1297,7 +1325,7 @@ body {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 10px 16px;
   color: #444;
   text-decoration: none;
@@ -1308,16 +1336,28 @@ body {
   cursor: pointer;
 }
 .nav-item:hover {
-  background: #fdf2f2;
+  background: rgba(139,26,26,0.06);
   color: var(--primary);
 }
 .nav-item.active {
-  background: #fef3f3;
+  background: rgba(139,26,26,0.08);
   color: var(--primary);
   border-left-color: var(--accent);
   font-weight: 600;
 }
-.nav-icon { font-size: 16px; width: 22px; text-align: center; }
+.nav-icon {
+  width: 28px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  letter-spacing: .08em;
+  color: #8B1A1A;
+  background: rgba(139,26,26,0.08);
+  font-weight: 700;
+}
 .nav-admin { color: var(--danger); }
 .nav-admin:hover { background: #fff5f5; color: var(--danger); }
 .nav-admin.active { background: #fef5f5; border-left-color: var(--danger); }
@@ -1356,7 +1396,7 @@ body {
 .main-content {
   padding: 24px 28px;
   overflow-x: auto;          /* 防止宽表格撑破布局 */
-  background: #f7f8fa;
+  background: transparent;
   min-width: 0;
   max-width: 100%;
 }
@@ -1389,13 +1429,16 @@ body {
   margin-bottom: 24px;
 }
 .stat-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--card);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
   padding: 18px 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  box-shadow: var(--shadow-soft);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 .stat-card:hover {
@@ -1404,9 +1447,13 @@ body {
 }
 .stat-icon {
   width: 48px; height: 48px;
-  border-radius: 12px;
+  border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 22px;
+  font-size: 13px;
+  letter-spacing: .08em;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #7c1717, #c4a35a);
   flex-shrink: 0;
 }
 .stat-info { flex: 1; }
@@ -1601,7 +1648,7 @@ body {
 <!-- ===== 管理员登录弹窗 ===== -->
 <div class="modal-overlay" id="adminLoginModal">
   <div class="modal-box">
-    <h2>🔐 管理员登录</h2>
+    <h2> 管理员登录</h2>
     <p>请输入管理员密码</p>
     <input type="password" id="adminPassword" placeholder="管理员密码" maxlength="50" autocomplete="off">
     <button onclick="doAdminLogin()">登&nbsp;&nbsp;录</button>
@@ -1677,7 +1724,7 @@ body {
 
 <!-- ===== 主页面 ===== -->
 <div class="main-page" id="mainPage">
-  <!-- Toast 提示 -->
+  <!-- Toast提示 -->
   <div id="toast" class="toast"></div>
   <!-- 顶栏 -->
   <div class="app-header">
@@ -1699,7 +1746,7 @@ body {
     <!-- 左侧导航栏 -->
     <nav class="sidebar" id="sidebar">
       <div class="sidebar-user-card">
-        <div class="sidebar-avatar" id="sidebarAvatar">👤</div>
+        <div class="sidebar-avatar" id="sidebarAvatar">人</div>
         <div class="sidebar-user-info">
           <div class="sidebar-name" id="sidebarName"></div>
           <div class="sidebar-role" id="sidebarRole"></div>
@@ -1709,79 +1756,79 @@ body {
       <div class="sidebar-nav">
         <div class="nav-group-title">功能导航</div>
         <a class="nav-item active" data-page="home" onclick="switchTab('home')">
-          <span class="nav-icon">🏠</span><span>首页概览</span>
+          <span class="nav-icon">01</span><span>首页概览</span>
         </a>
         <a class="nav-item" data-page="schedule" onclick="switchTab('schedule')">
-          <span class="nav-icon">📅</span><span>选班</span>
+          <span class="nav-icon">02</span><span>选班</span>
         </a>
         <a class="nav-item" data-page="history" onclick="switchTab('history')">
-          <span class="nav-icon">📜</span><span>历史排班</span>
+          <span class="nav-icon">03</span><span>历史排班</span>
         </a>
         <a class="nav-item" data-page="checkin" id="navCheckin" onclick="switchTab('checkin')">
-          <span class="nav-icon">📍</span><span>值班打卡</span>
+          <span class="nav-icon">04</span><span>值班打卡</span>
         </a>
         <a class="nav-item" data-page="stats" id="navStats" onclick="switchTab('stats')">
-          <span class="nav-icon">📋</span><span>取消与候补申请</span>
+          <span class="nav-icon">05</span><span>取消与候补申请</span>
         </a>
         <a class="nav-item" data-page="shiftMgmt" id="navShiftMgmt" onclick="switchTab('shiftMgmt')">
-          <span class="nav-icon">🔁</span><span>换班与代班管理</span><span class="unread-badge" id="shiftMgmtUnreadBadge" style="display:none"></span>
+          <span class="nav-icon">06</span><span>换班与代班管理</span><span class="unread-badge" id="shiftMgmtUnreadBadge" style="display:none"></span>
         </a>
           <a class="nav-item" data-page="achievements" id="navAchievements" onclick="switchTab('achievements')">
-            <span class="nav-icon">🏅</span>
+            <span class="nav-icon">07</span>
             <span>我的荣誉</span>
           </a>
           <a class="nav-item" data-page="profile" id="navProfile" onclick="switchTab('profile')">
-            <span class="nav-icon">📋</span>
+            <span class="nav-icon">08</span>
             <span>我的信息</span>
           </a>
           <a class="nav-item" data-page="worktime" id="navWorktime" onclick="switchTab('worktime')">
-          <span class="nav-icon">💼</span><span>工时申报</span>
+          <span class="nav-icon">09</span><span>工时申报</span>
         </a>
 
 
         <a class="nav-item" data-page="messages" id="navMessages" onclick="switchTab('messages')">
-          <span class="nav-icon">💬</span><span>搭子消息</span><span class="unread-badge" id="msgUnreadBadge" style="display:none"></span>
+          <span class="nav-icon">10</span><span>搭子消息</span><span class="unread-badge" id="msgUnreadBadge" style="display:none"></span>
         </a>
         <div class="nav-group-title" id="adminNavGroupTitle" style="display:none">管理功能</div>
         <div class="nav-item nav-admin" id="adminNavItem" style="display:none" onclick="toggleAdminSubmenu()">
-          <span class="nav-icon">⚙️</span><span>管理中心</span><span class="nav-arrow" id="adminArrow">▸</span>
+          <span class="nav-icon">AD</span><span>管理中心</span><span class="nav-arrow" id="adminArrow">▸</span>
         </div>
         <div class="nav-submenu" id="adminSubmenu" style="display:none">
           <a class="nav-subitem" data-page="admin-schedule" onclick="switchTab('admin-schedule')">
-            <span>📋 排班确认</span>
+            <span>排班确认</span>
           </a>
           <a class="nav-subitem" data-page="admin-waitlist" onclick="switchTab('admin-waitlist')">
-            <span>⏳ 候补与取消</span>
+            <span>候补与取消</span>
           </a>
           <a class="nav-subitem" data-page="admin-members" onclick="switchTab('admin-members')">
-            <span>👤 成员与密码</span>
+            <span>成员与密码</span>
           </a>
           <a class="nav-subitem" data-page="admin-checkins" onclick="switchTab('admin-checkins')">
-            <span>📍 打卡记录</span>
+            <span>打卡记录</span>
           </a>
           <a class="nav-subitem" data-page="admin-overtime" onclick="switchTab('admin-overtime')">
-            <span>📝 补报审核</span>
+            <span>补报审核</span>
           </a>
           <a class="nav-subitem" data-page="admin-worktime" onclick="switchTab('admin-worktime')">
-            <span>💼 工时申报</span>
+            <span>工时申报</span>
           </a>
           <a class="nav-subitem" data-page="admin-monthly" onclick="switchTab('admin-monthly')">
-            <span>📈 月度统计</span>
+            <span>月度统计</span>
           </a>
           <a class="nav-subitem" data-page="admin-meetings" onclick="switchTab('admin-meetings')">
-            <span>📅 例会设置</span>
+            <span>例会设置</span>
           </a>
           <a class="nav-subitem" data-page="admin-holidays" onclick="switchTab('admin-holidays')">
-            <span>🏖️ 节假日调休</span>
+            <span>节假日调休</span>
           </a>
           <a class="nav-subitem" data-page="admin-email" onclick="switchTab('admin-email')">
-            <span>📧 邮件配置</span>
+            <span>邮件配置</span>
           </a>
         </div>
       </div>
 
       <div class="sidebar-footer">
-        <div class="sidebar-version">v6.0</div>
+        <div class="sidebar-version">v7.0</div>
         <div class="sidebar-school">中山大学岭南学院</div>
       </div>
     </nav>
@@ -1799,28 +1846,28 @@ body {
         <!-- 统计卡片 -->
         <div class="stat-cards">
           <div class="stat-card">
-            <div class="stat-icon" style="background:linear-gradient(135deg,#8B1A1A,#c41230)">📋</div>
+            <div class="stat-icon">T</div>
             <div class="stat-info">
               <div class="stat-value" id="statTotalShifts">0</div>
               <div class="stat-label">本月值班次数</div>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon" style="background:linear-gradient(135deg,#1a6bc4,#4da6ff)">⏱️</div>
+            <div class="stat-icon">H</div>
             <div class="stat-info">
               <div class="stat-value" id="statTotalHours">0h</div>
               <div class="stat-label">累计值班时长</div>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon" style="background:linear-gradient(135deg,#2e7d32,#66bb6a)">🌅</div>
+            <div class="stat-icon">AM</div>
             <div class="stat-info">
               <div class="stat-value" id="statMorningShifts">0</div>
               <div class="stat-label">早班次数</div>
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon" style="background:linear-gradient(135deg,#e65100,#ff9800)">🌇</div>
+            <div class="stat-icon">PM</div>
             <div class="stat-info">
               <div class="stat-value" id="statAfternoonShifts">0</div>
               <div class="stat-label">午班次数</div>
@@ -1831,22 +1878,22 @@ body {
         <!-- 本周排班 + 月度分布（并排） -->
         <div class="home-row">
           <div class="section-card home-section home-half">
-            <h3>📅 本月我的排班</h3>
+            <h3>本月我的排班</h3>
             <div id="homeMyShifts"><p style="color:#999;text-align:center;padding:12px 0;font-size:13px">暂无排班记录</p></div>
           </div>
           <div class="section-card home-section home-half">
-            <h3>🤝 本月值班搭子</h3>
+            <h3>本月值班搭子</h3>
             <div id="homePartners" style="padding:4px 0"><p style="color:#999;text-align:center;padding:16px 0;font-size:13px">加载中...</p></div>
           </div>
         </div>
 
         <!-- 快捷操作 -->
         <div class="section-card home-section">
-          <h3>⚡ 快捷操作</h3>
+          <h3>快捷操作</h3>
           <div class="quick-actions">
-            <button class="quick-btn" onclick="switchTab('schedule')">📅 查看排班表</button>
-            <button class="quick-btn" onclick="switchTab('stats')">📋 取消与候补申请</button>
-            <button class="quick-btn quick-btn-primary" onclick="showChangePassword()">🔑 修改密码</button>
+            <button class="quick-btn" onclick="switchTab('schedule')">查看排班表</button>
+            <button class="quick-btn" onclick="switchTab('stats')">取消与候补申请</button>
+            <button class="quick-btn quick-btn-primary" onclick="showChangePassword()">修改密码</button>
           </div>
         </div>
       </div>
@@ -1855,7 +1902,7 @@ body {
       <!-- ===== 搭子消息视图 ===== -->
       <div class="page-view" id="messagesView">
         <div class="page-title-row">
-          <h2>💬 搭子消息</h2>
+          <h2>搭子消息</h2>
           <p class="page-subtitle">收到的留言和回复</p>
         </div>
         <div id="messagesContent">
@@ -1874,24 +1921,24 @@ body {
       <!-- ===== 值班打卡视图 ===== -->
       <div class="page-view" id="checkinView">
         <div class="page-title-row">
-          <h2>📍 值班打卡</h2>
+          <h2>值班打卡</h2>
         </div>
         <!-- 今日打卡 -->
         <div class="section-card">
           <h3>今日打卡</h3>
           <div id="checkinStatus" style="margin-bottom:12px"><span style="color:#999;font-size:13px">加载中...</span></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="quick-btn quick-btn-primary" id="btnCheckin" onclick="doCheckin()">📍 上班签到</button>
-            <button class="quick-btn" style="background:linear-gradient(135deg,#e65100,#ff9800);color:#fff;border:none" id="btnCheckout" onclick="doCheckout()">🏠 下班签退</button>
-            <button class="quick-btn" style="background:#e0e0e0;color:#666;display:none" id="btnRevokeOut" onclick="doRevokeCheckout()">↩️ 撤回签退</button>
-          <button onclick="showSuppCheckoutDialog()" style="padding:10px 20px;background:#fff;border:2px solid #c4a35a;color:#c4a35a;border-radius:10px;font-size:14px;cursor:pointer;transition:all 0.2s;margin-top:8px;width:100%;max-width:200px" onmouseover="this.style.background='#c4a35a';this.style.color='#fff'" onmouseout="this.style.background='#fff';this.style.color='#c4a35a'">📝 申请补签退</button>
+            <button class="quick-btn quick-btn-primary" id="btnCheckin" onclick="doCheckin()">上班签到</button>
+            <button class="quick-btn" style="background:linear-gradient(135deg,#8B1A1A,#c4a35a);color:#fff;border:none" id="btnCheckout" onclick="doCheckout()">下班签退</button>
+            <button class="quick-btn" style="background:#e0e0e0;color:#666;display:none" id="btnRevokeOut" onclick="doRevokeCheckout()">撤回签退</button>
+          <button onclick="showSuppCheckoutDialog()" style="padding:10px 20px;background:#fff;border:2px solid #c4a35a;color:#c4a35a;border-radius:10px;font-size:14px;cursor:pointer;transition:all 0.2s;margin-top:8px;width:100%;max-width:200px" onmouseover="this.style.background='#c4a35a';this.style.color='#fff'" onmouseout="this.style.background='#fff';this.style.color='#c4a35a'">申请补签退</button>
           </div>
           <div id="checkinError" style="color:#c41230;font-size:12px;margin-top:8px;display:none"></div>
           <div id="recentCheckins" style="margin-top:14px"></div>
         </div>
         <!-- 工作补报 -->
         <div class="section-card" style="margin-top:16px">
-          <h3>📝 工作补报</h3>
+          <h3>工作补报</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">上报老师额外安排的不在值班表里的工作时间，提交后由管理员审核。</p>
           <div style="display:flex;flex-direction:column;gap:10px">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1907,14 +1954,14 @@ body {
               <label style="font-size:13px;color:#555">工作内容：</label>
               <textarea id="otContent" rows="3" placeholder="简要描述工作内容..." style="padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;resize:vertical"></textarea>
             </div>
-            <button class="quick-btn quick-btn-primary" style="align-self:flex-start" onclick="submitOvertime()">📤 提交补报申请</button>
+            <button class="quick-btn quick-btn-primary" style="align-self:flex-start" onclick="submitOvertime()">提交补报申请</button>
           </div>
           <div id="otError" style="color:#c41230;font-size:12px;margin-top:8px;display:none"></div>
           <div id="otList" style="margin-top:14px"></div>
         </div>
         <!-- 我的打卡记录 -->
         <div class="section-card" style="margin-top:16px">
-          <h3>📍 我的打卡记录</h3>
+          <h3>我的打卡记录</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">查看历史签到/签退记录</p>
           <div id="myCheckinList" style="margin-top:10px"></div>
         </div>
@@ -1924,14 +1971,14 @@ body {
       <!-- ===== 排班表视图（选班） ===== -->
       <div class="page-view" id="scheduleView">
         <div class="page-title-row">
-          <h2>📋 选班</h2>
+          <h2>选班</h2>
           <p class="page-subtitle">点击格子选择你想要的值班时段</p>
         </div>
         <div class="tip-bar" id="scheduleTipBar">
-          💡 点击格子选择时段（先到先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟需提交申请。每时段最多 <span id="maxHint">2</span> 人，满了可申请候补。
+          点击格子选择时段（先到先得）。选择后 <strong>3分钟内可自由取消</strong>，超过3分钟需提交申请。每时段最多 <span id="maxHint">2</span> 人，满了可申请候补。
         </div>
         <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>
+          <button class="refresh-btn" onclick="loadSchedule()">刷新</button>
         </div>
         <div class="table-wrap">
           <div id="scheduleGrid"></div>
@@ -1941,7 +1988,7 @@ body {
       <!-- ===== 历史排班视图（只读） ===== -->
       <div class="page-view" id="historyView">
         <div class="page-title-row">
-          <h2>📜 历史排班</h2>
+          <h2>历史排班</h2>
           <p class="page-subtitle">查看已确认生效的历史排班记录</p>
         </div>
         <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1949,7 +1996,7 @@ body {
           <select id="periodSelector" onchange="switchPeriod(this.value)" style="min-width:200px;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;cursor:pointer">
             <option value="">-- 请选择已确认的排班周期 --</option>
           </select>
-          <button class="refresh-btn" onclick="updatePeriodSelector()">🔄 刷新列表</button>
+          <button class="refresh-btn" onclick="updatePeriodSelector()">刷新列表</button>
         </div>
         <div class="table-wrap">
           <div id="historyGrid"></div>
@@ -1964,25 +2011,25 @@ body {
         </div>
         <!-- 已选班次（已隐藏，按用户要求不显示） -->
         <div class="section-card" style="display:none">
-          <h3 style="color:var(--primary)">📌 已选班次</h3>
+          <h3 style="color:var(--primary)">已选班次</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">以下是你已选中的班次，可点击取消按钮提交取消申请。</p>
           <div id="myShifts"></div>
         </div>
         <!-- 候补中 -->
         <div class="section-card" id="myWaitlistSection" style="display:none">
-          <h3 style="color:var(--warning,#f59e0b)">⏳ 候补中</h3>
+          <h3 style="color:var(--warning,#f59e0b)">候补中</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">你正在等待这些班次的空位。</p>
           <div id="myWaitlist"></div>
         </div>
         <!-- 取消申请审核中 -->
         <div class="section-card" id="myCancelSection" style="display:none">
-          <h3 style="color:var(--danger)">❌ 取消申请审核中</h3>
+          <h3 style="color:var(--danger)">取消申请审核中</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">你的取消申请已提交，等待管理员审批。</p>
           <div id="myCancelRequests"></div>
         </div>
         <!-- 换班申请 -->
         <div class="section-card" id="mySwapSection" style="display:none">
-          <h3 style="color:var(--primary)">🔁 换班申请</h3>
+          <h3 style="color:var(--primary)">换班申请</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">排班表生效期间，可和其他成员互换两个具体班次。</p>
           <div id="mySwapRequests"></div>
         </div>
@@ -1997,8 +2044,8 @@ body {
 
         <!-- Tab 切换 -->
         <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:2px solid #f0e0e0;padding-bottom:0">
-          <button class="shift-mgmt-tab active" data-subtab="swap" onclick="switchShiftMgmtTab('swap')" style="padding:8px 18px;border:none;background:transparent;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);margin-bottom:-2px">🔁 换班</button>
-          <button class="shift-mgmt-tab" data-subtab="substitute" onclick="switchShiftMgmtTab('substitute')" style="padding:8px 18px;border:none;background:transparent;cursor:pointer;font-size:14px;font-weight:600;color:#888;border-bottom:3px solid transparent;margin-bottom:-2px">🤝 代班</button>
+          <button class="shift-mgmt-tab active" data-subtab="swap" onclick="switchShiftMgmtTab('swap')" style="padding:8px 18px;border:none;background:transparent;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary);border-bottom:3px solid var(--primary);margin-bottom:-2px">换班</button>
+          <button class="shift-mgmt-tab" data-subtab="substitute" onclick="switchShiftMgmtTab('substitute')" style="padding:8px 18px;border:none;background:transparent;cursor:pointer;font-size:14px;font-weight:600;color:#888;border-bottom:3px solid transparent;margin-bottom:-2px">代班</button>
         </div>
 
         <!-- 换班子页 -->
@@ -2023,7 +2070,7 @@ body {
       <!-- ===== v5.0 我的荣誉墙 ===== -->
       <div class="page-view" id="achievementsView">
         <div class="page-title-row">
-          <h2>🏅 我的荣誉墙</h2>
+          <h2>我的荣誉墙</h2>
           <p class="page-subtitle">看看你这一路走来摘下了哪些勋章</p>
         </div>
         <div class="admin-section" id="achievementsContent">
@@ -2034,7 +2081,7 @@ body {
       <!-- ===== v5.0 我的个人信息 ===== -->
       <div class="page-view" id="profileView">
         <div class="page-title-row">
-          <h2>📋 我的信息</h2>
+          <h2>我的信息</h2>
           <p class="page-subtitle">完善个人信息后，每月工时申报会自动填入；邮件通知也会发到此邮箱</p>
         </div>
         <div class="admin-section" id="profileContent">
@@ -2045,7 +2092,7 @@ body {
       <!-- ===== 工时申报视图 ===== -->
       <div class="page-view" id="worktimeView">
         <div class="page-title-row">
-          <h2>💼 工时申报</h2>
+          <h2>工时申报</h2>
           <p class="page-subtitle" id="worktimeSubtitle">申报本月工作时间</p>
         </div>
         <div id="worktimeContent">
@@ -2057,43 +2104,43 @@ body {
       <!-- 管理子页面：排班确认 -->
       <div class="page-view" id="adminScheduleView">
         <div class="page-title-row">
-          <h2>📋 排班确认</h2>
+          <h2>排班确认</h2>
           <p class="page-subtitle">确认排班表并设置执行时间，未确认为草稿状态</p>
         </div>
         <!-- 当前排班状态 -->
         <div class="admin-section" id="scheduleStatusSection">
-          <h3>📊 当前排班状态</h3>
+          <h3>当前排班状态</h3>
           <div id="scheduleStatusInfo" style="padding:16px;background:#f8f9fa;border-radius:8px;font-size:14px"></div>
         </div>
 
         <!-- 设置每班人数上限 -->
         <div class="admin-section">
-          <h3>👥 每班人数上限</h3>
+          <h3>每班人数上限</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">设置每个时段最多可选择的人数。保存后会立即影响成员选班、候补和管理员手动分配。</p>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
             <input type="number" id="maxPerSlotInput" min="1" max="10" step="1" style="width:120px;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
             <span id="maxPerSlotStatus" style="font-size:13px;color:#888"></span>
           </div>
-          <button class="admin-btn primary" onclick="saveShiftCapacity()">💾 保存上限</button>
+          <button class="admin-btn primary" onclick="saveShiftCapacity()">保存上限</button>
         </div>
         
         <!-- 设置选班开始时间 -->
         <div class="admin-section">
-          <h3>⏰ 设置选班开始时间</h3>
+          <h3>设置选班开始时间</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">设置后，成员在此时间前无法选班/候补，用于统一开放选班时间。</p>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
             <input type="datetime-local" id="startTimeInput" style="min-width:200px;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
             <span id="startTimeStatus" style="font-size:13px;color:#888"></span>
           </div>
           <div style="display:flex;gap:8px">
-            <button class="admin-btn" onclick="saveStartTime()">💾 保存</button>
+            <button class="admin-btn" onclick="saveStartTime()">保存</button>
             <button class="admin-btn" style="background:#e0e0e0;color:#666" onclick="clearStartTime()">清除</button>
           </div>
         </div>
         
         <!-- 设置排班执行时间（起止） -->
         <div class="admin-section">
-          <h3>⏰ 设置排班执行时间</h3>
+          <h3>设置排班执行时间</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">设置本次排班的起始和结束时间。设置后成员的月度日历将按此时间段统计，未设置时间的排班表为<strong style="color:var(--warn)">草稿</strong>状态。</p>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
             <div style="display:flex;flex-direction:column;gap:4px">
@@ -2106,19 +2153,19 @@ body {
             </div>
           </div>
           <div style="display:flex;gap:8px">
-            <button class="admin-btn success" onclick="confirmSchedule()">✅ 确认排班表</button>
+            <button class="admin-btn success" onclick="confirmSchedule()">确认排班表</button>
             <button class="admin-btn" style="background:#e0e0e0;color:#666" onclick="clearScheduleTime()">清除（设为草稿）</button>
           </div>
           <div id="confirmScheduleStatus" style="margin-top:10px;font-size:13px;color:#888"></div>
         </div>
         <!-- 排班预览 -->
         <div class="admin-section">
-          <h3>👁️ 排班预览</h3>
+          <h3>排班预览</h3>
           <div class="table-wrap" id="adminSchedulePreview"><p style="color:#999;font-size:13px;padding:16px 0;text-align:center">加载中...</p></div>
         </div>
         <!-- 手动分配 -->
         <div class="admin-section">
-          <h3>📌 手动调整班次</h3>
+          <h3>手动调整班次</h3>
           <div class="add-row">
             <select id="assignMember" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px">
               <option value="">选择成员</option>
@@ -2143,13 +2190,13 @@ body {
         </div>
         <!-- 开始新一轮排班 -->
         <div class="admin-section" style="border:1.5px solid #e0e7ff">
-          <h3 style="color:#4F46E5">🆕 开始新一轮排班</h3>
+          <h3 style="color:#4F46E5">开始新一轮排班</h3>
           <p style="color:#999;font-size:13px;margin-bottom:14px">将当前排班归档到历史，然后清空草稿开始新一轮选班</p>
           <button class="admin-btn primary" onclick="archiveSchedule()" style="background:#4F46E5;border-color:#4F46E5">开始新一轮排班</button>
         </div>
         <!-- 重置 -->
         <div class="admin-section" style="border:1.5px solid #ffe0e0">
-          <h3 style="color:var(--danger)">⚠️ 重置排班</h3>
+          <h3 style="color:var(--danger)">重置排班</h3>
           <p style="color:#999;font-size:13px;margin-bottom:14px">清空所有人的排班选择和候补，此操作不可恢复！</p>
           <button class="admin-btn danger" onclick="resetSchedule()">重置所有排班</button>
         </div>
@@ -2158,15 +2205,15 @@ body {
       <!-- 管理子页面：候补与取消 -->
       <div class="page-view" id="adminWaitlistView">
         <div class="page-title-row">
-          <h2>⏳ 候补与取消申请</h2>
+          <h2>候补与取消申请</h2>
           <p class="page-subtitle">处理成员的候补和取消班次申请</p>
         </div>
         <div class="admin-section">
-          <h3>⏳ 候补申请</h3>
+          <h3>候补申请</h3>
           <div id="waitlistPending"><p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无候补申请</p></div>
         </div>
         <div class="admin-section">
-          <h3>❌ 取消班次申请</h3>
+          <h3>取消班次申请</h3>
           <div id="cancelPending"><p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无取消申请</p></div>
         </div>
       </div>
@@ -2197,7 +2244,7 @@ body {
       <!-- 管理子页面：打卡记录 -->
       <div class="page-view" id="adminCheckinsView">
         <div class="page-title-row">
-          <h2>📍 成员打卡记录</h2>
+          <h2>成员打卡记录</h2>
           <p class="page-subtitle">查看所有成员的签到/签退记录</p>
         </div>
         <div class="admin-section">
@@ -2210,7 +2257,7 @@ body {
         </div>
         <!-- 补签退审核 -->
         <div class="admin-section">
-          <h3 style="color:#8B1A1A;font-size:16px;margin-bottom:12px">📝 补签退申请</h3>
+          <h3 style="color:#8B1A1A;font-size:16px;margin-bottom:12px">补签退申请</h3>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
             <button class="admin-btn" onclick="loadSuppCheckouts()">刷新列表</button>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#666;cursor:pointer">
@@ -2225,12 +2272,12 @@ body {
       <!-- 管理子页面：补报审核 -->
       <div class="page-view" id="adminOvertimeView">
         <div class="page-title-row">
-          <h2>📝 工作补报审核</h2>
+          <h2>工作补报审核</h2>
           <p class="page-subtitle">审核成员提交的额外工作时间补报申请</p>
         </div>
         <div class="admin-section">
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-            <button class="admin-btn primary" onclick="loadAdminOvertime()">🔄 刷新列表</button>
+            <button class="admin-btn primary" onclick="loadAdminOvertime()">刷新列表</button>
           </div>
           <div id="adminOtList"><p style="color:#999;font-size:13px;padding:16px 0;text-align:center">暂无补报申请</p></div>
         </div>
@@ -2239,7 +2286,7 @@ body {
       <!-- 管理子页面：工时申报管理 -->
       <div class="page-view" id="adminWorktimeView">
         <div class="page-title-row">
-          <h2>💼 工时申报管理</h2>
+          <h2>工时申报管理</h2>
           <p class="page-subtitle">开启工时申报并查看所有成员的申报情况</p>
         </div>
         <div class="admin-section">
@@ -2252,7 +2299,7 @@ body {
       <!-- 管理子页面：本月各成员值班情况 -->
       <div class="page-view" id="adminMonthlyView">
         <div class="page-title-row">
-          <h2>📊 本月值班情况</h2>
+          <h2>本月值班情况</h2>
           <p class="page-subtitle">查看本月（或指定月份）各成员值班安排与打卡状态</p>
         </div>
         <div class="admin-section">
@@ -2260,26 +2307,26 @@ body {
             <button class="admin-btn" onclick="loadAdminMonthly(-1)" title="上一月">◀ 上一月</button>
             <span id="adminMonthlyLabel" style="font-size:16px;font-weight:700;color:var(--primary);min-width:120px;text-align:center">加载中…</span>
             <button class="admin-btn" onclick="loadAdminMonthly(1)" title="下一月">下一月 ▶</button>
-            <button class="admin-btn primary" onclick="loadAdminMonthly()">🔄 刷新</button>
+            <button class="admin-btn primary" onclick="loadAdminMonthly()">刷新</button>
             <span id="adminMonthlyPeriod" style="font-size:12px;color:#888;margin-left:auto"></span>
           </div>
         </div>
         <div class="admin-section">
-          <h3>📈 总体概览</h3>
+          <h3>总体概览</h3>
           <div id="adminMonthlyTotals" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px">
             <p style="color:#999;font-size:13px;padding:8px 0">加载中...</p>
           </div>
         </div>
         <div class="admin-section">
-          <h3>👥 各成员值班明细</h3>
+          <h3>各成员值班明细</h3>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
             <span style="font-size:13px;color:#666">图例：</span>
-            <span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:8px;font-size:12px">✓ 已完成</span>
-            <span style="background:#cce5ff;color:#004085;padding:2px 8px;border-radius:8px;font-size:12px">⏱ 进行中</span>
-            <span style="background:#fff3cd;color:#856404;padding:2px 8px;border-radius:8px;font-size:12px">📅 今日</span>
+            <span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:8px;font-size:12px"> 已完成</span>
+            <span style="background:#cce5ff;color:#004085;padding:2px 8px;border-radius:8px;font-size:12px">进行中</span>
+            <span style="background:#fff3cd;color:#856404;padding:2px 8px;border-radius:8px;font-size:12px">今日</span>
             <span style="background:#e2e3e5;color:#383d41;padding:2px 8px;border-radius:8px;font-size:12px">⌛ 未到</span>
-            <span style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:8px;font-size:12px">✗ 缺勤</span>
-            <span style="background:#fff0d6;color:#8a5a00;padding:2px 8px;border-radius:8px;font-size:12px">📝 补签</span>
+            <span style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:8px;font-size:12px">缺勤</span>
+            <span style="background:#fff0d6;color:#8a5a00;padding:2px 8px;border-radius:8px;font-size:12px">补签</span>
           </div>
           <div id="adminMonthlyTable" style="overflow-x:auto">
             <p style="color:#999;font-size:13px;padding:16px 0;text-align:center">加载中...</p>
@@ -2293,7 +2340,7 @@ body {
       <!-- 管理子页面：例会设置 -->
       <div class="page-view" id="adminMeetingsView">
         <div class="page-title-row">
-          <h2>📅 每月例会设置</h2>
+          <h2>每月例会设置</h2>
           <p class="page-subtitle">为每月每次例会单独设置时长（单位：小时，支持 0.5 步进）。成员在工时申报时可勾选"已参会"。</p>
         </div>
         <div class="admin-section">
@@ -2301,8 +2348,8 @@ body {
             <button class="admin-btn" onclick="loadAdminMeetings(-1)">◀ 上一月</button>
             <span id="adminMeetingsLabel" style="font-size:16px;font-weight:700;color:var(--primary);min-width:120px;text-align:center">加载中…</span>
             <button class="admin-btn" onclick="loadAdminMeetings(1)">下一月 ▶</button>
-            <button class="admin-btn" onclick="addMeetingRow()">➕ 添加一周</button>
-            <button class="admin-btn primary" onclick="saveAdminMeetings()">💾 保存</button>
+            <button class="admin-btn" onclick="addMeetingRow()">添加一周</button>
+            <button class="admin-btn primary" onclick="saveAdminMeetings()">保存</button>
           </div>
         </div>
         <div class="admin-section">
@@ -2316,7 +2363,7 @@ body {
       <!-- 管理子页面：节假日调休 -->
       <div class="page-view" id="adminHolidaysView">
         <div class="page-title-row">
-          <h2>🏖️ 节假日调休</h2>
+          <h2>节假日调休</h2>
           <p class="page-subtitle">设置无需值班的休假日期，或把某个日期临时按周一至周五的班表执行。</p>
         </div>
         <div class="admin-section">
@@ -2345,22 +2392,22 @@ body {
           <div id="makeupDatesList" style="margin-top:12px"></div>
         </div>
         <div class="admin-section">
-          <button class="admin-btn primary" onclick="saveAdminHolidays()">💾 保存节假日设置</button>
+          <button class="admin-btn primary" onclick="saveAdminHolidays()">保存节假日设置</button>
         </div>
       </div>
 
       <!-- 管理子页面：邮件配置 v5.0 -->
       <div class="page-view" id="adminEmailView">
         <div class="page-title-row">
-          <h2>📧 邮件配置</h2>
+          <h2>邮件配置</h2>
           <p class="page-subtitle">配置 SMTP 与通知触发。授权码已写在服务端 .env 或代码默认值中（前端不展示）。</p>
         </div>
         <div class="admin-section">
-          <h3>🔌 当前邮件通道</h3>
+          <h3>当前邮件通道</h3>
           <div id="adminEmailConfig" style="margin-top:8px"></div>
         </div>
         <div class="admin-section">
-          <h3>📨 测试邮件</h3>
+          <h3>测试邮件</h3>
           <p style="color:#666;font-size:13px">向指定地址发送测试邮件，验证当前邮件通道是否可用。</p>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
             <input type="email" id="adminEmailTestTo" placeholder="收件人邮箱" style="flex:1;min-width:200px;padding:8px;border:1px solid #d4d4d8;border-radius:6px">
@@ -2369,12 +2416,12 @@ body {
           <div id="adminEmailTestResult" style="margin-top:8px;font-size:13px"></div>
         </div>
         <div class="admin-section">
-          <h3>👥 成员邮箱</h3>
+          <h3>成员邮箱</h3>
           <p style="color:#666;font-size:13px">已登记邮箱的成员会在触发通知时自动收到邮件。</p>
           <div id="adminEmailMembers" style="margin-top:8px;max-height:240px;overflow:auto;border:1px solid #e5e7eb;border-radius:6px"></div>
         </div>
         <div class="admin-section">
-          <h3>📜 发送日志（最近 50 条）</h3>
+          <h3>发送日志（最近 50 条）</h3>
           <div id="adminEmailLogs" style="margin-top:8px;max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:6px"></div>
         </div>
       </div>
@@ -2425,11 +2472,11 @@ async function loadSuppCheckouts() {
     var showAllEl = document.getElementById('suppShowAll');
     var showAll = !!(showAllEl && showAllEl.checked);
     if (!showAll) list = list.filter(function(it) { return it.status === 'pending' });
-    if (list.length === 0) { container.innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px">' + (showAll ? '暂无补签退申请' : '暂无待审核补签退申请 ✓ （勾选"显示已处理"可看历史）') + '</p>'; return; }
+    if (list.length === 0) { container.innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px">' + (showAll ? '暂无补签退申请' : '暂无待审核补签退申请  （勾选"显示已处理"可看历史）') + '</p>'; return; }
     var html = '<div style="display:flex;flex-direction:column;gap:10px">';
     list.forEach(function(item) {
       var statusBadge = '', actions = '';
-      if (item.status === 'pending') { statusBadge = '<span style="background:#fff3cd;color:#856404;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600">待审核</span>'; actions = '<div style="display:flex;gap:6px;margin-top:8px"><button onclick=\'reviewSupp("' + item.id + '","approve")\' style="padding:5px 14px;background:#27ae60;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">✅ 通过</button><button onclick=\'reviewSupp("' + item.id + '","reject")\' style="padding:5px 14px;background:#e74c3c;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">❌ 拒绝</button></div>'; }
+      if (item.status === 'pending') { statusBadge = '<span style="background:#fff3cd;color:#856404;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600">待审核</span>'; actions = '<div style="display:flex;gap:6px;margin-top:8px"><button onclick=\'reviewSupp("' + item.id + '","approve")\' style="padding:5px 14px;background:#27ae60;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">通过</button><button onclick=\'reviewSupp("' + item.id + '","reject")\' style="padding:5px 14px;background:#e74c3c;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">拒绝</button></div>'; }
       else if (item.status === 'approved') statusBadge = '<span style="background:#d4edda;color:#155724;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600">已通过</span>';
       else statusBadge = '<span style="background:#f8d7da;color:#721c24;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600">已拒绝</span>';
       html += '<div style="padding:14px;background:linear-gradient(135deg,#fefefe,#f9f9f9);border:1.5px solid #e8e8e8;border-radius:12px">';
@@ -2711,7 +2758,7 @@ async function doAdminLogin() {
       localStorage.setItem('adminToken', adminToken);
       localStorage.setItem('memberAdmin', 'false');
       document.getElementById('headerUserName').textContent = currentUser;
-      document.getElementById('sidebarAvatar').textContent = '⚙';
+      document.getElementById('sidebarAvatar').textContent = '管';
       document.getElementById('sidebarName').textContent = currentUser;
       document.getElementById('sidebarRole').textContent = '管理员';
       document.getElementById('adminNavGroupTitle').style.display = '';
@@ -2759,7 +2806,7 @@ async function loadConfig() {
       const now = new Date();
       if (now < d) {
         const tip = document.querySelector('.tip-bar');
-        if (tip) tip.innerHTML = '⏳ 排班尚未开始，开始时间：' + d.toLocaleString() + ' <button class="refresh-btn" onclick="loadSchedule()">🔄 刷新</button>';
+        if (tip) tip.innerHTML = '排班尚未开始，开始时间：' + d.toLocaleString() + ' <button class="refresh-btn" onclick="loadSchedule()">刷新</button>';
       }
     }
   } catch(e) {}
@@ -2964,20 +3011,20 @@ function renderSchedule(data) {
     const badge = document.createElement('div');
     badge.className = 'schedule-badge';
     badge.style.cssText = 'text-align:center;margin-bottom:8px;color:#666;font-size:14px';
-    badge.textContent = '📜 历史排班（' + (data.scheduleStart ? new Date(data.scheduleStart).toLocaleDateString() : '') + ' ~ ' + (data.scheduleEnd ? new Date(data.scheduleEnd).toLocaleDateString() : '') + '）- 已归档';
+    badge.textContent = '历史排班（' + (data.scheduleStart ? new Date(data.scheduleStart).toLocaleDateString() : '') + ' ~ ' + (data.scheduleEnd ? new Date(data.scheduleEnd).toLocaleDateString() : '') + '）- 已归档';
     grid.parentElement.insertBefore(badge, grid);
   } else if (data.confirmed) {
     const badge = document.createElement('div');
     badge.className = 'schedule-badge';
     badge.style.cssText = 'text-align:center;margin-bottom:8px;color:var(--success);font-weight:700;font-size:14px';
-    badge.textContent = '✅ 排班表已确认（' + (data.scheduleStart ? new Date(data.scheduleStart).toLocaleDateString() : '') + ' ~ ' + (data.scheduleEnd ? new Date(data.scheduleEnd).toLocaleDateString() : '') + '）';
+    badge.textContent = '排班表已确认（' + (data.scheduleStart ? new Date(data.scheduleStart).toLocaleDateString() : '') + ' ~ ' + (data.scheduleEnd ? new Date(data.scheduleEnd).toLocaleDateString() : '') + '）';
     grid.parentElement.insertBefore(badge, grid);
     grid.querySelectorAll('.pick-btn,.cancel-btn,.waitlist-btn').forEach(b => b.remove());
   } else {
     const badge = document.createElement('div');
     badge.className = 'schedule-badge';
     badge.style.cssText = 'text-align:center;margin-bottom:8px;color:var(--warn);font-size:13px';
-    badge.textContent = '📝 草稿 — 排班进行中，管理员确认后生效';
+    badge.textContent = '草稿 - 排班进行中，管理员确认后生效';
     grid.parentElement.insertBefore(badge, grid);
   }
 }
@@ -2997,7 +3044,7 @@ async function pickSlot(day, slot) {
     });
     const data = await res.json();
     console.log('[pick] response:', data);
-    if (data.ok) { showToast('✅ 选择成功！' + day + ' ' + slot); loadSchedule(); loadMyShifts(); }
+    if (data.ok) { showToast('选择成功：' + day + ' ' + slot); loadSchedule(); loadMyShifts(); }
     else if (data.waitlist) { showToast('已加入候补'); loadSchedule(); }
     else { alert(data.msg || '操作失败'); }
   } catch(e) { console.error('[pick] error:', e); alert('网络错误：' + e.message); }
@@ -3103,7 +3150,9 @@ function renderMyShifts(shifts, forHome) {
   }
   let html = '<div class="shift-list">';
   shifts.forEach(s => {
-    const cls = forHome ? 'shift-card shift-card-sm' : 'shift-card';
+    const source = s.source || {};
+    const isAdjusted = source.type && source.type !== 'normal';
+    const cls = (forHome ? 'shift-card shift-card-sm' : 'shift-card') + (isAdjusted ? ' is-adjusted' : '');
     // 用 slotLabel() 转换 slotId 为可读标签
     const displaySlot = (typeof slotLabel === 'function') ? (slotLabel(s.slotId || s.slot)) : (s.slotId || s.slot);
     // 首页模式：显示 日期（周X）格式（actualDate 可能是 Date 对象或字符串）
@@ -3119,6 +3168,9 @@ function renderMyShifts(shifts, forHome) {
     html += '<div class="' + cls + '">';
     html += '<div class="shift-day">' + displayDay + '</div>';
     html += '<div class="shift-slot">' + displaySlot + '</div>';
+    if (isAdjusted) {
+      html += '<span class="shift-source-badge">' + escapeHtml(source.label || '调班') + '</span>';
+    }
     if (!forHome) {
       html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
       html += '<button class="cancel-btn" onclick="cancelSlot(\'' + s.day + '\',\'' + s.slot + '\')">取消</button>';
@@ -4057,7 +4109,7 @@ async function loadHomeStats() {
     // 2. 处理当前未归档的 schedule（草稿状态才处理，避免与 confirmedPeriods 重复）
     const cur = allData.current || {};
     if (cur.schedule && Object.keys(cur.schedule).length > 0) {
-      // ✅ 关键修复：已确认（有起止时间）的排班数据已在 confirmedPeriods 中，跳过
+      //  关键修复：已确认（有起止时间）的排班数据已在 confirmedPeriods 中，跳过
       if (cur.start && cur.end) {
         console.log('[loadHomeStats] 当前排班已确认，跳过 current.schedule 以避免重复统计');
       } else {
@@ -4076,6 +4128,28 @@ async function loadHomeStats() {
     
     // 按日期排序显示（actualDate 是 Date 对象，直接比较时间戳）
     displayShifts.sort((a, b) => a.actualDate - b.actualDate);
+    try {
+      const msRes = await fetch(API + '/my-shifts?name=' + encodeURIComponent(currentUser));
+      const msData = await msRes.json();
+      const effectiveShifts = (msData.shifts || [])
+        .filter(s => {
+          const d = s.date || s.actualDate || '';
+          return d && d >= formatLocalDate(monthStartDate) && d <= formatLocalDate(monthEndDate);
+        })
+        .map(s => {
+          const d = s.date || s.actualDate || '';
+          return {
+            ...s,
+            actualDate: parseLocalDate(d),
+            weekdayLabel: s.weekdayLabel || s.day,
+            dateStr: d
+          };
+        })
+        .sort((a, b) => a.actualDate - b.actualDate);
+      displayShifts = effectiveShifts;
+    } catch (e) {
+      console.warn('[loadHomeStats] 使用后端实际班次失败，回退旧逻辑', e);
+    }
     renderMyShifts(displayShifts, true);
 
     // 渲染值班搭子卡片
@@ -4114,7 +4188,7 @@ async function loadMessages() {
       convMap[key].push(m);
     });
     if (Object.keys(convMap).length === 0) {
-      content.innerHTML = '<div style="text-align:center;padding:40px 0"><div style="font-size:48px;margin-bottom:12px">💬</div><p style="color:#999;font-size:14px">暂无搭子消息</p><p style="color:#aaa;font-size:12px;margin-top:6px">在首页搭子卡片给同学留言，对方就能在这里看到</p></div>';
+      content.innerHTML = '<div style="text-align:center;padding:40px 0"><p style="color:#999;font-size:14px">暂无搭子消息</p><p style="color:#aaa;font-size:12px;margin-top:6px">在首页搭子卡片给同学留言，对方就能在这里看到</p></div>';
       return;
     }
     let html = '<div style="display:flex;flex-direction:column;gap:10px">';
@@ -4128,7 +4202,7 @@ async function loadMessages() {
       const msgEsc = lastMsg.message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       html += '<div onclick="showThread(\'' + jsStr(partner) + '\')" style="cursor:pointer;padding:14px 16px;background:linear-gradient(135deg,#fef7f0,#fff5f5);border:1.5px solid #f0d9d0;border-radius:12px">';
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
-      html += '<span style="font-size:18px">👥</span>';
+      html += '<span style="font-size:12px;letter-spacing:.08em;color:#9f1239">PAIR</span>';
       html += '<span style="font-weight:700;font-size:15px;color:#8B1A1A">' + safePartner + '</span>';
       if (unreadCount > 0) html += '<span style="background:#c41230;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700">' + unreadCount + ' 未读</span>';
       html += '<span style="margin-left:auto;font-size:11px;color:#aaa;white-space:nowrap">' + timeStr + '</span></div>';
@@ -4180,7 +4254,7 @@ async function showThread(partner) {
         html += '<div style="max-width:75%;padding:10px 14px;border-radius:12px;background:' + bgColor + ';border:1px solid ' + (isMe ? '#f0d9d0' : '#d0e0f0') + ';font-size:13px;line-height:1.6;word-break:break-all">';
         html += '<div style="font-size:11px;color:' + labelColor + ';font-weight:600;margin-bottom:2px">' + (isMe ? '我' : m.from) + '</div>';
         html += msgEsc + '</div>';
-        html += '<div style="font-size:11px;color:#aaa;margin-top:3px">' + formatMsgTime(m.createdAt) + (m.read && isMe ? ' ✓已读' : '') + '</div></div>';
+        html += '<div style="font-size:11px;color:#aaa;margin-top:3px">' + formatMsgTime(m.createdAt) + (m.read && isMe ? ' 已读' : '') + '</div></div>';
       });
       html += '</div>';
       threadMsgsEl.innerHTML = html;
@@ -4258,7 +4332,7 @@ function loadCheckinStatus() {
       const lastOut = todayOuts.length > 0 ? todayOuts[0] : null;
       
       if (activeIn) {
-        statusEl.innerHTML = '<span style="color:#8B1A1A;font-weight:600;font-size:14px">🔴 值班中</span>' +
+        statusEl.innerHTML = '<span style="color:#8B1A1A;font-weight:600;font-size:14px">值班中</span>' +
           '<span style="color:#666;font-size:12px;margin-left:8px">签到时间：' + formatTime(activeIn.time) + (activeIn.slotId ? ' (' + (SLOT_LABELS[activeIn.slotId]||activeIn.slotId) + ')' : '') + '</span>';
         document.getElementById('btnCheckin').disabled = true;
         document.getElementById('btnCheckin').style.opacity = '0.5';
@@ -4266,7 +4340,7 @@ function loadCheckinStatus() {
         document.getElementById('btnCheckout').style.opacity = '1';
         revokeBtn.style.display = 'none';
       } else if (lastOut) {
-        statusEl.innerHTML = '<span style="color:#2e7d32;font-weight:600;font-size:14px">✅ 今日已签退</span>' +
+        statusEl.innerHTML = '<span style="color:#2e7d32;font-weight:600;font-size:14px">今日已签退</span>' +
           '<span style="color:#666;font-size:12px;margin-left:8px">最近签退：' + formatTime(lastOut.time) + '</span>';
         document.getElementById('btnCheckin').disabled = false;
         document.getElementById('btnCheckin').style.opacity = '1';
@@ -4277,7 +4351,7 @@ function loadCheckinStatus() {
       const diffMs = Date.now() - lastOutMs;
         if (diffMs <= 180000) {
           revokeBtn.style.display = '';
-          revokeBtn.textContent = '↩️ 撤回签退（' + Math.ceil((180000 - diffMs)/1000) + 's）';
+          revokeBtn.textContent = '撤回签退（' + Math.ceil((180000 - diffMs)/1000) + 's）';
         } else {
           revokeBtn.style.display = 'none';
         }
@@ -4293,9 +4367,9 @@ function loadCheckinStatus() {
       // 显示今日打卡记录
       const todayRecs = checkins.filter(c => c.date === today).sort((a,b)=>a.time.localeCompare(b.time));
       if (todayRecs.length > 0) {
-        let html = '<div style="margin-top:10px"><p style="font-size:12px;color:#888;margin-bottom:6px">📋 今日打卡记录：</p>';
+        let html = '<div style="margin-top:10px"><p style="font-size:12px;color:#888;margin-bottom:6px">今日打卡记录：</p>';
         todayRecs.forEach(c => {
-          const icon = c.type === 'in' ? '🟢' : (c.autoCheckout ? '🔵' : '🔴');
+          const icon = c.type === 'in' ? 'IN' : (c.autoCheckout ? 'AUTO' : 'OUT');
           const label = c.type === 'in' ? '签到' : (c.autoCheckout ? '自动签退' : '签退');
           html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid #f0f0f0">' +
             '<span>' + icon + ' ' + label + (c.slotId ? ' [' + (SLOT_LABELS[c.slotId]||c.slotId) + ']' : '') + '</span>' +
@@ -4400,7 +4474,7 @@ function sendCheckin(lat, lng) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) { showToast('✅ 签到成功' + (data.slotLabel ? '（' + (SLOT_LABELS[data.slotLabel]||data.slotLabel) + '班次)' : '')); loadCheckinStatus(); }
+    if (data.ok) { showToast('签到成功' + (data.slotLabel ? '（' + (SLOT_LABELS[data.slotLabel]||data.slotLabel) + '班次)' : '')); loadCheckinStatus(); }
     else { showCheckinError(data.msg || '签到失败'); }
   })
   .catch(() => { showCheckinError('网络错误'); });
@@ -4435,7 +4509,7 @@ function sendCheckout(lat, lng) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) { showToast('✅ ' + (data.msg || '签退成功')); loadCheckinStatus(); }
+    if (data.ok) { showToast(data.msg || '签退成功'); loadCheckinStatus(); }
     else { showCheckinError(data.msg || '签退失败'); }
   })
   .catch(() => { showCheckinError('网络错误'); });
@@ -4455,7 +4529,7 @@ function showSuppCheckoutDialog() {
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
     overlay.innerHTML = [
       '<div style="background:#fff;border-radius:16px;padding:24px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(139,26,26,0.15)">',
-      '<h3 style="color:#8B1A1A;font-size:18px;margin-bottom:16px;text-align:center">📝 申请补签退</h3>',
+      '<h3 style="color:#8B1A1A;font-size:18px;margin-bottom:16px;text-align:center">申请补签退</h3>',
       '<div style="margin-bottom:14px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">签到日期</label><input type="date" id="suppDate" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;box-sizing:border-box"></div>',
       '<div style="margin-bottom:14px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">补签退时间</label><input type="time" id="suppTime" value="17:30" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;box-sizing:border-box"></div>',
       '<div style="margin-bottom:18px"><label style="display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:600">备注说明</label><textarea id="suppReason" placeholder="如：忘记打卡、系统故障等..." rows="2" style="width:100%;padding:10px 12px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:14px;resize:none;box-sizing:border-box"></textarea></div>',
@@ -4484,7 +4558,7 @@ async function submitSuppCheckout() {
     });
     var data = await res.json();
     if (data.ok) {
-      showToast('✅ 补签退申请已提交，等待管理员审核');
+      showToast('补签退申请已提交，等待管理员审核');
       var overlay = document.getElementById('suppCheckoutOverlay');
       if (overlay) overlay.style.display = 'none';
       loadCheckinStatus();
@@ -4503,7 +4577,7 @@ function doRevokeCheckout() {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) { showToast('✅ ' + data.msg); loadCheckinStatus(); }
+    if (data.ok) { showToast(data.msg); loadCheckinStatus(); }
     else { showToast(data.msg || '撤回失败'); }
   })
   .catch(() => { showToast('网络错误'); });
@@ -4530,7 +4604,7 @@ function submitOvertime() {
   .then(r => r.json())
   .then(data => {
     if (data.ok) {
-      showToast('✅ ' + data.msg);
+      showToast(data.msg);
       document.getElementById('otDate').value = '';
       document.getElementById('otHours').value = '';
       document.getElementById('otContent').value = '';
@@ -4556,9 +4630,9 @@ function loadOvertimeList() {
     .then(data => {
       const list = data.list || [];
       if (list.length === 0) { listEl.innerHTML = ''; return; }
-      const statusMap = { pending: '⏳ 待审核', approved: '✅ 已通过', rejected: '❌ 已拒绝' };
+      const statusMap = { pending: '待审核', approved: '已通过', rejected: '已拒绝' };
       const colorMap = { pending: '#f59e0b', approved: '#2e7d32', rejected: '#c41230' };
-      let html = '<p style="font-size:12px;color:#888;margin-bottom:6px">📋 我的补报记录：</p>';
+      let html = '<p style="font-size:12px;color:#888;margin-bottom:6px">我的补报记录：</p>';
       list.forEach(o => {
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-bottom:6px;background:#fafafa;border-radius:8px;border-left:3px solid ' + (colorMap[o.status]||'#ccc') + '">' +
           '<div><div style="font-size:13px;font-weight:500">' + o.date + ' · ' + o.hours + '小时</div>' +
@@ -4604,8 +4678,8 @@ async function loadMyCheckinHistory() {
       html += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:6px">' + label + '</div>';
       recs.sort((a, b) => a.time.localeCompare(b.time)).forEach(c => {
         const timeStr = formatTime(c.time);
-        const typeLabel = c.type === 'in' ? '🟢 签到' : (c.isSupp ? '🟡 补签退' : (c.autoCheckout ? '🔵 自动签退' : '🔴 签退'));
-        const locStr = (c.latitude && c.longitude) ? '📍(' + c.latitude.toFixed(4) + ', ' + c.longitude.toFixed(4) + ')' : '';
+        const typeLabel = c.type === 'in' ? ' 签到' : (c.isSupp ? ' 补签退' : (c.autoCheckout ? ' 自动签退' : ' 签退'));
+        const locStr = (c.latitude && c.longitude) ? '(' + c.latitude.toFixed(4) + ', ' + c.longitude.toFixed(4) + ')' : '';
         html += '<div style="font-size:12px;color:#555;padding:2px 0;display:flex;gap:8px;align-items:center">' +
           '<span style="white-space:nowrap">' + typeLabel + '</span>' +
           '<span style="font-weight:500">' + timeStr + '</span>' +
@@ -4704,7 +4778,7 @@ function renderPartners(allData, myShifts) {
 
     html += '<div style="background:linear-gradient(135deg,#fef7f0,#fff5f5);border:1.5px solid #f0d9d0;border-radius:12px;padding:14px;margin-bottom:10px">';
     html += '  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-    html += '    <span style="font-size:22px">👥</span>';
+    html += '    <span style="font-size:12px;letter-spacing:.08em;color:#9f1239">PAIR</span>';
     html += '    <span style="font-weight:700;font-size:15px;color:#8B1A1A">' + name + '</span>';
     html += '    <span style="font-size:11px;color:#999;background:#f5f5f5;padding:2px 8px;border-radius:10px">共 ' + shifts.length + ' 班</span>';
     html += '  </div>';
@@ -4717,9 +4791,9 @@ function renderPartners(allData, myShifts) {
     html += '  </div>';
   // 快捷留言按钮
     const quickMsgs = [
-      { text: '怎么还没到', emoji: '😤' },
-      { text: '今天又靠你了', emoji: '🫡' },
-      { text: '爱你爱你', emoji: '❤️' }
+      { text: '怎么还没到', emoji: '' },
+      { text: '今天又靠你了', emoji: '' },
+      { text: '爱你爱你', emoji: '' }
     ];
     html += '  <div style="margin-top:8px;border-top:1px dashed #e8d8d0;padding-top:8px">';
     html += '    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
@@ -4732,7 +4806,7 @@ function renderPartners(allData, myShifts) {
     html += '    <input type="text" id="msg_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'_') + '" placeholder="给 ' + name + ' 留句话..." ';
     html += 'style="width:100%;padding:6px 10px;border:1.5px solid #e8d8d0;border-radius:8px;font-size:12px;box-sizing:border-box;background:#fff" />';
     html += '    <button onclick=\'sendPartnerMessage("' + name + '")\' ';
-    html += 'style="margin-top:6px;width:100%;padding:6px 12px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer">📨 发送</button>';
+    html += 'style="margin-top:6px;width:100%;padding:6px 12px;background:linear-gradient(135deg,#8B1A1A,#A41E22);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer">发送</button>';
     html += '  </div>';    html += '</div>';
   });
 
@@ -4793,7 +4867,7 @@ function renderCalendarFromDateMap(datePeriodMap, year, month) {
     html += '<div class="' + cls + '"><div class="cal-day">' + d + '</div>';
     if (total > 0) {
       if (completed === total) {
-        html += '<div class="cal-count" style="color:#8B1A1A">✓ ' + total + '班</div>';
+        html += '<div class="cal-count" style="color:#8B1A1A"> ' + total + '班</div>';
       } else if (completed > 0) {
         html += '<div class="cal-count" style="color:#f59e0b">' + completed + '/' + total + '班</div>';
       } else {
@@ -5063,10 +5137,10 @@ async function loadScheduleStatus() {
     if (hasStart || hasEnd) {
       const startStr = data.scheduleStart ? new Date(data.scheduleStart).toLocaleString() : '未设置';
       const endStr = data.scheduleEnd ? new Date(data.scheduleEnd).toLocaleString() : '未设置';
-      el.innerHTML = '<span style="color:var(--success);font-weight:700;font-size:16px">✅ 已生效</span>' +
+      el.innerHTML = '<span style="color:var(--success);font-weight:700;font-size:16px">已生效</span>' +
         '<div style="margin-top:8px;line-height:1.8"><b>开始：</b>' + startStr + '<br><b>结束：</b>' + endStr + '</div>';
     } else {
-      el.innerHTML = '<span style="color:var(--warn);font-weight:700;font-size:16px">📝 草稿状态</span>' +
+      el.innerHTML = '<span style="color:var(--warn);font-weight:700;font-size:16px">草稿状态</span>' +
         '<div style="margin-top:8px;color:#888">当前排班表尚未确认，成员端月度日历不会统计本次排班数据。请设置执行时间并确认。</div>';
     }
   } catch(e) { console.error('loadScheduleStatus:', e); }
@@ -5092,7 +5166,7 @@ async function confirmSchedule() {
       body: JSON.stringify({scheduleStart: startVal, scheduleEnd: endVal})
     });
     const data = await res.json();
-    if (data.ok) { showToast('✅ 排班表已确认生效！'); loadScheduleStatus(); loadConfig(); loadSchedule(); }
+    if (data.ok) { showToast('排班表已确认生效'); loadScheduleStatus(); loadConfig(); loadSchedule(); }
     else { showToast(data.msg || '确认失败'); }
   } catch(e) { showToast('网络错误'); }
 }
@@ -5139,7 +5213,7 @@ async function loadAdminSchedulePreview() {
         let inner = '';
         if (assigned.length > 0) inner = '<div class="names">' + assigned.join('、') + '</div>';
         if (count < max) inner += '<div style="font-size:11px;color:#aaa">空' + (max-count) + '/' + max + '</div>';
-        else inner += '<div style="font-size:11px;color:#27ae60">✓ 满</div>';
+        else inner += '<div style="font-size:11px;color:#27ae60"> 满</div>';
         html += '<td class="' + cls + '">' + inner + '</td>';
       });
       html += '</tr>';
@@ -5162,7 +5236,7 @@ async function loadWaitlist() {
     data.waitlist.filter(w => w.status !== 'auto-approved' && w.status !== 'approved' && w.status !== 'rejected').forEach((w,i) => {
       html += '<div class="req-card" data-name="' + w.name + '" data-day="' + w.day + '" data-slot="' + (w.slotId || w.slot) + '">';
       html += '<div class="req-info"><div class="req-name">' + w.name + '</div><div class="req-detail">' + w.day + ' ' + (slotLabel(w.slotId || w.slot) || w.slotId || w.slot || '') + '</div></div>';
-      html += '<div class="req-actions"><button class="approve-btn" onclick="approveWaitlist(' + i + ')">✓ 批准</button><button class="reject-btn" onclick="rejectWaitlist(' + i + ')">✕ 拒绝</button></div>';
+      html += '<div class="req-actions"><button class="approve-btn" onclick="approveWaitlist(' + i + ')"> 批准</button><button class="reject-btn" onclick="rejectWaitlist(' + i + ')"> 拒绝</button></div>';
       html += '</div>';
     });
     container.innerHTML = html;
@@ -5212,7 +5286,7 @@ async function loadCancelRequests() {
     pending.forEach((r,i) => {
       html += '<div class="req-card" data-name="' + r.name + '" data-day="' + r.day + '" data-slot="' + (r.slotId || r.slot) + '">';
       html += '<div class="req-info"><div class="req-name">' + r.name + '</div><div class="req-detail">' + r.day + ' ' + slotLabel(r.slotId || r.slot) + (r.reason ? '<br><span style="color:#666;font-size:12px">理由：' + r.reason + '</span>' : '') + '</div></div>';
-      html += '<div class="req-actions"><button class="approve-btn" style="background:var(--danger)" onclick="approveCancel(' + i + ')">✓ 批准取消</button><button class="reject-btn" onclick="rejectCancel(' + i + ')">✕ 拒绝</button></div>';
+      html += '<div class="req-actions"><button class="approve-btn" style="background:var(--danger)" onclick="approveCancel(' + i + ')"> 批准取消</button><button class="reject-btn" onclick="rejectCancel(' + i + ')"> 拒绝</button></div>';
       html += '</div>';
     });
     container.innerHTML = html;
@@ -5311,10 +5385,10 @@ function loadAdminCheckins(mode) {
       Object.keys(groups).sort().forEach(name => {
         const records = groups[name].sort((a, b) => a.time.localeCompare(b.time));
         html += '<div style="margin-bottom:12px;padding:10px;background:#fafafa;border-radius:8px">';
-        html += '<div style="font-weight:600;font-size:14px;margin-bottom:6px">👤 ' + name + '</div>';
+        html += '<div style="font-weight:600;font-size:14px;margin-bottom:6px">' + name + '</div>';
         records.forEach(c => {
-          const icon = c.type === 'in' ? '🟢 签到' : (c.isSupp ? '🟡 补签退' : (c.autoCheckout ? '🔵 自动签退' : '🔴 签退'));
-          const loc = c.lat ? ' 📍' + c.lat.toFixed(4) + ',' + c.lng.toFixed(4) : '';
+          const icon = c.type === 'in' ? '签到' : (c.isSupp ? '补签退' : (c.autoCheckout ? '自动签退' : '签退'));
+          const loc = c.lat ? ' ' + c.lat.toFixed(4) + ',' + c.lng.toFixed(4) : '';
           html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:#555">' +
             '<span>' + icon + '</span>' +
             '<span>' + c.date + ' ' + formatTime(c.time) + loc + '</span></div>';
@@ -5373,7 +5447,7 @@ function loadAdminCheckins(mode) {
       });
       listEl.innerHTML = html;
     })
-    .catch((e) => { console.error('loadAdminOvertime error:', e); listEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:16px 0;text-align:center">⚠️ 加载失败: ' + (e.message || '网络错误') + '</p>'; });
+    .catch((e) => { console.error('loadAdminOvertime error:', e); listEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:16px 0;text-align:center">加载失败: ' + (e.message || '网络错误') + '</p>'; });
 }
 
 // ========== 管理员补报审核 (v4.1) ==========
@@ -5389,7 +5463,7 @@ function loadAdminOvertime() {
       let html = '';
       html += '<div style="font-size:14px;font-weight:700;color:#8B1A1A;margin:4px 0 10px">待审核</div>';
       if (pending.length === 0) {
-        html += '<div style="text-align:center;padding:28px 20px;background:#fafafa;border-radius:10px;margin-bottom:16px"><div style="font-size:34px;margin-bottom:8px">📋</div><p style="color:#999;font-size:14px;margin-bottom:4px">暂无待审核的补报申请</p><p style="color:#bbb;font-size:12px">当成员提交补报申请后，会在此处显示</p></div>';
+        html += '<div style="text-align:center;padding:28px 20px;background:#fafafa;border-radius:10px;margin-bottom:16px"><p style="color:#999;font-size:14px;margin-bottom:4px">暂无待审核的补报申请</p><p style="color:#bbb;font-size:12px">当成员提交补报申请后，会在此处显示</p></div>';
       }
       pending.forEach(o => {
         html += '<div class="req-card" style="margin-bottom:8px">';
@@ -5398,8 +5472,8 @@ function loadAdminOvertime() {
         html += '<div class="req-detail">' + o.date + ' · ' + o.hours + '小时 · ' + o.content + '</div>';
         html += '</div>';
         html += '<div class="req-actions">';
-        html += '<button class="admin-btn primary" style="margin-right:4px" onclick="approveOt(\'' + o.id + '\',\'approve\')">✅ 批准</button>';
-        html += '<button class="admin-btn danger" onclick="approveOt(\'' + o.id + '\',\'reject\')">❌ 拒绝</button>';
+        html += '<button class="admin-btn primary" style="margin-right:4px" onclick="approveOt(\'' + o.id + '\',\'approve\')">批准</button>';
+        html += '<button class="admin-btn danger" onclick="approveOt(\'' + o.id + '\',\'reject\')">拒绝</button>';
         html += '</div></div>';
       });
       html += '<div style="font-size:14px;font-weight:700;color:#555;margin:18px 0 10px">已处理</div>';
@@ -5416,7 +5490,7 @@ function loadAdminOvertime() {
         html += '<div style="font-size:11px;color:#999;margin-top:4px">处理时间：' + (o.reviewedAt ? formatTime(o.reviewedAt) : '—') + '</div>';
         html += '</div>';
         html += '<div class="req-actions">';
-        html += '<button class="admin-btn" onclick="reopenOt(\'' + o.id + '\')">↩️ 撤回重审</button>';
+        html += '<button class="admin-btn" onclick="reopenOt(\'' + o.id + '\')">撤回重审</button>';
         html += '</div></div>';
       });
       listEl.innerHTML = html;
@@ -5432,7 +5506,7 @@ function approveOt(id, action) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) { showToast('✅ ' + data.msg); loadAdminOvertime(); }
+    if (data.ok) { showToast(data.msg); loadAdminOvertime(); }
     else { showToast(data.msg || '操作失败'); }
   })
   .catch(() => { showToast('网络错误'); });
@@ -5447,7 +5521,7 @@ function reopenOt(id) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) { showToast('✅ ' + data.msg); loadAdminOvertime(); }
+    if (data.ok) { showToast(' ' + data.msg); loadAdminOvertime(); }
     else { showToast(data.msg || '操作失败'); }
   })
   .catch(() => { showToast('网络错误'); });
@@ -5462,11 +5536,11 @@ let wtYear = 0, wtMonth = 0;
 
 // 状态文本与图标
 const WT_STATUS_META = {
-  completed:        { icon: '✓', text: '已完成',   cls: 'completed',       desc: '已正常打卡' },
-  incomplete:       { icon: '🕐', text: '已签到未签退', cls: 'incomplete',  desc: '有签到记录但缺少签退，按2小时估算' },
-  overtime:         { icon: '📝', text: '补报',     cls: 'overtime',        desc: '通过补报覆盖缺勤或额外工作' },
-  'overtime-pending':{icon: '⏳', text: '补报待审', cls: 'overtime-pending', desc: '补报已提交，等待管理员审核' },
-  absent:           { icon: '⚠️', text: '缺勤',     cls: 'absent',          desc: '排班未到且未提交补报' },
+  completed:        { icon: '', text: '已完成',   cls: 'completed',       desc: '已正常打卡' },
+  incomplete:       { icon: '待', text: '已签到未签退', cls: 'incomplete',  desc: '有签到记录但缺少签退，按2小时估算' },
+  overtime:         { icon: '补', text: '补报',     cls: 'overtime',        desc: '通过补报覆盖缺勤或额外工作' },
+  'overtime-pending':{icon: '审', text: '补报待审', cls: 'overtime-pending', desc: '补报已提交，等待管理员审核' },
+  absent:           { icon: '缺', text: '缺勤',     cls: 'absent',          desc: '排班未到且未提交补报' },
   none:             { icon: '—', text: '',         cls: 'none',            desc: '当天无排班' },
 };
 
@@ -5511,15 +5585,15 @@ async function loadWorkTimeClaim() {
     
     // 已提交提示
     if (submission) {
-      html += '<div class="tip-bar" style="background:#e8f5e9;color:#2e7d32;margin-bottom:16px">✅ 你已于 ' + formatSubmittedAt(submission.submittedAt) + ' 提交申报</div>';
+      html += '<div class="tip-bar" style="background:#e8f5e9;color:#2e7d32;margin-bottom:16px"> 你已于 ' + formatSubmittedAt(submission.submittedAt) + ' 提交申报</div>';
     } else {
-      html += '<div class="tip-bar" style="background:#fff8e1;color:#b45309;margin-bottom:16px">💡 请仔细核对每日工时，如有差异点击日期查看详情，或在下方提交申报</div>';
+      html += '<div class="tip-bar" style="background:#fff8e1;color:#b45309;margin-bottom:16px"> 请仔细核对每日工时，如有差异点击日期查看详情，或在下方提交申报</div>';
     }
     
     // 日历视图
     html += '<div class="worktime-calendar">';
     html += '<div class="wt-cal-header">';
-    html += '<div class="wt-cal-title">📅 ' + wtYear + '年' + wtMonth + '月 · 工时日历</div>';
+    html += '<div class="wt-cal-title"> ' + wtYear + '年' + wtMonth + '月 · 工时日历</div>';
     html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
     html += '<div class="wt-cal-legend">';
     html += '<span><i style="background:#c8e6c9"></i>已打卡</span>';
@@ -5529,7 +5603,7 @@ async function loadWorkTimeClaim() {
     html += '<span><i style="background:#ffcdd2"></i>缺勤</span>';
     html += '<span><i style="background:#eef0f3"></i>无排班</span>';
     html += '</div>';
-    html += '<button class="wt-refresh-btn" onclick="loadWorkTimeClaim()" title="刷新数据">🔄 刷新</button>';
+    html += '<button class="wt-refresh-btn" onclick="loadWorkTimeClaim()" title="刷新数据"> 刷新</button>';
     html += '</div></div>';
     html += '<div class="wt-cal-weekdays"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>';
     html += '<div class="wt-cal-grid">';
@@ -5538,7 +5612,7 @@ async function loadWorkTimeClaim() {
     
     // 工时汇总
     const ms = wtWorkData.monthSummary || {};
-    html += '<div class="section-card" style="margin-top:16px"><h3>📊 工时汇总</h3>';
+    html += '<div class="section-card" style="margin-top:16px"><h3> 工时汇总</h3>';
     html += '<div class="wt-summary-grid">';
     html += '<div class="wt-summary-card s-hours"><div class="lbl">月工作时长</div><div class="val">' + (wtWorkData.totalHours || 0).toFixed(1) + '<span style="font-size:13px;font-weight:400"> 小时</span></div><div class="sub">含打卡 + 通过补报</div></div>';
     html += '<div class="wt-summary-card s-pay"><div class="lbl">月劳务报酬</div><div class="val">' + (wtWorkData.totalPay || 0).toFixed(1) + '<span style="font-size:13px;font-weight:400"> 元</span></div><div class="sub">25元/小时</div></div>';
@@ -5549,8 +5623,8 @@ async function loadWorkTimeClaim() {
     html += '</div></div>';
     
     // 个人信息表单（v5.0：表单值在下方预填阶段从 profile 注入）
-    html += '<div class="section-card" style="margin-top:16px"><h3>📝 个人信息确认（已从「我的信息」自动填入）</h3>';
-    html += '<p style="color:#888;font-size:12px;margin-top:4px">💡 如需修改姓名/银行卡号/学号/宿舍/电话，请到侧栏「📋 我的信息」维护，保存后此页下次会自动同步。</p>';
+    html += '<div class="section-card" style="margin-top:16px"><h3> 个人信息确认（已从「我的信息」自动填入）</h3>';
+    html += '<p style="color:#888;font-size:12px;margin-top:4px"> 如需修改姓名/银行卡号/学号/宿舍/电话，请到侧栏「 我的信息」维护，保存后此页下次会自动同步。</p>';
     html += '<div id="wtProfileBanner"></div>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px">';
     html += '<div><label style="font-size:13px;color:#666">姓名</label><input type="text" id="wtName" value="' + currentUser + '" readonly style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;background:#f5f5f5;margin-top:4px"></div>';
@@ -5562,11 +5636,11 @@ async function loadWorkTimeClaim() {
     html += '</div></div>';
 
     // v5.0：账号与通知（邮箱）
-    html += '<div class="section-card" style="margin-top:16px"><h3>📧 账号与邮件通知</h3>'
+    html += '<div class="section-card" style="margin-top:16px"><h3> 账号与邮件通知</h3>'
     html += '<p style="color:#666;font-size:13px;margin-top:4px">填写邮箱后，密码重置 / 排班开启 / 申报开启 / 月度总结 都会自动发到此邮箱。</p>'
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">'
     html += '<div><label style="font-size:13px;color:#666">邮箱</label><input type="email" id="wtEmail" placeholder="例如：zhang@163.com" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px"></div>'
-    html += '<div style="display:flex;align-items:flex-end"><button class="quick-btn quick-btn-primary" onclick="saveMemberEmail()">💾 保存邮箱</button></div>'
+    html += '<div style="display:flex;align-items:flex-end"><button class="quick-btn quick-btn-primary" onclick="saveMemberEmail()"> 保存邮箱</button></div>'
     html += '</div>'
     html += '<div id="wtEmailStatus" style="margin-top:8px;font-size:12px;color:#888">加载中…</div>'
     html += '</div>'
@@ -5574,7 +5648,7 @@ async function loadWorkTimeClaim() {
     // 2026-07-02 新增：例会参会确认
     const meetings = wtWorkData.meetings || []
     if (meetings.length > 0) {
-      html += '<div class="section-card" style="margin-top:16px"><h3>📅 本月例会参会确认</h3>'
+      html += '<div class="section-card" style="margin-top:16px"><h3> 本月例会参会确认</h3>'
       html += '<p style="color:#666;font-size:13px;margin-top:6px">勾选你实际参加的例会，不参会不扣工时（按管理员设定的时长计算）。</p>'
       html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px">'
       meetings.forEach(m => {
@@ -5584,7 +5658,7 @@ async function loadWorkTimeClaim() {
         html += '<input type="checkbox" class="wt-meet-chk" data-week="' + m.week + '" ' + checked + ' style="width:18px;height:18px;accent-color:#22c55e;cursor:pointer">'
         html += '<div style="flex:1">'
         html += '<div style="font-weight:600;font-size:14px">第 ' + m.week + ' 周例会 · ' + m.date + '</div>'
-        html += '<div style="color:#666;font-size:12px;margin-top:2px">时长 ' + m.hours + ' 小时' + (m.attended ? ' · ✅ 已计入' : ' · 未参会不计') + '</div>'
+        html += '<div style="color:#666;font-size:12px;margin-top:2px">时长 ' + m.hours + ' 小时' + (m.attended ? ' · 已计入' : ' · 未参会不计') + '</div>'
         html += '</div></label>'
       })
       html += '</div>'
@@ -5614,9 +5688,9 @@ async function loadWorkTimeClaim() {
         if (!statusEl || !inputEl) return
         if (d.ok && d.email) {
           inputEl.value = d.email
-          statusEl.innerHTML = '<span style="color:#2e7d32">✅ 当前邮箱：' + escapeText(d.email) + '</span>'
+          statusEl.innerHTML = '<span style="color:#2e7d32"> 当前邮箱：' + escapeText(d.email) + '</span>'
         } else {
-          statusEl.innerHTML = '<span style="color:#f59e0b">⚠️ 尚未填写邮箱，请补充（用于接收系统通知）</span>'
+          statusEl.innerHTML = '<span style="color:#f59e0b"> 尚未填写邮箱，请补充（用于接收系统通知）</span>'
         }
       })
       .catch(() => {
@@ -5642,7 +5716,7 @@ async function loadWorkTimeClaim() {
         if (!p.phone) missing.push('联系电话')
         const banner = document.getElementById('wtProfileBanner')
         if (banner && missing.length > 0) {
-          banner.innerHTML = '<div style="margin-top:10px;padding:12px 16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:6px;color:#92400e;font-size:13px">⚠️ 你的个人信息还没填完整（缺：' + missing.join('、') + '）。请到侧栏「📋 我的信息」完善，本页表格会自动填入。</div>'
+          banner.innerHTML = '<div style="margin-top:10px;padding:12px 16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:6px;color:#92400e;font-size:13px"> 你的个人信息还没填完整（缺：' + missing.join('、') + '）。请到侧栏「 我的信息」完善，本页表格会自动填入。</div>'
         }
       })
       .catch(() => {})
@@ -5659,7 +5733,7 @@ async function saveMemberEmail() {
   if (!input || !status) return
   const email = input.value.trim()
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    status.innerHTML = '<span style="color:#c41230">❌ 邮箱格式不正确</span>'
+    status.innerHTML = '<span style="color:#c41230"> 邮箱格式不正确</span>'
     return
   }
   try {
@@ -5670,13 +5744,13 @@ async function saveMemberEmail() {
     })
     const data = await res.json()
     if (data.ok) {
-      status.innerHTML = '<span style="color:#2e7d32">✅ ' + (email ? '邮箱已保存：' + escapeText(email) : '邮箱已清空') + '</span>'
-      showToast('✅ 邮箱已保存')
+      status.innerHTML = '<span style="color:#2e7d32"> ' + (email ? '邮箱已保存：' + escapeText(email) : '邮箱已清空') + '</span>'
+      showToast(' 邮箱已保存')
     } else {
-      status.innerHTML = '<span style="color:#c41230">❌ ' + escapeText(data.msg || '保存失败') + '</span>'
+      status.innerHTML = '<span style="color:#c41230"> ' + escapeText(data.msg || '保存失败') + '</span>'
     }
   } catch (e) {
-    status.innerHTML = '<span style="color:#c41230">❌ 网络错误</span>'
+    status.innerHTML = '<span style="color:#c41230"> 网络错误</span>'
   }
 }
 
@@ -5705,7 +5779,7 @@ async function loadMyProfile() {
     let html = ''
     if (isIncomplete) {
       html += '<div style="padding:14px 18px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;margin-bottom:18px;color:#92400e">'
-      html += '⚠️ <b>首次使用请先完善个人信息</b>（' + missing.join('、') + ' 还没填）。完善后，每月工时申报会自动填入，无需手动输入。'
+      html += ' <b>首次使用请先完善个人信息</b>（' + missing.join('、') + ' 还没填）。完善后，每月工时申报会自动填入，无需手动输入。'
       html += '</div>'
     }
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'
@@ -5717,11 +5791,11 @@ async function loadMyProfile() {
     html += profileField('宿舍', p.dorm || '', false)
     html += profileField('联系电话', p.phone || '', false, 'tel')
     html += '</div>'
-    html += '<div style="margin-top:18px;text-align:center"><button class="quick-btn quick-btn-primary" style="padding:12px 36px;font-size:15px" onclick="saveMyProfile()">💾 保存全部信息</button></div>'
+    html += '<div style="margin-top:18px;text-align:center"><button class="quick-btn quick-btn-primary" style="padding:12px 36px;font-size:15px" onclick="saveMyProfile()"> 保存全部信息</button></div>'
     html += '<div id="profileStatus" style="margin-top:10px;text-align:center;font-size:13px;color:#888"></div>'
     contentEl.innerHTML = html
   } catch (e) {
-    contentEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:20px;text-align:center">⚠️ 加载失败：' + escapeText(e.message || '网络错误') + '</p>'
+    contentEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:20px;text-align:center"> 加载失败：' + escapeText(e.message || '网络错误') + '</p>'
   }
 }
 
@@ -5746,11 +5820,11 @@ async function saveMyProfile() {
     phone:       v('联系电话').trim(),
   }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    status.innerHTML = '<span style="color:#c41230">❌ 邮箱格式不正确</span>'
+    status.innerHTML = '<span style="color:#c41230"> 邮箱格式不正确</span>'
     return
   }
   if (!profile.bankAccount || !profile.studentId || !profile.phone) {
-    status.innerHTML = '<span style="color:#c41230">❌ 银行账号 / 学号 / 联系电话为必填</span>'
+    status.innerHTML = '<span style="color:#c41230"> 银行账号 / 学号 / 联系电话为必填</span>'
     return
   }
   status.innerHTML = '<span style="color:#888">保存中…</span>'
@@ -5769,13 +5843,13 @@ async function saveMyProfile() {
     const pData = await pRes.json()
     const eData = await eRes.json()
     if (pData.ok && eData.ok) {
-      status.innerHTML = '<span style="color:#2e7d32">✅ 已保存。工时申报页会自动填入。</span>'
-      showToast('✅ 个人信息已保存')
+      status.innerHTML = '<span style="color:#2e7d32"> 已保存。工时申报页会自动填入。</span>'
+      showToast(' 个人信息已保存')
     } else {
-      status.innerHTML = '<span style="color:#c41230">❌ ' + escapeText((pData.msg || eData.msg || '保存失败')) + '</span>'
+      status.innerHTML = '<span style="color:#c41230"> ' + escapeText((pData.msg || eData.msg || '保存失败')) + '</span>'
     }
   } catch (e) {
-    status.innerHTML = '<span style="color:#c41230">❌ 网络错误</span>'
+    status.innerHTML = '<span style="color:#c41230"> 网络错误</span>'
   }
 }
 
@@ -5789,7 +5863,7 @@ async function sendMonthlySummary(name) {
     const isAll = name === 'all'
     if (isAll && !confirm('确认要给所有成员（已登记邮箱的）发送 ' + wtc.year + ' 年 ' + wtc.month + ' 月的工时总结邮件吗？')) return
 
-    showToast('📧 正在发送…（请稍候）')
+    showToast(' 正在发送…（请稍候）')
     const res = await fetch(API + '/admin/email/monthly-summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5798,24 +5872,24 @@ async function sendMonthlySummary(name) {
     const data = await res.json()
     if (data.ok) {
       if (data.stoppedReason) {
-        showToast('❌ ' + data.stoppedReason, 5200)
+        showToast(' ' + data.stoppedReason, 5200)
         loadAdminEmail()
         return
       }
       if ((data.sentCount || 0) === 0 && (data.failCount || 0) > 0) {
         const firstError = (data.results || []).find(r => r && r.error)
-        showToast('❌ 发送失败：' + escapeText((firstError && firstError.error) || '请查看发送日志'), 5200)
+        showToast(' 发送失败：' + escapeText((firstError && firstError.error) || '请查看发送日志'), 5200)
         loadAdminEmail()
         return
       }
       const f = data.failCount > 0 ? '（' + data.failCount + ' 失败）' : ''
-      showToast('✅ ' + (isAll ? '全发完成' : '已发送') + '：成功 ' + data.sentCount + ' 封' + f)
+      showToast(' ' + (isAll ? '全发完成' : '已发送') + '：成功 ' + data.sentCount + ' 封' + f)
       loadAdminEmail()
     } else {
-      showToast('❌ ' + (data.msg || '发送失败'))
+      showToast(' ' + (data.msg || '发送失败'))
     }
   } catch (e) {
-    showToast('❌ 网络错误')
+    showToast(' 网络错误')
   }
 }
 
@@ -5834,7 +5908,7 @@ async function loadAdminEmailLogs() {
     let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f8f9fa;position:sticky;top:0"><th style="padding:6px 10px;text-align:left">时间</th><th style="padding:6px 10px;text-align:left">收件人</th><th style="padding:6px 10px;text-align:left">主题</th><th style="padding:6px 10px;text-align:center;width:80px">状态</th></tr></thead><tbody>';
     logs.slice(0, 50).forEach(l => {
       const okBg = l.status === 'ok' ? '#d1fae5' : l.status === 'fail' ? '#fee2e2' : '#fef9c3';
-      const okTxt = l.status === 'ok' ? '✅ 成功' : l.status === 'fail' ? '❌ 失败' : '⏳ 发送中';
+      const okTxt = l.status === 'ok' ? '成功' : l.status === 'fail' ? '失败' : '发送中';
       html += '<tr style="border-bottom:1px solid #f0f0f0">';
       html += '<td style="padding:6px 10px;color:#666">' + escapeText(l.at || '') + '</td>';
       html += '<td style="padding:6px 10px">' + escapeText(l.to || '') + '</td>';
@@ -5924,16 +5998,16 @@ async function adminSaveMemberEmail(name) {
   const input = document.getElementById('memail_' + name)
   if (!input) return
   const email = input.value.trim()
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('❌ ' + name + ' 邮箱格式不正确'); return }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast(' ' + name + ' 邮箱格式不正确'); return }
   try {
     const res = await fetch(API + '/member/email', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email })
     })
     const d = await res.json()
-    if (d.ok) showToast('✅ 已保存 ' + name + (email ? '：' + email : '（清空）'))
-    else showToast('❌ ' + (d.msg || '失败'))
-  } catch (e) { showToast('❌ 网络错误') }
+    if (d.ok) showToast(' 已保存 ' + name + (email ? '：' + email : '（清空）'))
+    else showToast(' ' + (d.msg || '失败'))
+  } catch (e) { showToast(' 网络错误') }
 }
 
 async function adminSendTestEmail() {
@@ -5948,10 +6022,10 @@ async function adminSendTestEmail() {
       body: JSON.stringify({ to })
     })
     const data = await res.json()
-    if (data.ok) result.innerHTML = '<span style="color:#2e7d32">✅ 发送成功！messageId=' + escapeText(data.info && data.info.messageId || '') + '</span>'
-    else result.innerHTML = '<span style="color:#c41230">❌ ' + escapeText(data.error || '失败') + '</span>'
+    if (data.ok) result.innerHTML = '<span style="color:#2e7d32"> 发送成功！messageId=' + escapeText(data.info && data.info.messageId || '') + '</span>'
+    else result.innerHTML = '<span style="color:#c41230"> ' + escapeText(data.error || '失败') + '</span>'
   } catch (e) {
-    result.innerHTML = '<span style="color:#c41230">❌ 网络错误</span>'
+    result.innerHTML = '<span style="color:#c41230"> 网络错误</span>'
   }
 }
 
@@ -5969,7 +6043,7 @@ async function loadMyAchievements() {
     list.sort((a, b) => (b.year - a.year) || (b.month - a.month))
 
     if (list.length === 0) {
-      contentEl.innerHTML = '<div style="text-align:center;padding:60px 20px;background:#fafafa;border-radius:12px"><div style="font-size:48px;margin-bottom:12px">🌱</div><div style="font-size:16px;color:#666;margin-bottom:8px">荣誉墙还空空的呢</div><div style="color:#888;font-size:13px">完成更多排班，参加例会，下次再见就有勋章啦 ✨</div></div>'
+      contentEl.innerHTML = '<div style="text-align:center;padding:60px 20px;background:#fafafa;border-radius:12px"><div style="font-size:48px;margin-bottom:12px"></div><div style="font-size:16px;color:#666;margin-bottom:8px">荣誉墙还空空的呢</div><div style="color:#888;font-size:13px">完成更多排班，参加例会，下次再见就有勋章啦 </div></div>'
       return
     }
     // 按月份分组
@@ -5983,7 +6057,7 @@ async function loadMyAchievements() {
     Object.keys(groups).forEach(monthLabel => {
       const items = groups[monthLabel]
       html += '<div style="margin-bottom:24px">'
-      html += '<h3 style="color:#8B1A1A;font-size:16px;margin-bottom:12px">📅 ' + monthLabel + '</h3>'
+      html += '<h3 style="color:#8B1A1A;font-size:16px;margin-bottom:12px"> ' + monthLabel + '</h3>'
       html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">'
       items.forEach(a => {
         html += '<div style="padding:18px;background:linear-gradient(135deg,#faf6ff,#fce7f3);border:1px solid #e9d5ff;border-radius:12px;text-align:center">'
@@ -5997,7 +6071,7 @@ async function loadMyAchievements() {
     html += '<div style="text-align:center;padding:16px;color:#999;font-size:13px;border-top:1px solid #eef0f3;margin-top:12px">共 ' + list.length + ' 项荣誉 · ' + Object.keys(groups).length + ' 个月</div>'
     contentEl.innerHTML = html
   } catch (e) {
-    contentEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:20px;text-align:center">⚠️ 加载失败：' + escapeText(e.message || '未知错误') + '</p>'
+    contentEl.innerHTML = '<p style="color:#c41230;font-size:13px;padding:20px;text-align:center"> 加载失败：' + escapeText(e.message || '未知错误') + '</p>'
   }
 }
 
@@ -6095,7 +6169,7 @@ function showWtDayDetail(dateStr) {
   if (day.pendingOvertimes && day.pendingOvertimes.length > 0) {
     day.pendingOvertimes.forEach(ot => {
       rows += `<div class="wt-modal-row">
-        <div class="label">⏳ 待审补报</div>
+        <div class="label">待审补报</div>
         <div class="value">${ot.hours}小时<div class="ot-content">${escapeHtml(ot.content)}</div></div>
       </div>`;
     });
@@ -6116,10 +6190,10 @@ function showWtDayDetail(dateStr) {
   let actions = '';
   const closeBtn = `<button class="btn-secondary" onclick="hideWtDayDetail()">关闭</button>`;
   if (day.status === 'absent') {
-    actions = `<button class="btn-warn" onclick="hideWtDayDetail();wtGoOvertime('${dateStr}')">📝 去补报工时</button>` + closeBtn;
+    actions = `<button class="btn-warn" onclick="hideWtDayDetail();wtGoOvertime('${dateStr}')"> 去补报工时</button>` + closeBtn;
   } else if (day.status === 'incomplete') {
     // 已签到未签退：提醒去补签退（在打卡页）
-    actions = `<button class="btn-primary" onclick="hideWtDayDetail();wtGoCheckin('${dateStr}')">📍 去补签退</button>` + closeBtn;
+    actions = `<button class="btn-primary" onclick="hideWtDayDetail();wtGoCheckin('${dateStr}')"> 去补签退</button>` + closeBtn;
   } else {
     actions = closeBtn;
   }
@@ -6190,7 +6264,7 @@ async function submitWorkTimeClaim() {
     });
     const data = await res.json();
     if (data.ok) {
-      showToast('✅ 申报提交成功');
+      showToast(' 申报提交成功');
       loadWorkTimeClaim();
     } else {
       showToast(data.msg || '提交失败');
@@ -6232,10 +6306,10 @@ async function showAdminMemberDetail(name) {
     
     const ms = data.workData?.monthSummary || {};
     sumEl.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
-      '<span style="padding:3px 8px;background:#e8f5e9;color:#2e7d32;border-radius:4px;font-size:12px">✓ 已完成 ' + (ms.completedDays || 0) + ' 天</span>' +
-      '<span style="padding:3px 8px;background:#e3f2fd;color:#1565c0;border-radius:4px;font-size:12px">🕐 签到未签退 ' + (ms.incompleteDays || 0) + ' 天</span>' +
-      '<span style="padding:3px 8px;background:#fff8e1;color:#b45309;border-radius:4px;font-size:12px">📝 仅补报 ' + (ms.overtimeDays || 0) + ' 天</span>' +
-      '<span style="padding:3px 8px;background:#ffebee;color:#c41230;border-radius:4px;font-size:12px">⚠️ 缺勤 ' + (ms.absentDays || 0) + ' 天</span>' +
+      '<span style="padding:3px 8px;background:#e8f5e9;color:#2e7d32;border-radius:4px;font-size:12px"> 已完成 ' + (ms.completedDays || 0) + ' 天</span>' +
+      '<span style="padding:3px 8px;background:#e3f2fd;color:#1565c0;border-radius:4px;font-size:12px"> 签到未签退 ' + (ms.incompleteDays || 0) + ' 天</span>' +
+      '<span style="padding:3px 8px;background:#fff8e1;color:#b45309;border-radius:4px;font-size:12px"> 仅补报 ' + (ms.overtimeDays || 0) + ' 天</span>' +
+      '<span style="padding:3px 8px;background:#ffebee;color:#c41230;border-radius:4px;font-size:12px"> 缺勤 ' + (ms.absentDays || 0) + ' 天</span>' +
       '</div>';
 
     // 2026-07-02 新增：例会参会区块
@@ -6245,12 +6319,12 @@ async function showAdminMemberDetail(name) {
       const unattendedList = meetings.filter(m => !m.attended);
       const meetingHoursSum = attendedList.reduce((s, m) => s + (m.hours || 0), 0);
       let meetHtml = '<div style="margin-top:10px;padding:10px 12px;background:#faf6ff;border:1px solid #e9d5ff;border-radius:8px">';
-      meetHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-weight:600;color:#7c3aed">📅 本月例会参会</span>';
+      meetHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-weight:600;color:#7c3aed"> 本月例会参会</span>';
       meetHtml += '<span style="font-size:12px;color:#666">已勾 ' + attendedList.length + ' / ' + meetings.length + ' 次 · 参会工时 <b style="color:#7c3aed">' + meetingHoursSum.toFixed(1) + 'h</b></span></div>';
       meetHtml += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
       meetings.forEach(m => {
         const tag = m.attended
-          ? '<span style="background:#dcfce7;color:#166534;border:1px solid #86efac">✅ 第 ' + m.week + ' 周 ' + m.date + ' · ' + m.hours + 'h</span>'
+          ? '<span style="background:#dcfce7;color:#166534;border:1px solid #86efac"> 第 ' + m.week + ' 周 ' + m.date + ' · ' + m.hours + 'h</span>'
           : '<span style="background:#f5f5f5;color:#888;border:1px solid #e5e7eb">○ 第 ' + m.week + ' 周 ' + m.date + ' · ' + m.hours + 'h（未参会）</span>';
         meetHtml += '<span style="padding:3px 10px;border-radius:12px;font-size:12px">' + tag + '</span>';
       });
@@ -6262,7 +6336,7 @@ async function showAdminMemberDetail(name) {
     // 只列出有工时或有排班的天（避免 30 行空白）
     const interesting = daily.filter(d => d.totalHours > 0 || d.scheduled.length > 0 || d.approvedOvertimes.length > 0 || d.pendingOvertimes.length > 0);
     
-    const STATUS_LABEL = { completed: '✓ 已完成', incomplete: '🕐 签到未签退', overtime: '📝 仅补报', 'overtime-pending': '⏳ 补报待审', absent: '⚠️ 缺勤', none: '— 无排班' };
+    const STATUS_LABEL = { completed: '已完成', incomplete: '签到未签退', overtime: '仅补报', 'overtime-pending': '补报待审', absent: '缺勤', none: '— 无排班' };
     const STATUS_COLOR = { completed: '#2e7d32', incomplete: '#1565c0', overtime: '#b45309', 'overtime-pending': '#ef6c00', absent: '#c41230', none: '#888' };
     
     let html = '<div style="max-height:60vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px">';
@@ -6294,12 +6368,12 @@ async function showAdminMemberDetail(name) {
         let otStr = '';
         if (d.approvedOvertimes && d.approvedOvertimes.length > 0) {
           otStr += d.approvedOvertimes.map(ot =>
-            '<div style="margin-bottom:4px"><span style="color:#2e7d32">✅ ' + ot.hours + 'h</span> · ' + escapeHtml(ot.content || '(无内容)') + '</div>'
+            '<div style="margin-bottom:4px"><span style="color:#2e7d32"> ' + ot.hours + 'h</span> · ' + escapeHtml(ot.content || '(无内容)') + '</div>'
           ).join('');
         }
         if (d.pendingOvertimes && d.pendingOvertimes.length > 0) {
           otStr += d.pendingOvertimes.map(ot =>
-            '<div style="margin-bottom:4px"><span style="color:#ef6c00">⏳ ' + ot.hours + 'h</span> · ' + escapeHtml(ot.content || '(无内容)') + '</div>'
+            '<div style="margin-bottom:4px"><span style="color:#ef6c00">待审 ' + ot.hours + 'h</span> · ' + escapeHtml(ot.content || '(无内容)') + '</div>'
           ).join('');
         }
         
@@ -6315,11 +6389,11 @@ async function showAdminMemberDetail(name) {
     
     html += '</tbody></table></div>';
     html += '<div style="margin-top:8px;padding:8px 12px;background:#fafafa;border-radius:6px;font-size:12px;color:#666">';
-    html += '💡 提示：如果工时偏高，请检查 1) 重复打卡 2) 跨天签退配对 3) 补报小时数 是否异常';
+    html += '提示：如果工时偏高，请检查 1) 重复打卡 2) 跨天签退配对 3) 补报小时数 是否异常';
     html += '</div>';
     dailyEl.innerHTML = html;
   } catch (e) {
-    dailyEl.innerHTML = '<div style="padding:30px;text-align:center;color:#c41230">⚠️ 加载失败：' + escapeHtml(e.message || '未知错误') + '</div>';
+    dailyEl.innerHTML = '<div style="padding:30px;text-align:center;color:#c41230"> 加载失败：' + escapeHtml(e.message || '未知错误') + '</div>';
   }
 }
 
@@ -6344,7 +6418,7 @@ async function loadAdminWorktime() {
     let html = '';
     
     // 开启/关闭申报控制
-    html += '<div class="section-card"><h3>⚙️ 申报设置</h3>';
+    html += '<div class="section-card"><h3> 申报设置</h3>';
     html += '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">';
     
     if (wtc.isOpen) {
@@ -6360,16 +6434,16 @@ async function loadAdminWorktime() {
 
     // v5.0：邮件工具栏
     if (wtc.year && wtc.month) {
-      html += '<div class="section-card" style="margin-top:16px;background:linear-gradient(135deg,#faf6ff,#fce7f3)"><h3>📧 月度总结邮件</h3>'
+      html += '<div class="section-card" style="margin-top:16px;background:linear-gradient(135deg,#faf6ff,#fce7f3)"><h3> 月度总结邮件</h3>'
       html += '<p style="color:#666;font-size:13px;margin-top:6px">每月申报结束后，给已申报成员自动发送当月工时与荣誉总结。可逐位发也可一键全发。</p>'
       html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
-      html += '<button class="quick-btn quick-btn-primary" onclick="sendMonthlySummary(\'all\')">🚀 一键全发（含荣誉）</button>'
+      html += '<button class="quick-btn quick-btn-primary" onclick="sendMonthlySummary(\'all\')"> 一键全发（含荣誉）</button>'
       html += '<span style="color:#888;font-size:12px;align-self:center">目标月份：<b>' + wtc.year + ' 年 ' + wtc.month + ' 月</b></span>'
       html += '</div></div>'
     }
 
     // 成员申报统计表
-    html += '<div class="section-card" style="margin-top:16px"><h3>📋 成员申报统计</h3>';
+    html += '<div class="section-card" style="margin-top:16px"><h3> 成员申报统计</h3>';
     
     const allRes = await fetch(API + '/admin/worktime-claim/all');
     const allData = await allRes.json();
@@ -6392,14 +6466,14 @@ async function loadAdminWorktime() {
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + safeName + '</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalHours || 0).toFixed(1) + ' 小时</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.totalPay || 0).toFixed(1) + ' 元</td>';
-        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submitted ? '<span style="color:#2e7d32">✅ 已提交</span>' : '<span style="color:#999">⏳ 未提交</span>') + '</td>';
+        html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + (s.submitted ? '<span style="color:#2e7d32">已提交</span>' : '<span style="color:#999">未提交</span>') + '</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0">' + formatSubmittedAt(s.submittedAt) + '</td>';
         html += '<td style="padding:10px;border-bottom:1px solid #e2e8f0;white-space:nowrap">';
         // 查看明细：显示该成员每日工时/补报内容（用于排查统计异常）
-        html += '<button class="quick-btn" style="background:#5C6BC0;color:#fff;padding:4px 10px;font-size:12px;margin-right:6px" onclick="showAdminMemberDetail(\'' + safeName + '\')">🔍 查看明细</button>';
+        html += '<button class="quick-btn" style="background:#5C6BC0;color:#fff;padding:4px 10px;font-size:12px;margin-right:6px" onclick="showAdminMemberDetail(\'' + safeName + '\')"> 查看明细</button>';
         if (s.submitted) {
-          html += '<button class="quick-btn quick-btn-primary" onclick="exportAttendanceDocx(\'' + safeName + '\')" style="padding:4px 12px;font-size:12px;margin-right:6px">📄 导出考勤表</button>';
-          html += '<button class="quick-btn" style="background:#8b5cf6;color:#fff;padding:4px 12px;font-size:12px" onclick="sendMonthlySummary(\'' + safeName + '\')">📧 发月度总结</button>';
+          html += '<button class="quick-btn quick-btn-primary" onclick="exportAttendanceDocx(\'' + safeName + '\')" style="padding:4px 12px;font-size:12px;margin-right:6px"> 导出考勤表</button>';
+          html += '<button class="quick-btn" style="background:#8b5cf6;color:#fff;padding:4px 12px;font-size:12px" onclick="sendMonthlySummary(\'' + safeName + '\')"> 发月度总结</button>';
         }
         html += '</td>';
         html += '</tr>';
@@ -6415,7 +6489,7 @@ async function loadAdminWorktime() {
       html += '已提交：' + submittedCount + '/' + allData.submissions.length + ' 人　｜　总工时：' + totalHours.toFixed(1) + ' 小时　｜　总报酬：' + totalPay.toFixed(1) + ' 元';
       html += '</div>';
     } else {
-      html += '<div style="text-align:center;padding:30px"><div style="font-size:40px;margin-bottom:10px">📊</div><p style="color:#999;font-size:14px">暂无成员数据</p><p style="color:#bbb;font-size:12px;margin-top:4px">请先开启工时申报并通知成员提交</p></div>';
+      html += '<div style="text-align:center;padding:30px"><div style="font-size:40px;margin-bottom:10px"></div><p style="color:#999;font-size:14px">暂无成员数据</p><p style="color:#bbb;font-size:12px;margin-top:4px">请先开启工时申报并通知成员提交</p></div>';
     }
     
     html += '</div>';
@@ -6423,7 +6497,7 @@ async function loadAdminWorktime() {
     content.innerHTML = html;
   } catch (e) {
     console.error('loadAdminWorktime error:', e);
-    content.innerHTML = '<div style="text-align:center;padding:30px"><p style="color:#c41230;font-size:14px;margin-bottom:8px">⚠️ 加载失败</p><p style="color:#999;font-size:12px">' + (e.message || '未知错误') + '</p><button class="quick-btn quick-btn-primary" style="margin-top:12px" onclick="loadAdminWorktime()">重试</button></div>';
+    content.innerHTML = '<div style="text-align:center;padding:30px"><p style="color:#c41230;font-size:14px;margin-bottom:8px"> 加载失败</p><p style="color:#999;font-size:12px">' + (e.message || '未知错误') + '</p><button class="quick-btn quick-btn-primary" style="margin-top:12px" onclick="loadAdminWorktime()">重试</button></div>';
   }
 }
 
@@ -6447,7 +6521,7 @@ async function toggleWorkTimeClaim(isOpen) {
     });
     const data = await res.json();
     if (data.ok) {
-      showToast(isOpen ? '✅ 已开启申报' : '已关闭申报');
+      showToast(isOpen ? ' 已开启申报' : '已关闭申报');
       loadAdminWorktime();
     } else {
       showToast(data.msg || '操作失败');
@@ -6502,11 +6576,11 @@ function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
 // 状态映射（颜色 + 文字）
 const SHIFT_STATUS_META = {
-  completed:      { color: '#d4edda', text: '#155724', label: '✓ 已完成' },
-  in_progress:    { color: '#cce5ff', text: '#004085', label: '⏱ 进行中' },
-  supp_completed: { color: '#fff0d6', text: '#8a5a00', label: '📝 补签'   },
-  today:          { color: '#fff3cd', text: '#856404', label: '📅 今日'   },
-  missed:         { color: '#f8d7da', text: '#721c24', label: '✗ 缺勤'   },
+  completed:      { color: '#d4edda', text: '#155724', label: ' 已完成' },
+  in_progress:    { color: '#cce5ff', text: '#004085', label: '进行中' },
+  supp_completed: { color: '#fff0d6', text: '#8a5a00', label: ' 补签'   },
+  today:          { color: '#fff3cd', text: '#856404', label: ' 今日'   },
+  missed:         { color: '#f8d7da', text: '#721c24', label: ' 缺勤'   },
   pending:        { color: '#e2e3e5', text: '#383d41', label: '⌛ 未到'   }
 };
 
@@ -6536,7 +6610,7 @@ async function loadAdminMeetings(monthDelta) {
     renderAdminMeetingsRows(data.weeks || [])
   } catch (e) {
     console.error('loadAdminMeetings error:', e)
-    listEl.innerHTML = '<p style="color:#c41230;padding:16px;text-align:center">⚠️ 加载失败: ' + (e.message || '网络错误') + '</p>'
+    listEl.innerHTML = '<p style="color:#c41230;padding:16px;text-align:center"> 加载失败: ' + (e.message || '网络错误') + '</p>'
   }
 }
 
@@ -6617,7 +6691,7 @@ async function saveAdminMeetings() {
     })
     const data = await res.json()
     if (data.ok) {
-      showToast('✅ 例会设置已保存（' + data.weeks.length + ' 条）')
+      showToast(' 例会设置已保存（' + data.weeks.length + ' 条）')
       renderAdminMeetingsRows(data.weeks)
     } else {
       showToast(data.msg || '保存失败')
@@ -6709,7 +6783,7 @@ async function saveAdminHolidays() {
     if (!data.ok) throw new Error(data.msg || '保存失败');
     _adminHolidaySettings = data.settings || _adminHolidaySettings;
     renderAdminHolidays();
-    showToast('✅ 节假日调休设置已保存');
+    showToast(' 节假日调休设置已保存');
   } catch (e) {
     showToast(e.message || '保存失败');
   }
@@ -6742,7 +6816,7 @@ async function loadAdminMonthly(monthDelta) {
   } catch (e) {
     console.error('loadAdminMonthly error:', e);
     const table = document.getElementById('adminMonthlyTable');
-    if (table) table.innerHTML = '<p style="color:#c41230;font-size:13px;padding:16px 0;text-align:center">⚠️ 加载失败：' + (e.message || '网络错误') + '</p>';
+    if (table) table.innerHTML = '<p style="color:#c41230;font-size:13px;padding:16px 0;text-align:center"> 加载失败：' + (e.message || '网络错误') + '</p>';
   }
 }
 
@@ -6760,7 +6834,7 @@ function renderAdminMonthly(data) {
       const sourceText = data.period.source === 'schedule' ? '已与排班周期取交集' : '按自然月';
       period.innerHTML = '排班周期：' + s + ' ~ ' + e + '（' + sourceText + '）';
     } else {
-      period.innerHTML = '⚠️ 当前没有已确认的排班周期，按自然月统计';
+      period.innerHTML = ' 当前没有已确认的排班周期，按自然月统计';
     }
   }
 
@@ -6794,7 +6868,7 @@ function renderAdminMonthly(data) {
   const members = data.members || [];
   if (members.length === 0 || totals.total === 0) {
     tableEl.innerHTML = '<div style="text-align:center;padding:40px 20px">'
-      + '<div style="font-size:48px;margin-bottom:12px">📅</div>'
+      + '<div style="font-size:48px;margin-bottom:12px"></div>'
       + '<p style="color:#999;font-size:14px;margin-bottom:6px">' + data.year + '年' + data.month + '月暂无排班数据</p>'
       + '<p style="color:#bbb;font-size:12px">请确认排班表已设置或选择其他月份</p>'
       + '</div>';
