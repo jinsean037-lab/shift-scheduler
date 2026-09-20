@@ -1771,6 +1771,9 @@ body {
           <a class="nav-subitem" data-page="admin-meetings" onclick="switchTab('admin-meetings')">
             <span>📅 例会设置</span>
           </a>
+          <a class="nav-subitem" data-page="admin-holidays" onclick="switchTab('admin-holidays')">
+            <span>🏖️ 节假日调休</span>
+          </a>
           <a class="nav-subitem" data-page="admin-email" onclick="switchTab('admin-email')">
             <span>📧 邮件配置</span>
           </a>
@@ -2310,6 +2313,42 @@ body {
         </div>
       </div>
 
+      <!-- 管理子页面：节假日调休 -->
+      <div class="page-view" id="adminHolidaysView">
+        <div class="page-title-row">
+          <h2>🏖️ 节假日调休</h2>
+          <p class="page-subtitle">设置无需值班的休假日期，或把某个日期临时按周一至周五的班表执行。</p>
+        </div>
+        <div class="admin-section">
+          <h3>休假日期</h3>
+          <p style="color:#666;font-size:13px;margin-bottom:10px">当天成员端会显示“今日休假”，不生成值班班次，也不会发送打卡提醒。</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="date" id="holidayDateInput" style="padding:8px;border:1px solid #d4d4d8;border-radius:6px">
+            <button class="admin-btn" onclick="addHolidayDate()">添加休假</button>
+          </div>
+          <div id="holidayDatesList" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"></div>
+        </div>
+        <div class="admin-section">
+          <h3>调休上班</h3>
+          <p style="color:#666;font-size:13px;margin-bottom:10px">例如周日补周五的班，就选择该周日，并设为“按周五排班”。</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="date" id="makeupDateInput" style="padding:8px;border:1px solid #d4d4d8;border-radius:6px">
+            <select id="makeupWeekdaySelect" style="padding:8px;border:1px solid #d4d4d8;border-radius:6px">
+              <option value="周一">按周一排班</option>
+              <option value="周二">按周二排班</option>
+              <option value="周三">按周三排班</option>
+              <option value="周四">按周四排班</option>
+              <option value="周五">按周五排班</option>
+            </select>
+            <button class="admin-btn" onclick="addMakeupDate()">添加调休</button>
+          </div>
+          <div id="makeupDatesList" style="margin-top:12px"></div>
+        </div>
+        <div class="admin-section">
+          <button class="admin-btn primary" onclick="saveAdminHolidays()">💾 保存节假日设置</button>
+        </div>
+      </div>
+
       <!-- 管理子页面：邮件配置 v5.0 -->
       <div class="page-view" id="adminEmailView">
         <div class="page-title-row">
@@ -2571,6 +2610,10 @@ function switchTab(tab) {
     document.getElementById('adminMeetingsView').classList.add('active');
     highlightAdminSub('admin-meetings');
     loadAdminMeetings();
+  } else if (tab === 'admin-holidays') {
+    document.getElementById('adminHolidaysView').classList.add('active');
+    highlightAdminSub('admin-holidays');
+    loadAdminHolidays();
   } else if (tab === 'admin-email') {
     document.getElementById('adminEmailView').classList.add('active');
     highlightAdminSub('admin-email');
@@ -6542,6 +6585,94 @@ async function saveAdminMeetings() {
     }
   } catch (e) {
     showToast('网络错误')
+  }
+}
+
+// ========== 管理员：节假日调休 ==========
+let _adminHolidaySettings = { noShiftDates: [], workdayOverrides: {} };
+
+async function loadAdminHolidays() {
+  const holidayList = document.getElementById('holidayDatesList');
+  const makeupList = document.getElementById('makeupDatesList');
+  if (holidayList) holidayList.innerHTML = '<span style="color:#999;font-size:13px">加载中…</span>';
+  if (makeupList) makeupList.innerHTML = '<span style="color:#999;font-size:13px">加载中…</span>';
+  try {
+    const res = await fetch(API + '/admin/holiday-settings');
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.msg || '加载失败');
+    _adminHolidaySettings = data.settings || { noShiftDates: [], workdayOverrides: {} };
+    renderAdminHolidays();
+  } catch (e) {
+    if (holidayList) holidayList.innerHTML = '<span style="color:#c41230;font-size:13px">加载失败，请刷新重试</span>';
+    if (makeupList) makeupList.innerHTML = '';
+  }
+}
+
+function renderAdminHolidays() {
+  const holidayList = document.getElementById('holidayDatesList');
+  const makeupList = document.getElementById('makeupDatesList');
+  const noShiftDates = (_adminHolidaySettings.noShiftDates || []).slice().sort();
+  const workdayOverrides = _adminHolidaySettings.workdayOverrides || {};
+  if (holidayList) {
+    holidayList.innerHTML = noShiftDates.length
+      ? noShiftDates.map(d => '<span style="display:inline-flex;gap:6px;align-items:center;background:#fef3c7;color:#92400e;padding:6px 10px;border-radius:999px;font-size:13px">' + d + '<button onclick="removeHolidayDate(\'' + d + '\')" style="border:none;background:transparent;color:#92400e;cursor:pointer">×</button></span>').join('')
+      : '<span style="color:#999;font-size:13px">暂无休假日期</span>';
+  }
+  if (makeupList) {
+    const rows = Object.keys(workdayOverrides).sort();
+    makeupList.innerHTML = rows.length
+      ? rows.map(d => '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;background:#fff"><span><b>' + d + '</b> 按 <b>' + workdayOverrides[d] + '</b> 排班</span><button onclick="removeMakeupDate(\'' + d + '\')" style="border:none;background:#fee2e2;color:#dc2626;padding:5px 10px;border-radius:6px;cursor:pointer">删除</button></div>').join('')
+      : '<span style="color:#999;font-size:13px">暂无调休上班日期</span>';
+  }
+}
+
+function addHolidayDate() {
+  const input = document.getElementById('holidayDateInput');
+  const date = input && input.value;
+  if (!date) { showToast('请选择休假日期'); return; }
+  _adminHolidaySettings.noShiftDates = Array.from(new Set([ ...(_adminHolidaySettings.noShiftDates || []), date ])).sort();
+  if (_adminHolidaySettings.workdayOverrides) delete _adminHolidaySettings.workdayOverrides[date];
+  if (input) input.value = '';
+  renderAdminHolidays();
+}
+
+function removeHolidayDate(date) {
+  _adminHolidaySettings.noShiftDates = (_adminHolidaySettings.noShiftDates || []).filter(d => d !== date);
+  renderAdminHolidays();
+}
+
+function addMakeupDate() {
+  const input = document.getElementById('makeupDateInput');
+  const select = document.getElementById('makeupWeekdaySelect');
+  const date = input && input.value;
+  const weekday = select && select.value;
+  if (!date || !weekday) { showToast('请选择调休日期和对应班表'); return; }
+  _adminHolidaySettings.workdayOverrides = _adminHolidaySettings.workdayOverrides || {};
+  _adminHolidaySettings.workdayOverrides[date] = weekday;
+  _adminHolidaySettings.noShiftDates = (_adminHolidaySettings.noShiftDates || []).filter(d => d !== date);
+  if (input) input.value = '';
+  renderAdminHolidays();
+}
+
+function removeMakeupDate(date) {
+  if (_adminHolidaySettings.workdayOverrides) delete _adminHolidaySettings.workdayOverrides[date];
+  renderAdminHolidays();
+}
+
+async function saveAdminHolidays() {
+  try {
+    const res = await fetch(API + '/admin/holiday-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: _adminHolidaySettings })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.msg || '保存失败');
+    _adminHolidaySettings = data.settings || _adminHolidaySettings;
+    renderAdminHolidays();
+    showToast('✅ 节假日调休设置已保存');
+  } catch (e) {
+    showToast(e.message || '保存失败');
   }
 }
 
