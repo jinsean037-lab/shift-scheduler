@@ -145,7 +145,7 @@ async function connectMongo() {
       console.log('[mongo] 已创建初始数据')
     }
 
-    console.log('[mongo] 连接成功 ✅')
+    console.log('[mongo] 连接成功 ')
     return true
   } catch (e) {
     console.error('[mongo] 连接失败:', e.message)
@@ -773,6 +773,27 @@ function getEffectiveSlotMembers(store, dateStr, day, slotId) {
   return members
 }
 
+function getShiftSourceForMember(store, dateStr, day, slotId, name) {
+  const baseMembers = cloneScheduleList(store, day, slotId)
+  const swapOverrides = getShiftSwapOverrides(store).filter(o => o.status === 'approved')
+  for (const item of swapOverrides) {
+    if (item.fromDate === dateStr && item.fromDay === day && item.fromSlotId === slotId && item.to === name) {
+      return { type: 'swap', label: '换班', from: item.from, to: item.to }
+    }
+    if (item.toDate === dateStr && item.toDay === day && item.toSlotId === slotId && item.from === name) {
+      return { type: 'swap', label: '换班', from: item.to, to: item.from }
+    }
+  }
+  const subOverrides = getShiftSubstituteOverrides(store).filter(o => o.status === 'approved')
+  for (const item of subOverrides) {
+    if (item.date === dateStr && item.day === day && item.slotId === slotId && item.to === name) {
+      return { type: 'substitute', label: '代班', from: item.from, to: item.to }
+    }
+  }
+  if (!baseMembers.includes(name)) return { type: 'adjusted', label: '调班' }
+  return { type: 'normal', label: '原排班' }
+}
+
 function listDatesForWeekday(startDate, endDate, weekday) {
   const result = []
   if (!startDate || !endDate || !weekday) return result
@@ -813,7 +834,8 @@ function getEffectiveShiftsForMember(store, name) {
         const members = getEffectiveSlotMembers(store, date, day, slotId)
         if (members.includes(name)) {
           const slotInfo = (store.timeSlots || defaultStore().timeSlots).find(t => t.id === slotId)
-          shifts.push({ day, date, slot: slotId, slotId, slotLabel: slotInfo ? slotInfo.label : slotId })
+          const source = getShiftSourceForMember(store, date, day, slotId, name)
+          shifts.push({ day, date, slot: slotId, slotId, slotLabel: slotInfo ? slotInfo.label : slotId, source })
         }
       }
     }
@@ -2798,7 +2820,7 @@ app.post('/api/admin/email/test', async (req, res) => {
       to,
       subject: '【测试】排班系统邮件连通性测试',
       text: '这是一封测试邮件，用于验证排班系统当前邮件通道是否可用。',
-      html: '<div style="font-family:Arial,sans-serif;padding:24px;background:#f9fafb;border-radius:8px"><h2 style="color:#8B1A1A">📧 邮件测试</h2><p>这是一封来自 <b>学工办助理排班管理系统</b> 的连通性测试邮件。</p><p style="color:#888;font-size:13px">如果你看到这封邮件，说明当前邮件通道已生效。</p></div>',
+      html: '<div style="font-family:Arial,sans-serif;padding:24px;background:#f9fafb;border-radius:8px"><h2 style="color:#8B1A1A">邮件测试</h2><p>这是一封来自 <b>学工办助理排班管理系统</b> 的连通性测试邮件。</p><p style="color:#888;font-size:13px">如果你看到这封邮件，说明当前邮件通道已生效。</p></div>',
     })
     if (result.ok) res.json({ ok: true, info: result.info })
     else res.json({ ok: false, error: result.error })
@@ -3639,9 +3661,9 @@ function calculateMemberWorkTime(store, name, year, month) {
   
   // ========== 构建每日明细（用于日历展示）==========
   // 状态判定规则：
-  //   - 'completed' ✓ 已打卡（按班打卡，不论是否有补报）
-  //   - 'overtime'  📝 仅补报（无打卡但有通过补报，覆盖缺勤或额外工作）
-  //   - 'absent'    ⚠️ 缺勤（被排班且未打卡且无通过补报）
+  //   - 'completed'  已打卡（按班打卡，不论是否有补报）
+  //   - 'overtime'   仅补报（无打卡但有通过补报，覆盖缺勤或额外工作）
+  //   - 'absent'     缺勤（被排班且未打卡且无通过补报）
   //   - 'none'      — 无排班无工作
   const daysInMonth = new Date(year, month, 0).getDate()
   const todayStr = getBeijingDateString()
@@ -4430,7 +4452,7 @@ async function sendEmail(opts) {
     if (e && (e.code === 'ETIMEDOUT' || e.code === 'ENETUNREACH' || e.code === 'ECONNREFUSED')) {
       log.error = log.error + ' ｜ 诊断：部署平台（如 Render）到 ' + SMTP_HOST + ':' + SMTP_PORT + ' 的出站网络不通。建议换 Brevo/Resend/SendGrid 等 HTTP API 服务。'
     }
-    // Brevo/Resend 401/403 提示凭据问题
+    // Brevo/Resend 401/403提示凭据问题
     if (typeof log.error === 'string' && /\b(401|403)\b/.test(log.error)) {
       log.error = log.error + ' ｜ 诊断：API Key 无效或发件邮箱未 verify。Brevo 需在 Brevo 控制台 verify 发件邮箱；Resend 免费 plan 需 verify 自有域。'
     }
@@ -4479,33 +4501,33 @@ function computeMemberMonthlyAchievements(store, name, year, month) {
   const daily = workData.daily || []
   const meetings = workData.meetings || []
 
-  // 🏆 全勤达人：本月所有排班天都完成（completed），且至少有一天排班
+  //  全勤达人：本月所有排班天都完成（completed），且至少有一天排班
   const scheduledDays = daily.filter(d => d.scheduled && d.scheduled.length > 0)
   const completedDays = scheduledDays.filter(d => d.status === 'completed' || d.status === 'incomplete')
   if (scheduledDays.length >= 3 && completedDays.length === scheduledDays.length) {
-    achs.push({ id: 'full_attend', icon: '🏆', name: '本月全勤达人', desc: '本月所有排班天都准时打卡' })
+    achs.push({ id: 'full_attend', icon: '', name: '本月全勤达人', desc: '本月所有排班天都准时打卡' })
   }
 
-  // 🌟 例会全勤：本月所有例会都参会
+  //  例会全勤：本月所有例会都参会
   if (meetings.length > 0 && meetings.every(m => m.attended)) {
-    achs.push({ id: 'meeting_full', icon: '🌟', name: '例会全勤', desc: '本月所有例会都参会了' })
+    achs.push({ id: 'meeting_full', icon: '', name: '例会全勤', desc: '本月所有例会都参会了' })
   }
 
   // ⏰ 守时之神：本月 5 天以上签到记录时间在 [班次-15min, 班次+5min] 范围内（v1 简化：要求所有有数据的签到都守时）
   // 这里略复杂：暂不实现，v2 时再做
 
-  // 📚 学习标兵（v1 临时用例会时长达到阈值的标签）
+  //  学习标兵（v1 临时用例会时长达到阈值的标签）
   const meetingHours = meetings.reduce((s, m) => s + (m.attendedHours || 0), 0)
   if (meetingHours >= 1.5) {
-    achs.push({ id: 'learner', icon: '📚', name: '学习标兵', desc: '本月例会参会 ≥ ' + meetingHours.toFixed(1) + ' 小时' })
+    achs.push({ id: 'learner', icon: '', name: '学习标兵', desc: '本月例会参会 ≥ ' + meetingHours.toFixed(1) + ' 小时' })
   }
 
-  // 🌙 深夜值班：本月有至少 2 次 pm2 班次打卡
+  //  深夜值班：本月有至少 2 次 pm2 班次打卡
   const lateShifts = daily.filter(d =>
     d.scheduled && d.scheduled.some(s => s.slotId === 'pm2') && (d.status === 'completed' || d.status === 'incomplete')
   ).length
   if (lateShifts >= 2) {
-    achs.push({ id: 'late_shift', icon: '🌙', name: '深夜守护者', desc: '本月完成 ' + lateShifts + ' 个 pm2 班次' })
+    achs.push({ id: 'late_shift', icon: '', name: '深夜守护者', desc: '本月完成 ' + lateShifts + ' 个 pm2 班次' })
   }
 
   // ⭐ 累计里程碑（100h/200h/500h/1000h）—— 跨月累计
@@ -4516,32 +4538,32 @@ function computeMemberMonthlyAchievements(store, name, year, month) {
       // v1 简化：每个里程碑都展示（不要求"首次跨过"）
       achs.push({
         id: 'milestone_' + ms_val,
-        icon: '🥇',
+        icon: '',
         name: '累计 ' + ms_val + ' 小时',
         desc: '你已累计值班 ' + totalHours.toFixed(1) + ' 小时',
       })
     }
   })
 
-  // 🎯 单日标准：本月有 1 天以上达到当天 3h+ 班次（勤奋型）
+  //  单日标准：本月有 1 天以上达到当天 3h+ 班次（勤奋型）
   const heavyDays = daily.filter(d => (d.totalHours || 0) >= 3).length
   if (heavyDays >= 1) {
-    achs.push({ id: 'hard_worker', icon: '💪', name: '勤奋之星', desc: '本月有 ' + heavyDays + ' 天超过 3 小时' })
+    achs.push({ id: 'hard_worker', icon: '', name: '勤奋之星', desc: '本月有 ' + heavyDays + ' 天超过 3 小时' })
   }
 
-  // 🐦 早起鸟：本月有 am1 或 am2 班次打卡（前提 am 班）
+  //  早起鸟：本月有 am1 或 am2 班次打卡（前提 am 班）
   const morningShifts = daily.filter(d =>
     d.scheduled && d.scheduled.some(s => s.slotId === 'am1' || s.slotId === 'am2') && (d.status === 'completed' || d.status === 'incomplete')
   ).length
   if (morningShifts >= 1) {
-    achs.push({ id: 'early_bird', icon: '🐦', name: '早起鸟', desc: '本月完成 ' + morningShifts + ' 个早班' })
+    achs.push({ id: 'early_bird', icon: '', name: '早起鸟', desc: '本月完成 ' + morningShifts + ' 个早班' })
   }
 
-  // 🌈 满勤+例会双满：本月全勤 + 例会全勤 都达成
+  //  满勤+例会双满：本月全勤 + 例会全勤 都达成
   const hasFull = achs.some(a => a.id === 'full_attend')
   const hasMeetFull = achs.some(a => a.id === 'meeting_full')
   if (hasFull && hasMeetFull) {
-    achs.push({ id: 'double_perfect', icon: '🌈', name: '双满贯', desc: '本月值班 + 例会双全勤' })
+    achs.push({ id: 'double_perfect', icon: '', name: '双满贯', desc: '本月值班 + 例会双全勤' })
   }
 
   return achs
@@ -4566,7 +4588,7 @@ function buildMonthlySummaryEmail(store, name, year, month) {
   // 行（每天）：简洁
   const dayRows = days.map(d => {
     const statusCls = d.status === 'completed' ? '#d1fae5' : d.status === 'incomplete' ? '#dbeafe' : d.status === 'overtime' ? '#fef3c7' : d.status === 'absent' ? '#fee2e2' : '#f3f4f6'
-    const statusText = ({completed:'✓完成', incomplete:'🕐待补', overtime:'📝补报', 'overtime-pending':'⏳待审', absent:'⚠️缺勤', none:'—'})[d.status] || d.status
+    const statusText = ({completed:'已完成', incomplete:'待补', overtime:'补报', 'overtime-pending':'待审', absent:'缺勤', none:'—'})[d.status] || d.status
     return `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #eef0f3;color:#444">${d.date.slice(5)} ${d.weekday || ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #eef0f3;text-align:center">
@@ -4588,7 +4610,7 @@ function buildMonthlySummaryEmail(store, name, year, month) {
   const meetRows = meetings.map(m => `
     <tr>
       <td style="padding:6px 12px;border-bottom:1px solid #f0f0f0">第 ${m.week} 周 · ${m.date}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;text-align:right;color:${m.attended ? '#166534' : '#9ca3af'}">${m.attended ? '✅ 参会 · ' + m.hours + 'h' : '○ 未参会 · ' + m.hours + 'h'}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;text-align:right;color:${m.attended ? '#166534' : '#9ca3af'}">${m.attended ? '参会 · ' + m.hours + 'h' : '未参会 · ' + m.hours + 'h'}</td>
     </tr>`).join('')
 
   const html = `
@@ -4621,25 +4643,25 @@ function buildMonthlySummaryEmail(store, name, year, month) {
       </div>
 
       ${achs.length > 0 ? `
-      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">🏅 本月获得的荣誉</h2>
+      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">本月获得的荣誉</h2>
       <table style="width:100%;border-collapse:collapse;background:#faf6ff;border:1px solid #e9d5ff;border-radius:10px;overflow:hidden">${achRows}</table>
       ` : `
-      <div style="margin:20px 0;padding:14px;background:#f9fafb;border-radius:8px;color:#666;font-size:14px;text-align:center">💪 本月暂未获得荣誉称号，继续加油！</div>
+      <div style="margin:20px 0;padding:14px;background:#f9fafb;border-radius:8px;color:#666;font-size:14px;text-align:center"> 本月暂未获得荣誉称号，继续加油！</div>
       `}
 
       ${meetings.length > 0 ? `
-      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">📅 本月例会参会</h2>
+      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">本月例会参会</h2>
       <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden"><tbody>${meetRows || '<tr><td style="padding:14px;text-align:center;color:#999" colspan="2">本月无例会</td></tr>'}</tbody></table>
       ` : ''}
 
-      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">📋 每日明细</h2>
+      <h2 style="font-size:17px;margin:24px 0 12px;color:#8B1A1A;letter-spacing:1px">每日明细</h2>
       <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;font-size:13px">
         <thead><tr style="background:#f8fafc"><th style="padding:10px 12px;text-align:left;border-bottom:1px solid #e5e7eb">日期</th><th style="padding:10px 12px;border-bottom:1px solid #e5e7eb">状态</th><th style="padding:10px 12px;text-align:right;border-bottom:1px solid #e5e7eb">工时</th></tr></thead>
         <tbody>${dayRows || '<tr><td colspan="3" style="padding:20px;text-align:center;color:#999">本月无排班和打卡记录</td></tr>'}</tbody>
       </table>
 
       <div style="margin-top:28px;padding:16px;background:#fef9c3;border-left:4px solid #facc15;border-radius:6px;font-size:13px;color:#713f12;line-height:1.6">
-        💡 <b>温馨提示</b>：如有疑问或数据不符，请登录系统核对每周打卡记录，或在工作群联系管理员。
+        <b>温馨提示</b>：如有疑问或数据不符，请登录系统核对每周打卡记录，或在工作群联系管理员。
       </div>
     </div>
 
@@ -4665,7 +4687,7 @@ function buildScheduleConfirmEmail(store, scheduleStart, scheduleEnd, days, slot
   const html = `
 <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f6f7f9;font-family:'Microsoft YaHei',Arial,sans-serif">
 <div style="max-width:600px;margin:24px auto;background:#fff;border-radius:10px;padding:32px">
-  <h2 style="color:#8B1A1A;margin:0 0 18px">📅 排班已开启</h2>
+  <h2 style="color:#8B1A1A;margin:0 0 18px">排班已开启</h2>
   <p style="line-height:1.7;color:#444">新一轮排班表已发布，请尽快登录系统选班。</p>
   <div style="padding:16px;background:#fef3c7;border-radius:8px;margin:18px 0">
     <div><b>排班周期：</b>${scheduleStart} ~ ${scheduleEnd}</div>
@@ -4682,7 +4704,7 @@ function buildWorktimeClaimOpenEmail(store, year, month) {
   const html = `
 <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f6f7f9;font-family:'Microsoft YaHei',Arial,sans-serif">
 <div style="max-width:600px;margin:24px auto;background:#fff;border-radius:10px;padding:32px">
-  <h2 style="color:#8B1A1A;margin:0 0 18px">💼 月度工时申报已开放</h2>
+  <h2 style="color:#8B1A1A;margin:0 0 18px">月度工时申报已开放</h2>
   <p style="line-height:1.7;color:#444">${year} 年 ${month} 月工时申报已开放，请登录系统核对工时并提交。</p>
   <div style="padding:16px;background:#dbeafe;border-radius:8px;margin:18px 0;color:#1e40af">
     ⏰ 请在管理员关闭申报之前提交
@@ -4698,12 +4720,12 @@ function buildPasswordResetEmail(name, newPassword) {
   const html = `
 <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f6f7f9;font-family:'Microsoft YaHei',Arial,sans-serif">
 <div style="max-width:600px;margin:24px auto;background:#fff;border-radius:10px;padding:32px">
-  <h2 style="color:#8B1A1A;margin:0 0 18px">🔑 密码已重置</h2>
+  <h2 style="color:#8B1A1A;margin:0 0 18px">密码已重置</h2>
   <p style="line-height:1.7;color:#444">管理员已为账号 <b style="color:#8B1A1A">${name}</b> 重置登录密码：</p>
   <div style="padding:18px;background:#f3f4f6;border-radius:8px;margin:18px 0;text-align:center">
     <div style="font-size:28px;font-weight:700;letter-spacing:4px;color:#8B1A1A;font-family:Consolas,Monaco,monospace">${newPassword}</div>
   </div>
-  <p style="line-height:1.7;color:#666;font-size:13px">⚠️ 请尽快登录系统并在"修改密码"中重置成自己的密码。如非本人操作请及时联系管理员。</p>
+  <p style="line-height:1.7;color:#666;font-size:13px">请尽快登录系统并在"修改密码"中重置成自己的密码。如非本人操作请及时联系管理员。</p>
   <p style="color:#888;font-size:13px">${SMTP_FROM_NAME} · 自动通知</p>
 </div>
 </body></html>`
@@ -4723,6 +4745,7 @@ module.exports = {
   buildMemberWeekSchedule,
   defaultStore,
   getMemberTodayStatus,
+  getEffectiveShiftsForMember,
   removeMemberRelatedData,
   normalizeWechatSubscriptionSettings,
   normalizeMaxPerSlot,
