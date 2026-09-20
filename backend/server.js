@@ -100,7 +100,14 @@ function defaultStore() {
     suppCheckouts: [],
     memberEmails: {},
     memberProfiles: {},
-    wechatSubscriptions: {}
+    wechatSubscriptions: {},
+    holidaySettings: {
+      noShiftDates: ['2026-09-25'],
+      workdayOverrides: {
+        '2026-09-20': '周五'
+      }
+    },
+    wechatReminderLogs: []
   }
 }
 
@@ -272,6 +279,10 @@ const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000
 
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
+
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, time: new Date().toISOString() })
+})
 
 function createAdminToken() {
   const token = crypto.randomBytes(32).toString('hex')
@@ -672,19 +683,39 @@ function dateToWeekday(dateStr) {
   return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]
 }
 
-// 临时调休覆盖：后续可替换为正式节假日配置。
-const SPECIAL_WORKDAY_WEEKDAYS = {
-  '2026-09-20': '周五'
+function normalizeHolidaySettings(input = {}) {
+  const validDays = new Set(['周一', '周二', '周三', '周四', '周五'])
+  const noShiftDates = Array.isArray(input.noShiftDates)
+    ? [...new Set(input.noShiftDates.map(d => String(d || '').slice(0, 10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))]
+    : []
+  const workdayOverrides = {}
+  const rawOverrides = input.workdayOverrides && typeof input.workdayOverrides === 'object' ? input.workdayOverrides : {}
+  Object.keys(rawOverrides).forEach(date => {
+    const d = String(date || '').slice(0, 10)
+    const day = rawOverrides[date]
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d) && validDays.has(day)) workdayOverrides[d] = day
+  })
+  return { noShiftDates, workdayOverrides }
 }
-const SPECIAL_NO_SHIFT_DATES = new Set([
-  '2026-09-25'
-])
 
-function getScheduleWeekday(dateStr) {
+function getHolidaySettings(store) {
+  return normalizeHolidaySettings((store && store.holidaySettings) || defaultStore().holidaySettings)
+}
+
+function getScheduleDateNotice(store, dateStr) {
+  const day = String(dateStr || '').slice(0, 10)
+  const settings = getHolidaySettings(store)
+  if (settings.noShiftDates.includes(day)) return { type: 'holiday', text: '今日休假，无需值班' }
+  if (settings.workdayOverrides[day]) return { type: 'makeup', text: `今日调休，按${settings.workdayOverrides[day]}排班` }
+  return { type: 'normal', text: '' }
+}
+
+function getScheduleWeekday(dateStr, store) {
   if (!dateStr) return null
   const day = String(dateStr).slice(0, 10)
-  if (SPECIAL_NO_SHIFT_DATES.has(day)) return null
-  return SPECIAL_WORKDAY_WEEKDAYS[day] || dateToWeekday(day)
+  const settings = getHolidaySettings(store)
+  if (settings.noShiftDates.includes(day)) return null
+  return settings.workdayOverrides[day] || dateToWeekday(day)
 }
 
 function getBeijingDateString() {
@@ -709,7 +740,7 @@ function isDateInSchedulePeriod(store, dateStr) {
 }
 
 function isScheduledDateInPeriod(store, dateStr) {
-  return isDateInSchedulePeriod(store, dateStr) && !!getScheduleWeekday(dateStr)
+  return isDateInSchedulePeriod(store, dateStr) && !!getScheduleWeekday(dateStr, store)
 }
 
 function cloneScheduleList(store, day, slotId) {
@@ -752,14 +783,14 @@ function listDatesForWeekday(startDate, endDate, weekday) {
   return result
 }
 
-function listScheduleDatesForWeekday(startDate, endDate, weekday) {
+function listScheduleDatesForWeekday(store, startDate, endDate, weekday) {
   const result = []
   if (!startDate || !endDate || !weekday) return result
   let current = new Date(`${startDate}T12:00:00+08:00`)
   const end = new Date(`${endDate}T12:00:00+08:00`)
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10)
-    if (getScheduleWeekday(dateStr) === weekday) result.push(dateStr)
+    if (getScheduleWeekday(dateStr, store) === weekday) result.push(dateStr)
     current.setDate(current.getDate() + 1)
   }
   return result
@@ -774,7 +805,7 @@ function getEffectiveShiftsForMember(store, name) {
   for (const day of ['周一','周二','周三','周四','周五']) {
     const dayData = sched[day]
     if (!dayData || typeof dayData !== 'object') continue
-    for (const date of listScheduleDatesForWeekday(start, end, day)) {
+    for (const date of listScheduleDatesForWeekday(store, start, end, day)) {
       for (const slotId of Object.keys(dayData)) {
         const members = getEffectiveSlotMembers(store, date, day, slotId)
         if (members.includes(name)) {
@@ -810,7 +841,7 @@ function buildMemberWeekSchedule(store, baseDate) {
   const days = []
   for (let i = 0; i < 5; i++) {
     const date = addDaysString(weekStart, i)
-    const weekday = getScheduleWeekday(date)
+    const weekday = getScheduleWeekday(date, store)
     const daySlots = []
     if (weekday && isDateInSchedulePeriod(store, date)) {
       for (const slotId of slotIds) {
@@ -901,7 +932,7 @@ app.post('/api/shift-swap/request', async (req, res) => {
     const store = await readStore()
     if (!isScheduleActive(store)) return res.json({ ok: false, msg: '当前不在排班表生效期间，暂不能换班' })
     if (!isScheduledDateInPeriod(store, fromDate) || !isScheduledDateInPeriod(store, toDate)) return res.json({ ok: false, msg: '换班日期不在当前排班生效周期内' })
-    if (getScheduleWeekday(fromDate) !== fromDay || getScheduleWeekday(toDate) !== toDay) return res.json({ ok: false, msg: '换班日期与周几不匹配' })
+    if (getScheduleWeekday(fromDate, store) !== fromDay || getScheduleWeekday(toDate, store) !== toDay) return res.json({ ok: false, msg: '换班日期与周几不匹配' })
     if (!store.members.includes(from) || !store.members.includes(to)) return res.json({ ok: false, msg: '成员不存在' })
     const fromList = getEffectiveSlotMembers(store, fromDate, fromDay, fromSlotId)
     const toList = getEffectiveSlotMembers(store, toDate, toDay, toSlotId)
@@ -1054,7 +1085,7 @@ app.post('/api/shift-substitute/request', async (req, res) => {
     if (from === to) return res.json({ ok: false, msg: '不能委托给自己' })
     const store = await readStore()
     if (!isScheduledDateInPeriod(store, date)) return res.json({ ok: false, msg: '代班日期不在当前排班生效周期内' })
-    if (getScheduleWeekday(date) !== day) return res.json({ ok: false, msg: '代班日期与周几不匹配' })
+    if (getScheduleWeekday(date, store) !== day) return res.json({ ok: false, msg: '代班日期与周几不匹配' })
     if (!store.members.includes(from) || !store.members.includes(to)) return res.json({ ok: false, msg: '成员不存在' })
     // 检查发起人是否在该班次中（按 effective 算）
     const fromList = getEffectiveSlotMembers(store, date, day, slotId)
@@ -1630,6 +1661,28 @@ app.post('/api/admin/settings', async (req, res) => {
   }
 })
 
+// 管理员：节假日与调休设置
+app.get('/api/admin/holiday-settings', async (req, res) => {
+  try {
+    const store = await readStore()
+    res.json({ ok: true, settings: getHolidaySettings(store) })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+app.put('/api/admin/holiday-settings', async (req, res) => {
+  try {
+    const store = await readStore()
+    const settings = normalizeHolidaySettings((req.body && req.body.settings) || req.body || {})
+    store.holidaySettings = settings
+    await writeStore({ holidaySettings: settings })
+    res.json({ ok: true, msg: '节假日调休设置已保存', settings })
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 // 管理员：重置成员密码
 app.post('/api/admin/reset-password', async (req, res) => {
   try {
@@ -1822,7 +1875,7 @@ function slotByInTime(timeStr) {
 
 // 2026-07-02 v3：获取某成员在指定日期实际排班的所有 slot（合并换班覆盖）
 function getMemberScheduledSlots(store, dateStr, name) {
-  const weekday = getScheduleWeekday(dateStr)
+  const weekday = getScheduleWeekday(dateStr, store)
   const slotIds = []
   if (!weekday || !['周一','周二','周三','周四','周五'].includes(weekday)) return slotIds
   if (!isScheduledDateInPeriod(store, dateStr)) return slotIds
@@ -1981,7 +2034,7 @@ function getBeijingTimeHHMM() {
 function getTodaySlots(store, name) {
   const schedule = store.schedule || {}
   const today = getBeijingDateString()
-  const todayWeekday = getScheduleWeekday(today)
+  const todayWeekday = getScheduleWeekday(today, store)
   if (!todayWeekday) return []
   const daySchedule = schedule[todayWeekday]
   if (!daySchedule) return []
@@ -2001,8 +2054,9 @@ function getTodaySlots(store, name) {
 
 function getMemberTodayStatus(store, name, nowDate) {
   const today = nowDate || getBeijingDateString()
-  const todayWeekday = getScheduleWeekday(today)
+  const todayWeekday = getScheduleWeekday(today, store)
   const nowHHMM = getBeijingTimeHHMM()
+  const notice = getScheduleDateNotice(store, today)
   const shifts = getEffectiveShiftsForMember(store, name)
     .filter(s => s.date === today)
     .map(s => {
@@ -2035,7 +2089,7 @@ function getMemberTodayStatus(store, name, nowDate) {
         canCheckout: status === 'in_progress' && outWindow
       }
     })
-  return { date: today, weekday: todayWeekday, shifts }
+  return { date: today, weekday: todayWeekday || dateToWeekday(today), notice, shifts }
 }
 
 app.get('/api/member/today-status', async (req, res) => {
@@ -2438,7 +2492,7 @@ app.get('/api/admin/monthly-shifts', async (req, res) => {
         const dayData = schedule[day]
         if (!dayData || typeof dayData !== 'object') continue
         // 本月内本星期对应的所有日期
-        const dates = listScheduleDatesForWeekday(effStart, effEnd, day)
+        const dates = listScheduleDatesForWeekday(store, effStart, effEnd, day)
         for (const date of dates) {
           for (const slotId of slotIds) {
             const list = dayData[slotId]
@@ -2979,6 +3033,129 @@ function logWechatSubscribeResult(type, to, promise) {
     })
 }
 
+function getBeijingParts(date = new Date()) {
+  const beijingMs = date.getTime() + 8 * 3600 * 1000
+  const beijing = new Date(beijingMs)
+  return {
+    dateStr: beijing.toISOString().slice(0, 10),
+    hhmm: beijing.toISOString().slice(11, 16),
+    minutes: beijing.getUTCHours() * 60 + beijing.getUTCMinutes()
+  }
+}
+
+function minutesToHHMM(minutes) {
+  const m = ((minutes % (24 * 60)) + (24 * 60)) % (24 * 60)
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+}
+
+function formatWechatDateTime(dateStr, minuteOrHHMM) {
+  const hhmm = typeof minuteOrHHMM === 'number' ? minutesToHHMM(minuteOrHHMM) : String(minuteOrHHMM || '').slice(0, 5)
+  const m = String(dateStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (!m) return truncateWechatValue(`${dateStr} ${hhmm}`, 20)
+  return `${m[1]}年${Number(m[2])}月${Number(m[3])}日 ${hhmm}`
+}
+
+function isReminderWindow(nowMin, targetMin) {
+  return nowMin >= targetMin && nowMin < targetMin + 10
+}
+
+function reminderLogKey(date, slotId, type, name) {
+  return `${date}|${slotId}|${type}|${name}`
+}
+
+function hasCheckinByMinute(checkins, name, date, slotId, targetMin) {
+  return checkins.some(c => (
+    c.name === name &&
+    c.date === date &&
+    c.type === 'in' &&
+    c.slotId === slotId &&
+    timeToMinutes(c.time) <= targetMin
+  ))
+}
+
+function hasCheckoutForSlot(checkins, name, date, slotId) {
+  return checkins.some(c => c.name === name && c.date === date && c.type === 'out' && c.slotId === slotId)
+}
+
+async function recordAttendanceReminder(store, date, slotId, type, name, templateKey, data) {
+  if (!store.wechatReminderLogs) store.wechatReminderLogs = []
+  const key = reminderLogKey(date, slotId, type, name)
+  if (store.wechatReminderLogs.some(log => log.key === key)) return false
+  const result = await sendWechatSubscribeMessage(store, name, templateKey, 'pages/index/index', data)
+  store.wechatReminderLogs.push({
+    key,
+    date,
+    slotId,
+    type,
+    name,
+    ok: !!result.ok,
+    msg: result.msg || '',
+    createdAt: new Date().toISOString()
+  })
+  if (result.ok) console.log(`[wechat-reminder] ${type} -> ${name} 已发送`)
+  else console.warn(`[wechat-reminder] ${type} -> ${name} 未发送: ${result.msg}`)
+  return true
+}
+
+async function runAttendanceReminderTick(now = new Date()) {
+  const store = await readStore()
+  const { dateStr, minutes: nowMin } = getBeijingParts(now)
+  if (autoCloseExpiredCheckins(store, now)) {
+    await writeStore({ checkins: store.checkins })
+  }
+  if (!isScheduledDateInPeriod(store, dateStr)) return
+  const weekday = getScheduleWeekday(dateStr, store)
+  if (!weekday) return
+  const slots = store.timeSlots || defaultStore().timeSlots
+  const checkins = store.checkins || []
+  let changed = false
+
+  for (const slot of slots) {
+    const slotId = slot.id
+    const standard = SLOT_STANDARD_WINDOWS[slotId]
+    if (!standard) continue
+    const members = getEffectiveSlotMembers(store, dateStr, weekday, slotId)
+    if (!members.length) continue
+
+    if (isReminderWindow(nowMin, standard.startMin)) {
+      for (const name of members) {
+        if (hasCheckinByMinute(checkins, name, dateStr, slotId, standard.startMin)) continue
+        changed = await recordAttendanceReminder(store, dateStr, slotId, 'missedCheckin', name, 'missedCheckin', {
+          name3: { value: truncateWechatValue(name, 10) },
+          time23: { value: formatWechatDateTime(dateStr, standard.startMin) }
+        }) || changed
+      }
+    }
+
+    if (isReminderWindow(nowMin, standard.endMin)) {
+      for (const name of members) {
+        const openCheckin = findOpenCheckin(checkins, name, dateStr, slotId)
+        if (!openCheckin || hasCheckoutForSlot(checkins, name, dateStr, slotId)) continue
+        changed = await recordAttendanceReminder(store, dateStr, slotId, 'missedCheckout', name, 'missedCheckout', {
+          time5: { value: formatWechatDateTime(dateStr, standard.endMin) },
+          thing4: { value: truncateWechatValue(`${slot.label || slotId} 请及时签退`, 20) }
+        }) || changed
+      }
+    }
+  }
+
+  if (changed) {
+    store.wechatReminderLogs = (store.wechatReminderLogs || []).slice(-1200)
+    await writeStore({ wechatReminderLogs: store.wechatReminderLogs })
+  }
+}
+
+let attendanceReminderTimer = null
+
+function startAttendanceReminderScheduler() {
+  if (attendanceReminderTimer) return
+  const tick = () => runAttendanceReminderTick().catch(e => {
+    console.warn('[wechat-reminder] 自动提醒检查失败:', e.message || e)
+  })
+  setTimeout(tick, 5000)
+  attendanceReminderTimer = setInterval(tick, 60 * 1000)
+}
+
 app.post('/api/member/wechat-bind', async (req, res) => {
   try {
     const { name, code } = req.body || {}
@@ -3453,7 +3630,7 @@ function calculateMemberWorkTime(store, name, year, month) {
   
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    const weekday = getScheduleWeekday(dateStr)
+    const weekday = getScheduleWeekday(dateStr, store)
     
     // 排班信息：检查该成员在指定日期的每个时段是否被排班
     const scheduled = []
@@ -4021,6 +4198,8 @@ async function start() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`排班系统运行中: http://localhost:${PORT}`)
     if (!useFileFallback) console.log(`[db] MongoDB 持久化已启用`)
+    startAttendanceReminderScheduler()
+    console.log('[wechat-reminder] 签到/签退自动提醒已启用')
   })
 }
 
