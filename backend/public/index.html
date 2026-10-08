@@ -3868,7 +3868,38 @@ async function loadHomeStats() {
     let morningShifts = 0;
     let afternoonShifts = 0;
     const processedDates = new Set();
+    let usedUnifiedWorkStats = false;
     try {
+      const wtRes = await fetch(API + '/worktime-claim/my-data?name=' + encodeURIComponent(currentUser));
+      const wtData = await wtRes.json();
+      if (wtData.ok && wtData.isOpen && wtData.workData) {
+        const wd = wtData.workData;
+        totalHours = wd.totalHours || 0;
+        const countedSlots = new Set();
+        Object.entries(wd.workByDate || {}).forEach(([date, info]) => {
+          (info.slots || []).forEach(slot => {
+            if (slot.overtime) return;
+            const breakdown = slot.slotBreakdown && slot.slotBreakdown.length
+              ? slot.slotBreakdown
+              : (slot.scheduledSlots || []).map(slotId => ({ slotId }));
+            breakdown.forEach(item => {
+              const slotId = item.slotId || '';
+              if (!slotId) return;
+              const key = date + '|' + slotId;
+              if (countedSlots.has(key)) return;
+              countedSlots.add(key);
+              totalShifts++;
+              if (slotId.startsWith('am')) morningShifts++;
+              else if (slotId.startsWith('pm')) afternoonShifts++;
+            });
+          });
+        });
+        usedUnifiedWorkStats = true;
+      }
+    } catch(e) {
+      console.warn('统一工时统计加载失败，回退到本地统计', e);
+    }
+    if (!usedUnifiedWorkStats) try {
       // 获取当前排班周期范围（与工时申报页一致）
       const allData = await (await fetch(API + '/schedule')).json();
       let rangeStart = null, rangeEnd = null;
@@ -5568,7 +5599,7 @@ async function loadWorkTimeClaim() {
     const myData = await myRes.json();
     
     if (!myData.ok || !myData.isOpen) {
-      content.innerHTML = '<div class="section-card"><p style="color:#999;font-size:14px;text-align:center;padding:30px">无法获取工时数据</p></div>';
+      content.innerHTML = '<div class="section-card"><p style="color:#999;font-size:14px;text-align:center;padding:30px">' + escapeHtml(myData.msg || '无法获取工时数据') + '</p></div>';
       return;
     }
     
@@ -6107,9 +6138,10 @@ function buildWtCalendarGrid() {
     let actionHtml = '';
     if (day.status === 'absent' && !isFuture) actionHtml = `<div class="wt-cal-action">去补报</div>`;
     else if (day.status === 'incomplete' && !isFuture) actionHtml = `<div class="wt-cal-action" style="background:#1565c0">补签退</div>`;
+    const weekdayText = String(day.weekday || '').replace('周','');
     html += `<div class="wt-cal-cell ${meta.cls} ${isToday} ${isFutureCls}" onclick="showWtDayDetail('${dateStr}')">
       ${badgeHtml}
-      <div><span class="wt-cal-date">${d}</span><span class="wt-cal-weekday">${day.weekday.replace('周','')}</span></div>
+      <div><span class="wt-cal-date">${d}</span><span class="wt-cal-weekday">${weekdayText}</span></div>
       <div class="wt-cal-hours">${hours || '&nbsp;'}</div>
       ${day.status !== 'none' ? `<div class="wt-cal-status">${meta.icon} ${meta.text}</div>` : ''}
       ${actionHtml}
@@ -6125,13 +6157,17 @@ function showWtDayDetail(dateStr) {
   const meta = WT_STATUS_META[day.status] || WT_STATUS_META.none;
   const dateObj = new Date(dateStr + 'T12:00:00+08:00');
   const dateLabel = `${dateObj.getFullYear()}年${dateObj.getMonth()+1}月${dateObj.getDate()}日`;
+  const scheduled = day.scheduled || [];
+  const checkinSlots = day.checkinSlots || [];
+  const approvedOvertimes = day.approvedOvertimes || [];
+  const pendingOvertimes = day.pendingOvertimes || [];
   
-  document.getElementById('wtDayTitle').textContent = dateLabel + ' · ' + day.weekday;
+  document.getElementById('wtDayTitle').textContent = dateLabel + (day.weekday ? ' · ' + day.weekday : '');
   
   // 副标题：排班信息
   let subParts = [];
-  if (day.scheduled.length > 0) {
-    subParts.push('排班：' + day.scheduled.map(s => s.label).join(', '));
+  if (scheduled.length > 0) {
+    subParts.push('排班：' + scheduled.map(s => s.label).join(', '));
   }
   if (subParts.length === 0) subParts.push('当天无排班');
   document.getElementById('wtDaySubtitle').textContent = subParts.join('　');
@@ -6144,8 +6180,8 @@ function showWtDayDetail(dateStr) {
   let rows = '';
   
   // 打卡记录
-  if (day.checkinSlots && day.checkinSlots.length > 0) {
-    day.checkinSlots.forEach((cs, idx) => {
+  if (checkinSlots.length > 0) {
+    checkinSlots.forEach((cs, idx) => {
       const suppTag = cs.supp ? ' <span style="color:#ef6c00;font-size:11px">（含补签退）</span>' : '';
       const outTxt = cs.out || '<span style="color:#c41230">未签退</span>';
       rows += `<div class="wt-modal-row">
@@ -6156,8 +6192,8 @@ function showWtDayDetail(dateStr) {
   }
   
   // 通过的补报
-  if (day.approvedOvertimes && day.approvedOvertimes.length > 0) {
-    day.approvedOvertimes.forEach(ot => {
+  if (approvedOvertimes.length > 0) {
+    approvedOvertimes.forEach(ot => {
       rows += `<div class="wt-modal-row">
         <div class="label">通过补报</div>
         <div class="value">${ot.hours}小时<div class="ot-content">${escapeHtml(ot.content)}</div></div>
@@ -6166,8 +6202,8 @@ function showWtDayDetail(dateStr) {
   }
   
   // 待审核补报
-  if (day.pendingOvertimes && day.pendingOvertimes.length > 0) {
-    day.pendingOvertimes.forEach(ot => {
+  if (pendingOvertimes.length > 0) {
+    pendingOvertimes.forEach(ot => {
       rows += `<div class="wt-modal-row">
         <div class="label">待审补报</div>
         <div class="value">${ot.hours}小时<div class="ot-content">${escapeHtml(ot.content)}</div></div>
@@ -6181,7 +6217,7 @@ function showWtDayDetail(dateStr) {
     <div class="value" style="font-weight:700;color:var(--primary)">${day.totalHours.toFixed(1)} 小时</div>
   </div>`;
   
-  if (!rows || day.checkinSlots.length === 0 && day.approvedOvertimes.length === 0 && day.pendingOvertimes.length === 0) {
+  if (!rows || checkinSlots.length === 0 && approvedOvertimes.length === 0 && pendingOvertimes.length === 0) {
     rows = `<div style="padding:24px 0;color:#999;font-size:13px;text-align:center">当天无打卡也无补报记录</div>`;
   }
   document.getElementById('wtDayContent').innerHTML = rows;
@@ -6334,7 +6370,7 @@ async function showAdminMemberDetail(name) {
 
     const daily = data.workData?.daily || [];
     // 只列出有工时或有排班的天（避免 30 行空白）
-    const interesting = daily.filter(d => d.totalHours > 0 || d.scheduled.length > 0 || d.approvedOvertimes.length > 0 || d.pendingOvertimes.length > 0);
+    const interesting = daily.filter(d => (d.totalHours || 0) > 0 || (d.scheduled || []).length > 0 || (d.approvedOvertimes || []).length > 0 || (d.pendingOvertimes || []).length > 0);
     
     const STATUS_LABEL = { completed: '已完成', incomplete: '签到未签退', overtime: '仅补报', 'overtime-pending': '补报待审', absent: '缺勤', none: '— 无排班' };
     const STATUS_COLOR = { completed: '#2e7d32', incomplete: '#1565c0', overtime: '#b45309', 'overtime-pending': '#ef6c00', absent: '#c41230', none: '#888' };
@@ -6367,18 +6403,18 @@ async function showAdminMemberDetail(name) {
         // 补报明细（含 content）
         let otStr = '';
         if (d.approvedOvertimes && d.approvedOvertimes.length > 0) {
-          otStr += d.approvedOvertimes.map(ot =>
+          otStr += (d.approvedOvertimes || []).map(ot =>
             '<div style="margin-bottom:4px"><span style="color:#2e7d32"> ' + ot.hours + 'h</span> · ' + escapeHtml(ot.content || '(无内容)') + '</div>'
           ).join('');
         }
         if (d.pendingOvertimes && d.pendingOvertimes.length > 0) {
-          otStr += d.pendingOvertimes.map(ot =>
+          otStr += (d.pendingOvertimes || []).map(ot =>
             '<div style="margin-bottom:4px"><span style="color:#ef6c00">待审 ' + ot.hours + 'h</span> · ' + escapeHtml(ot.content || '(无内容)') + '</div>'
           ).join('');
         }
         
         html += '<tr>';
-        html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5">' + d.date + '<br><span style="color:#999;font-size:11px">' + d.weekday + '</span></td>';
+        html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5">' + d.date + '<br><span style="color:#999;font-size:11px">' + escapeHtml(d.weekday || '') + '</span></td>';
         html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5;color:' + color + ';font-weight:600;font-size:12px">' + label + '</td>';
         html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5;font-weight:600">' + d.totalHours.toFixed(1) + 'h</td>';
         html += '<td style="padding:8px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#555">' + (checkinStr || '<span style="color:#bbb">—</span>') + '</td>';
