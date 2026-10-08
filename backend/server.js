@@ -342,6 +342,7 @@ app.get('/api/config', async (req, res) => {
       members: store.members
     })
   } catch (e) {
+    console.error('[worktime-claim/my-data] error:', e)
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
 })
@@ -1972,6 +1973,68 @@ function hasCheckinForSlot(checkins, name, date, slotId) {
   return checkins.some(c => c.name === name && c.date === date && c.type === 'in' && c.slotId === slotId)
 }
 
+function recordKey(record) {
+  return record.id || `${record.type || ''}|${record.slotId || ''}|${record.time || ''}|${record.isSupp ? 'supp' : ''}`
+}
+
+function chooseLaterRecord(a, b) {
+  if (!a) return b
+  return timeToMinutes(b.time) >= timeToMinutes(a.time) ? b : a
+}
+
+function chooseCheckoutRecord(a, b) {
+  if (!a) return b
+  const priority = rec => rec && rec.isSupp ? 3 : rec && !rec.autoCheckout ? 2 : 1
+  const pa = priority(a)
+  const pb = priority(b)
+  if (pb !== pa) return pb > pa ? b : a
+  return chooseLaterRecord(a, b)
+}
+
+function getRecordSlotId(record, keptIns) {
+  if (record.slotId) return record.slotId
+  const inferred = slotByInTime(record.time)
+  if (inferred) return inferred
+  if (!keptIns || keptIns.length === 0) return 'unknown'
+  const outMin = timeToMinutes(record.time)
+  let best = null
+  for (const iRec of keptIns) {
+    const inMin = timeToMinutes(iRec.time)
+    if (inMin <= outMin && (!best || inMin > timeToMinutes(best.time))) best = iRec
+  }
+  return (best && best.slotId) || 'unknown'
+}
+
+// 工时统计只认每人每天每个班次的一组有效打卡。
+// 网络延迟/重复点击可能写入多条相同班次的 in/out；这里保留最早签到、最合适签退，
+// 防止历史脏数据在月度工时里被重复累加。
+function dedupeCheckinsForWorkTime(records) {
+  const insBySlot = {}
+  records
+    .filter(r => r.type === 'in')
+    .forEach(record => {
+      const slotId = getRecordSlotId(record)
+      const current = insBySlot[slotId]
+      if (!current || timeToMinutes(record.time) < timeToMinutes(current.time)) {
+        insBySlot[slotId] = { ...record, slotId: record.slotId || (slotId === 'unknown' ? '' : slotId) }
+      }
+    })
+
+  const keptIns = Object.values(insBySlot)
+  const outsBySlot = {}
+  records
+    .filter(r => r.type === 'out')
+    .forEach(record => {
+      const slotId = getRecordSlotId(record, keptIns)
+      const normalized = { ...record, slotId: record.slotId || (slotId === 'unknown' ? '' : slotId) }
+      outsBySlot[slotId] = chooseCheckoutRecord(outsBySlot[slotId], normalized)
+    })
+
+  return keptIns
+    .concat(Object.values(outsBySlot))
+    .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')))
+}
+
 function autoCloseExpiredCheckins(store, nowDate) {
   const checkins = store.checkins || []
   const today = getBeijingDateString()
@@ -3433,10 +3496,14 @@ function calculateMemberWorkTime(store, name, year, month) {
   
   // 1. 打卡记录：每次 in/out 配对独立计算，连续班次自动合并
   const myCheckins = checkins.filter(c => c.name === name && c.date >= monthStartStr && c.date <= monthEndStr)
-  const byDate = {}
+  const rawByDate = {}
   myCheckins.forEach(c => {
-    if (!byDate[c.date]) byDate[c.date] = []
-    byDate[c.date].push(c)
+    if (!rawByDate[c.date]) rawByDate[c.date] = []
+    rawByDate[c.date].push(c)
+  })
+  const byDate = {}
+  Object.entries(rawByDate).forEach(([date, records]) => {
+    byDate[date] = dedupeCheckinsForWorkTime(records)
   })
   
   Object.keys(byDate).forEach(date => {
@@ -3511,6 +3578,12 @@ function calculateMemberWorkTime(store, name, year, month) {
     const SLOT_BUF = 15  // 配对覆盖判定的 buffer（与 slotByInTime 对齐）
 
     mergedPairs.forEach(mp => {
+      const pairSlotIds = Array.from(new Set(mp.slots.map(s => s.slotId).filter(Boolean)))
+      const scopedScheduledSlots = pairSlotIds.length > 0
+        ? scheduledSlots.filter(sid => pairSlotIds.includes(sid))
+        : scheduledSlots
+      const calculationSlots = scopedScheduledSlots.length > 0 ? scopedScheduledSlots : scheduledSlots
+
       if (mp.lastOut) {
         const inMin = timeToMinutes(mp.firstIn.time)
         const outMin = timeToMinutes(mp.lastOut.time)
@@ -3539,16 +3612,16 @@ function calculateMemberWorkTime(store, name, year, month) {
           } else {
             rounded = Math.ceil((Math.max(0, diffMinutes) / 60) * 2) / 2
           }
-        } else if (scheduledSlots.length === 1) {
+        } else if (calculationSlots.length === 1) {
           // 单 slot：cap 在 slot 标准时长（避免溢出浪费）
-          const sid = scheduledSlots[0]
+          const sid = calculationSlots[0]
           const slotCapMin = SLOT_HOURS[sid] * 60
           if (diffMinutes > slotCapMin) { diffMinutes = slotCapMin; cappedBySlot = true }
           rounded = Math.ceil((Math.max(0, diffMinutes) / 60) * 2) / 2
           slotBreakdown.push({ slotId: sid, hours: rounded })
         } else {
           // 多 slot：按与每个排班 slot 的实际重叠时长计费，避免短暂相交就记完整班次。
-          for (const sid of scheduledSlots) {
+          for (const sid of calculationSlots) {
             const { startMin, endMin } = SLOT_STANDARD_WINDOWS[sid]
             const overlap = slotOverlapMinutes(inMin, outMin, startMin, endMin, SLOT_BUF)
             if (overlap > 0) {
@@ -3583,7 +3656,7 @@ function calculateMemberWorkTime(store, name, year, month) {
           originalDuration: originalDiff,        // 原始配对时长（分钟），用于排查
           cappedBySlot,                          // true 表示被 slot 时长截断
           slotBreakdown,                         // v3：每个 slot 的分配工时（用于 UI/debug）
-          scheduledSlots,                        // v3：当天所有排班 slot（用于 UI/debug）
+          scheduledSlots: calculationSlots,       // v3：本组打卡实际参与计算的 slot
         })
       } else {
         // 无签退：按成员当天排班的每个 slot 估算（v3：也支持多 slot）
@@ -3601,7 +3674,7 @@ function calculateMemberWorkTime(store, name, year, month) {
           slotBreakdown.push({ slotId: sid, hours: rounded })
         } else {
           // 有排班：每个被 in-time 覆盖的 slot 计完整时长
-          for (const sid of scheduledSlots) {
+          for (const sid of calculationSlots) {
             const { startMin, endMin } = SLOT_STANDARD_WINDOWS[sid]
             if (isPairCoveringSlot(inMin, null, startMin, endMin, SLOT_BUF)) {
               const h = SLOT_HOURS[sid]
@@ -3623,13 +3696,19 @@ function calculateMemberWorkTime(store, name, year, month) {
         if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
         workByDate[date].hours += estHours
         workByDate[date].checkinHours += estHours
-        workByDate[date].slots.push({ estimated: true, slotCount: mp.slots.length, hours: estHours, slotBreakdown, scheduledSlots })
+        workByDate[date].slots.push({ estimated: true, slotCount: mp.slots.length, hours: estHours, slotBreakdown, scheduledSlots: calculationSlots })
       }
     })
   })
   
   // 2. 已通过补报：按次累加，不限制每日一次
+  const seenAutoOvertimes = new Set()
   overtimes.filter(ot => ot.name === name && ot.date >= monthStartStr && ot.date <= monthEndStr).forEach(ot => {
+    if (ot.source === 'auto_checkout_overtime') {
+      const key = `${ot.date}|${ot.name}|${ot.checkinId || ot.slotId || ot.content || ot.hours}`
+      if (seenAutoOvertimes.has(key)) return
+      seenAutoOvertimes.add(key)
+    }
     const date = ot.date
     if (!workByDate[date]) workByDate[date] = { hours: 0, slots: [], checkinHours: 0, overtimeHours: 0 }
     const rounded = Math.ceil((ot.hours || 0) * 2) / 2
@@ -3690,23 +3769,27 @@ function calculateMemberWorkTime(store, name, year, month) {
     
     // 打卡时段明细（已配对的 in/out，按 in 时间升序）
     const dayRecs = (byDate[dateStr] || []).slice().sort((a, b) => a.time.localeCompare(b.time))
+    const displayUsedOuts = new Set()
+    const displayOuts = dayRecs.filter(r => r.type === 'out')
     const checkinSlots = dayRecs
       .filter(r => r.type === 'in')
       .map(iRec => {
         // 找与该 in 配对的 out（同日，按已配对规则）
-        const dayOuts = dayRecs.filter(r => r.type === 'out')
         const iMin = timeToMinutes(iRec.time)
         let bestOut = null
-        for (const o of dayOuts) {
+        for (const o of displayOuts) {
+          if (displayUsedOuts.has(recordKey(o))) continue
           const oMin = timeToMinutes(o.time)
           if (oMin >= iMin && (!bestOut || oMin < timeToMinutes(bestOut.time))) bestOut = o
         }
         if (!bestOut) {
-          for (const o of dayOuts) {
+          for (const o of displayOuts) {
+            if (displayUsedOuts.has(recordKey(o))) continue
             const oMin = timeToMinutes(o.time)
             if (oMin < iMin && (!bestOut || oMin > timeToMinutes(bestOut.time))) bestOut = o
           }
         }
+        if (bestOut) displayUsedOuts.add(recordKey(bestOut))
         return {
           in: normalizeHHMM(iRec.time),
           out: bestOut ? normalizeHHMM(bestOut.time) : null,
@@ -3715,7 +3798,17 @@ function calculateMemberWorkTime(store, name, year, month) {
       })
     
     // 补报记录（通过 / 待审核）
-    const dayApproved = allOvertimes.filter(ot => ot.name === name && ot.date === dateStr && ot.status === 'approved')
+    const dayApprovedRaw = allOvertimes.filter(ot => ot.name === name && ot.date === dateStr && ot.status === 'approved')
+    const dayApproved = []
+    const daySeenAutoOvertimes = new Set()
+    dayApprovedRaw.forEach(ot => {
+      if (ot.source === 'auto_checkout_overtime') {
+        const key = `${ot.date}|${ot.name}|${ot.checkinId || ot.slotId || ot.content || ot.hours}`
+        if (daySeenAutoOvertimes.has(key)) return
+        daySeenAutoOvertimes.add(key)
+      }
+      dayApproved.push(ot)
+    })
     const dayPending  = allOvertimes.filter(ot => ot.name === name && ot.date === dateStr && ot.status === 'pending')
     const approvedOvertimes = dayApproved.map(ot => ({ hours: ot.hours, content: ot.content }))
     const pendingOvertimes  = dayPending.map(ot => ({ hours: ot.hours, content: ot.content }))
