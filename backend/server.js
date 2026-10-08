@@ -2762,12 +2762,28 @@ app.get('/api/admin/meetings', async (req, res) => {
 app.post('/api/admin/meetings', async (req, res) => {
   try {
     const { year, month, weeks } = req.body || {}
-    if (!year || !month) return res.status(400).json({ ok: false, msg: '缺少year/month参数' })
+    const y = parseInt(year)
+    const m = parseInt(month)
+    if (!y || !m || m < 1 || m > 12) return res.status(400).json({ ok: false, msg: '缺少有效的year/month参数' })
     if (!Array.isArray(weeks)) return res.status(400).json({ ok: false, msg: 'weeks 必须为数组' })
     
     const store = await readStore()
     if (!store.meetings) store.meetings = {}
-    const key = `${year}-${String(month).padStart(2, '0')}`
+    const key = `${y}-${String(m).padStart(2, '0')}`
+    const monthPrefix = `${y}-${String(m).padStart(2, '0')}-`
+    const lastDay = new Date(y, m, 0).getDate()
+    const monthStart = `${monthPrefix}01`
+    const monthEnd = `${monthPrefix}${String(lastDay).padStart(2, '0')}`
+
+    for (const item of weeks) {
+      if (!item || !item.date) continue
+      if (typeof item.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) {
+        return res.status(400).json({ ok: false, msg: '例会日期格式不正确' })
+      }
+      if (!item.date.startsWith(monthPrefix)) {
+        return res.status(400).json({ ok: false, msg: `例会日期必须在 ${monthStart} 至 ${monthEnd} 之间` })
+      }
+    }
     
     // 兜底清洗：丢掉非法条目（week 缺失/date 非 YYYY-MM-DD/hours 非有限数）
     const cleaned = weeks
@@ -2780,9 +2796,9 @@ app.post('/api/admin/meetings', async (req, res) => {
       .filter(w => w.date)
       .sort((a, b) => a.week - b.week)
     
-    store.meetings[key] = { year, month, weeks: cleaned }
+    store.meetings[key] = { year: y, month: m, weeks: cleaned }
     await writeStore({ meetings: store.meetings })
-    res.json({ ok: true, msg: '例会设置已保存', year, month, weeks: cleaned })
+    res.json({ ok: true, msg: '例会设置已保存', year: y, month: m, weeks: cleaned })
   } catch (e) {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
