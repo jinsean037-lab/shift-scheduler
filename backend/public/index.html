@@ -6623,6 +6623,20 @@ const SHIFT_STATUS_META = {
 // ========== 2026-07-02 新增：管理员例会设置 ==========
 let _adminMeetingsState = { year: null, month: null }
 
+function getMeetingMonthRange() {
+  const y = _adminMeetingsState.year || new Date().getFullYear()
+  const m = _adminMeetingsState.month || (new Date().getMonth() + 1)
+  const last = new Date(y, m, 0).getDate()
+  const prefix = y + '-' + String(m).padStart(2, '0') + '-'
+  return {
+    year: y,
+    month: m,
+    start: prefix + '01',
+    end: prefix + String(last).padStart(2, '0'),
+    prefix
+  }
+}
+
 async function loadAdminMeetings(monthDelta) {
   if (monthDelta && _adminMeetingsState.year) {
     const d = new Date(_adminMeetingsState.year, _adminMeetingsState.month - 1 + monthDelta, 1)
@@ -6653,9 +6667,10 @@ async function loadAdminMeetings(monthDelta) {
 function renderAdminMeetingsRows(weeks) {
   const listEl = document.getElementById('adminMeetingsList')
   if (!listEl) return
+  const range = getMeetingMonthRange()
   // 如果完全空就给一行占位（让用户能直接填）
   const rows = weeks.length ? weeks.slice() : []
-  if (rows.length === 0) rows.push({ week: 1, date: '', hours: 1 })
+  if (rows.length === 0) rows.push({ week: 1, date: range.start, hours: 1 })
   rows.sort((a, b) => a.week - b.week)
   let html = '<table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden">'
   html += '<thead><tr style="background:var(--primary);color:#fff">'
@@ -6667,13 +6682,13 @@ function renderAdminMeetingsRows(weeks) {
   rows.forEach((r, idx) => {
     html += '<tr style="border-bottom:1px solid #eef0f3">'
     html += '<td style="padding:8px;text-align:center"><input type="number" min="1" max="6" value="' + (r.week || (idx + 1)) + '" data-field="week" data-idx="' + idx + '" style="width:60px;padding:6px;text-align:center;border:1px solid #d4d4d8;border-radius:4px"></td>'
-    html += '<td style="padding:8px;text-align:center"><input type="date" value="' + (r.date || '') + '" data-field="date" data-idx="' + idx + '" style="padding:6px;border:1px solid #d4d4d8;border-radius:4px"></td>'
+    html += '<td style="padding:8px;text-align:center"><input type="date" min="' + range.start + '" max="' + range.end + '" value="' + (r.date || range.start) + '" data-field="date" data-idx="' + idx + '" style="padding:6px;border:1px solid #d4d4d8;border-radius:4px"></td>'
     html += '<td style="padding:8px;text-align:center"><input type="number" min="0" max="8" step="0.5" value="' + (r.hours != null ? r.hours : 1) + '" data-field="hours" data-idx="' + idx + '" style="width:80px;padding:6px;text-align:center;border:1px solid #d4d4d8;border-radius:4px"></td>'
     html += '<td style="padding:8px;text-align:center"><button onclick="removeMeetingRow(' + idx + ')" style="background:#fee2e2;color:#dc2626;border:none;padding:4px 10px;border-radius:4px;cursor:pointer">删除</button></td>'
     html += '</tr>'
   })
   html += '</tbody></table>'
-  html += '<p style="color:#888;font-size:12px;margin-top:10px">说明：填 0 即可表示"该周无例会/取消"，时长只算参会成员的。可删除多余的行。</p>'
+  html += '<p style="color:#888;font-size:12px;margin-top:10px">说明：当前只能设置 ' + range.year + ' 年 ' + range.month + ' 月内的日期（' + range.start + ' 至 ' + range.end + '）。填 0 即可表示"该周无例会/取消"，时长只算参会成员的。可删除多余的行。</p>'
   listEl.innerHTML = html
 }
 
@@ -6685,7 +6700,7 @@ function addMeetingRow() {
   inputs.forEach(inp => { const v = parseInt(inp.value); if (v >= nextWeek) nextWeek = v + 1 })
   // 默认新行追加到末尾：复用当前 render 重新画
   const weeks = collectMeetingRows()
-  weeks.push({ week: nextWeek, date: '', hours: 1 })
+  weeks.push({ week: nextWeek, date: getMeetingMonthRange().start, hours: 1 })
   renderAdminMeetingsRows(weeks)
 }
 
@@ -6713,6 +6728,13 @@ async function saveAdminMeetings() {
   // 过滤掉有空日期的（避免脏数据）
   const filtered = weeks.filter(w => w.date && /^\d{4}-\d{2}-\d{2}$/.test(w.date))
   if (filtered.length === 0) { showToast('请至少填一个有效的例会日期'); return }
+  const range = getMeetingMonthRange()
+  for (const w of filtered) {
+    if (!w.date.startsWith(range.prefix)) {
+      showToast('第 ' + w.week + ' 周日期 ' + w.date + ' 不属于 ' + range.year + ' 年 ' + range.month + ' 月')
+      return
+    }
+  }
   // week 去重，避免同 week 两个
   const seenWeek = new Set()
   for (const w of filtered) {
