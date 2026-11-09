@@ -6478,6 +6478,16 @@ async function loadAdminWorktime() {
       html += '</div></div>'
     }
 
+    // v7.1：工时名单导出（按「助理工时考勤名单导入模板」生成 xlsx）
+    if (wtc.year && wtc.month) {
+      html += '<div class="section-card" style="margin-top:16px;background:linear-gradient(135deg,#f0fdf4,#ecfeff)"><h3> 工时名单导出</h3>'
+      html += '<p style="color:#666;font-size:13px;margin-top:6px">按「助理工时考勤名单导入模板」导出全部成员的工时名单（.xlsx）。已申报的成员填入工时，未申报的工时留空。</p>'
+      html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center">'
+      html += '<button class="quick-btn quick-btn-primary" onclick="exportWorkTimeRoster()"> 导出工时名单（xlsx）</button>'
+      html += '<span style="color:#888;font-size:12px;align-self:center">目标月份：<b>' + wtc.year + ' 年 ' + wtc.month + ' 月</b></span>'
+      html += '</div></div>'
+    }
+
     // 成员申报统计表
     html += '<div class="section-card" style="margin-top:16px"><h3> 成员申报统计</h3>';
     
@@ -6601,6 +6611,49 @@ async function exportAttendanceDocx(name) {
     document.body.removeChild(a);
     URL.revokeObjectURL(objectUrl);
   } catch (e) {
+    showToast('网络错误');
+  }
+}
+
+// v7.1：导出工时名单（xlsx，按「助理工时考勤名单导入模板」）
+async function exportWorkTimeRoster() {
+  const url = API + '/admin/worktime-claim/export-roster';
+  showToast('正在生成工时名单...');
+  try {
+    const headers = {};
+    if (adminToken) headers['X-Admin-Token'] = adminToken;
+    const res = await fetch(url + (adminToken ? ('?adminToken=' + encodeURIComponent(adminToken)) : ''), { headers });
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.msg || '导出失败，请重新登录管理员账号');
+      return;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.msg || '导出失败');
+      return;
+    }
+    const blob = await res.blob();
+    if (!blob || blob.size === 0) { showToast('导出失败：文件为空'); return; }
+    // 优先用后端给的中文文件名
+    let fileName = '助理工时考勤名单.xlsx';
+    const cd = res.headers.get('content-disposition') || '';
+    const starMatch = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (starMatch) {
+      try { fileName = decodeURIComponent(starMatch[1]); } catch (e) { /* keep default */ }
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(objectUrl);
+    showToast('工时名单已导出：' + fileName);
+  } catch (e) {
+    console.error('exportWorkTimeRoster', e);
     showToast('网络错误');
   }
 }
