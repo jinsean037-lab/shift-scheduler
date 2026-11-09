@@ -1,4 +1,4 @@
-# shift-scheduler-v3 — 学工办助理排班管理系统
+# shift-scheduler-v4 — 学工办助理排班管理系统
 
 ## 关键数据模型怪癖
 
@@ -302,3 +302,29 @@ pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
 - 后端改完需要重启 server（`node server.js`，端口 3000）。前端 SPA 无需重启，浏览器刷新即可
 - 本地种子数据脚本参考对话历史（不要把测试脚本留在仓库里）
 - Playwright MCP 可用：`mavis mcp call playwright browser_navigate` 等；工具调用用 `--file` 传 JSON 参数
+
+## 工时名单 xlsx 导出（v7.1，2026-11-09）
+
+管理员端「工时申报管理」页新增「工时名单导出」区块，导出**一个 xlsx 名单**（不是每人一个文件）。
+
+**API**：`GET /api/admin/worktime-claim/export-roster`
+- 走全局 `/api/admin/` 中间件鉴权（`adminToken` 走 header 或 query）
+- 返回 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+- `Content-Disposition` 同时给 ASCII fallback 和 `filename*=UTF-8''` 中文名（`2026年6月_助理工时考勤名单.xlsx`）
+
+**模板文件**：`backend/templates/roster-template.xlsx`
+- 用 `exceljs` **读模板**再填数据 → 表头、列宽（A=20 / C=40 / E=10 / F=22.625）、行高全部自动继承
+- 模板第 2 行是示例行（红色字体 = 待填写占位），导出时覆盖成数据
+- **模板文件要进 git**（`.gitignore` 没排除 `backend/templates/`）
+
+**导出规则**（2026-11-09 用户确认）：
+- 岗位类型固定 `固定岗`、岗位名称固定 `学工部103学生助理`（`server.js` 顶部 `ROSTER_POST_TYPE` / `ROSTER_POST_NAME` 常量）
+- 导出**全部成员**；已提交的填 `totalHours`，**未提交的工时留空**（`null`）
+- 学号来源：`store.memberProfiles[name].studentId`，回退到 `submissions[name].studentId`
+
+**样式坑**：
+- 学号列必须 `numFmt='@'`（文本），否则 12 位学号被 Excel 当数字变形
+- 申报工时列必须 `numFmt='General'`（数字）—— 不能跟学号一样用 `'@'`，否则对方无法 SUM
+- **不要**逐列复制模板第 2 行的样式：exceljs 会把宋体 10.5 截成 10.0，且 D 列字体跟其他列不一致。数据行统一写 `等线 11 + 居中 + 黑色`（模板的"预设数据行格式"）
+- exceljs 读模板时 D 列 `General` 会被读成 `'@'`，写回时列宽不受影响（已验证 A/C/E/F 宽度与模板完全一致）
+
