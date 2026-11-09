@@ -9,6 +9,16 @@ const {
 } = require('docx')
 // v5.0 邮件模块
 const nodemailer = require('nodemailer')
+// v7.1 工时名单导出（xlsx）
+const ExcelJS = require('exceljs')
+
+// ========== 工时名单导出配置（v7.1）============
+// 模板文件：backend/templates/roster-template.xlsx
+//   表头：姓名 | 学号 | 岗位类型 | 岗位名称 | 申报工时
+//   第 2 行是模板示例行（红色字体 = 待填写占位），导出时复用为数据行样式
+const ROSTER_TEMPLATE_PATH = path.join(__dirname, 'templates', 'roster-template.xlsx')
+const ROSTER_POST_TYPE = '固定岗'
+const ROSTER_POST_NAME = '学工部103学生助理'
 
 // ========== SMTP 配置（v5.0）============
 // 163 SMTP：smtp.163.com:465 (SSL)。授权码从环境变量读，本地默认值便于开发。
@@ -3985,6 +3995,73 @@ app.get('/api/admin/worktime-claim/export-all', async (req, res) => {
     })
   } catch (e) {
     console.error('批量导出错误:', e)
+    res.status(500).json({ ok: false, msg: '导出失败: ' + e.message })
+  }
+})
+
+// 管理员：按模板导出全部成员的工时名单（xlsx）
+// 规则：所有成员都导出；已提交的填工时，未提交的工时留空
+app.get('/api/admin/worktime-claim/export-roster', async (req, res) => {
+  try {
+    const store = await readStore()
+    const wtc = store.workTimeClaim || { year: null, month: null, isOpen: false, submissions: {} }
+    const members = Array.isArray(store.members) ? store.members : []
+    if (members.length === 0) {
+      return res.status(400).json({ ok: false, msg: '暂无成员数据' })
+    }
+
+    const wb = new ExcelJS.Workbook()
+    try {
+      await wb.xlsx.readFile(ROSTER_TEMPLATE_PATH)
+    } catch (e) {
+      console.error('[export-roster] 读取模板失败:', e.message)
+      return res.status(500).json({ ok: false, msg: '读取导出模板失败: ' + e.message })
+    }
+    const ws = wb.getWorksheet('Sheet0') || wb.worksheets[0]
+    if (!ws) return res.status(500).json({ ok: false, msg: '导出模板无工作表' })
+
+    // 模板第 2 行是示例行（红色字体 = 待填写占位）。
+    // 数据行统一采用模板的"预设数据行格式"：等线 11、居中、黑色；
+    // 学号列保持文本格式 @（防止 12 位学号变形），申报工时列用数字格式（方便对方 SUM）。
+    const STYLE_ROW = 2
+    const dataStyle = {
+      font: { name: '等线', size: 11, color: { argb: 'FF000000' } },
+      alignment: { horizontal: 'center', vertical: 'middle' },
+    }
+
+    const submissions = wtc.submissions || {}
+    members.forEach((name, idx) => {
+      const rowNo = STYLE_ROW + idx
+      const row = ws.getRow(rowNo)
+      for (let c = 1; c <= 5; c++) {
+        const cell = row.getCell(c)
+        cell.style = JSON.parse(JSON.stringify(dataStyle))
+        cell.numFmt = (c === 5) ? 'General' : '@'
+      }
+      const sub = submissions[name]
+      const profile = (store.memberProfiles && store.memberProfiles[name]) || {}
+      const studentId = String((profile.studentId || (sub && sub.studentId) || '')).trim()
+      const hours = sub ? Number(sub.totalHours) : null
+
+      row.getCell(1).value = name
+      row.getCell(2).value = studentId
+      row.getCell(3).value = ROSTER_POST_TYPE
+      row.getCell(4).value = ROSTER_POST_NAME
+      // 未提交 → 工时留空（null），已提交 → 数值
+      row.getCell(5).value = (hours === null || hours === undefined || Number.isNaN(hours)) ? null : hours
+      row.height = 17
+    })
+
+    // 清掉模板可能残留的多余行（成员数少于模板示例行数时不会有，这里兜底）
+    const buffer = await wb.xlsx.writeBuffer()
+    const year = wtc.year || new Date().getFullYear()
+    const month = wtc.month || (new Date().getMonth() + 1)
+    const fileName = `${year}年${month}月_助理工时考勤名单.xlsx`
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="roster-${year}-${month}.xlsx"; filename*=UTF-8''${encodeURIComponent(fileName)}`)
+    res.send(Buffer.from(buffer))
+  } catch (e) {
+    console.error('[export-roster] 导出失败:', e)
     res.status(500).json({ ok: false, msg: '导出失败: ' + e.message })
   }
 })
