@@ -1,4 +1,4 @@
-const { request, requireUser, toast, slotLabel, getLocation, rateShift } = require('../../utils/api')
+const { request, requireUser, toast, slotLabel, getLocation, rateShift, deleteShiftRating } = require('../../utils/api')
 
 function currentUserName() {
   const u = requireUser()
@@ -132,6 +132,28 @@ Page({
       })
     } catch (e) {
       console.error('loadRating', e)
+    }
+  },
+  // v7.5：重评 —— 清除当前这条评价，回到未评价状态后可重新打分
+  async reRate() {
+    const target = this.data.ratingTarget
+    if (!target) return
+    if (!this.data.myStars) { toast('还没有评价，先点星星打分'); return }
+    try {
+      const data = await deleteShiftRating({
+        name: currentUserName(),
+        date: target.date,
+        day: target.day,
+        slotId: target.slotId
+      })
+      if (data && data.ok) {
+        this.setData({ myStars: 0, slotAvg: data.slotAvg, slotCount: data.slotCount })
+        toast(data.msg || '已清除，可重新评价')
+      } else {
+        toast((data && data.msg) || '清除失败')
+      }
+    } catch (e) {
+      toast(e.message || '清除失败')
     }
   },
   // v7.3：点星星即时提交评价

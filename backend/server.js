@@ -2386,6 +2386,43 @@ app.post('/api/member/rate-shift', async (req, res) => {
   }
 })
 
+// 成员：撤销（清除）自己给出的某条评价，用于「重评」
+app.post('/api/member/rate-shift/delete', async (req, res) => {
+  try {
+    const { name, date, day, slotId } = req.body
+    if (!name || !date || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    const list = getShiftRatingList(store)
+    const idx = list.findIndex(r => r.name === name && r.date === date && r.day === day && r.slotId === slotId)
+    if (idx < 0) {
+      const agg0 = aggregateSlotRatings(store)
+      const k0 = day + '|' + slotId
+      return res.json({
+        ok: true,
+        msg: '当前没有评价记录',
+        removed: false,
+        slotAvg: agg0[k0] ? agg0[k0].avg : null,
+        slotCount: agg0[k0] ? agg0[k0].count : 0
+      })
+    }
+    list.splice(idx, 1)
+    await writeStore({ shiftRatings: list })
+    const agg = aggregateSlotRatings(store)
+    const key = day + '|' + slotId
+    res.json({
+      ok: true,
+      msg: '已清除评价，可重新评价',
+      removed: true,
+      slotAvg: agg[key] ? agg[key].avg : null,
+      slotCount: agg[key] ? agg[key].count : 0
+    })
+  } catch (e) {
+    console.error('[rate-shift/delete] 清除评价失败:', e)
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 // 成员：我给出的评价列表
 app.get('/api/member/my-ratings', async (req, res) => {
   try {

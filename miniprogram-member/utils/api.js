@@ -138,6 +138,11 @@ async function rateShift(payload) {
 async function getMyRatings(name) {
   return request('/member/my-ratings?name=' + encodeURIComponent(name))
 }
+
+// v7.5：清除（撤销）自己给出的某条评价，用于「重评」
+async function deleteShiftRating(payload) {
+  return request('/member/rate-shift/delete', { method: 'POST', data: payload })
+}
 function getLocation() {
   return new Promise((resolve, reject) => {
     wx.getLocation({
@@ -159,5 +164,6 @@ module.exports = {
   statusLabel,
   getLocation,
   rateShift,
-  getMyRatings
+  getMyRatings,
+  deleteShiftRating
 }

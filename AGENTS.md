@@ -376,6 +376,18 @@ pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
 **`pages/shifts/shifts.*`**
 - 时段行右侧显示 `4.2★` 徽章（选班参考）
 
+### v7.5 追加：标签改「班次评价（忙碌程度）」+「重评」按钮
+
+- 后端新增 `POST /api/member/rate-shift/delete`：body `{ name, date, day, slotId }`，删除自己那条评价，返回 `{ ok, removed, slotAvg, slotCount }`
+  - 记录不存在时返回 `removed: false`，不报错
+- 小程序 `utils/api.js` 新增 `deleteShiftRating(payload)`
+- 小程序 `pages/index/index.js` 新增 `reRate()`：调用删除接口 → `myStars` 归零、`slotAvg/slotCount` 用返回值刷新
+- 小程序 `pages/index/index.wxml`：
+  - 第四格标签改为 **班次评价（忙碌程度）**
+  - 标题行右侧加「重评」按钮，**仅在已有评价时显示**（`wx:if="{{ratingTarget && myStars}}"`），点击即清除并可重新打分
+- 小程序 `pages/index/index.wxss`：新增 `.stat-rate-head`（标题行 flex）、`.rate-reset`（紫色胶囊小按钮）
+- 注意：**点星星是「即时提交/更新」**，所以改分只需直接点别的星；「重评」按钮的作用是**撤销这条评价**，让平均分重新计算
+
 ### 网页端改动
 
 **`backend/public/index.html`**

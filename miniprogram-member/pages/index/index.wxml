@@ -25,7 +25,10 @@
       <view class="stat-sub">25 元/小时</view>
     </view>
     <view class="stat-cell stat-rate">
-      <view class="stat-label">班次评价</view>
+      <view class="stat-rate-head">
+        <view class="stat-label">班次评价（忙碌程度）</view>
+        <view class="rate-reset" wx:if="{{ratingTarget && myStars}}" bindtap="reRate">重评</view>
+      </view>
       <view class="stars" wx:if="{{ratingTarget}}">
         <text
           class="star {{item <= myStars ? 'on' : ''}}"
