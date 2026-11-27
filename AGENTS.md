@@ -328,3 +328,47 @@ pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
 - **不要**逐列复制模板第 2 行的样式：exceljs 会把宋体 10.5 截成 10.0，且 D 列字体跟其他列不一致。数据行统一写 `等线 11 + 居中 + 黑色`（模板的"预设数据行格式"）
 - exceljs 读模板时 D 列 `General` 会被读成 `'@'`，写回时列宽不受影响（已验证 A/C/E/F 宽度与模板完全一致）
 
+
+## 小程序端四宫格 + 天气（v7.2，2026-11-27）
+
+小程序端（`miniprogram-member/`）打卡页（`pages/index/`）新增**月度统计 + 天气四宫格**，放在 hero 卡片下方、today-shift 卡片上方。
+
+### 后端新增 2 个接口
+
+**`GET /api/member/monthly-stats?name=xxx`**
+- 口径与网页端首页一致：
+  - `shiftCount` = 本月签到次数（每个 `in` 记 1 次）+ 已批准补报次数（`daily[].checkinSlots.length` + `daily[].approvedOvertimes.length`）
+  - `totalHours` = `calculateMemberWorkTime` 的 `totalHours`（已含补报）
+  - `totalPay` = `calculateMemberWorkTime` 的 `totalPay`（25 元/小时）
+
+**`GET /api/weather`** — 广州市海珠区**次日**预报
+- 坐标硬编码 `WEATHER_LAT=23.0836` / `WEATHER_LON=113.2666`
+- **多源自动降级**（重要）：
+  1. `open-meteo`（无 key；Render 在境外约 200ms，**国内约 7s**）— 重试 2 次，超时 15s
+  2. `wttr.in`（无 key；国内约 1.5s，但**会限流**，实测 3 次挂 2 次）— 重试 2 次，超时 10s
+  - 任意一个成功即可；全失败则回退 `_weatherCache`（标 `stale:true`）
+- `_weatherCache` 按天缓存（`getBeijingDateString()` 作 key）→ 每天只抓一次；Render 休眠唤醒后进程重启自然重新抓
+- `decodeWeatherCode(code)` 把 WMO code 映射成 `{ text, icon, tip }`（tip 就是"大雨，记得带伞"这类提示语）
+- 两个源都用 **WMO weather code**（wttr.in 的 `hourly[].weatherCode` 也是 WMO），所以共用同一套映射
+
+### 小程序端改动
+
+**`utils/api.js`**
+- 新增 `WEATHER_KEY` 本地缓存（`wx.setStorageSync`，key 带当天日期，同一天不重复请求）
+- 新增 `getWeather(force)`：本地缓存 → 服务端 `/weather` → 网络失败退回上一次缓存
+- **`warmupService()` 成功后自动 `getWeather()`**（fire-and-forget，不阻塞唤醒）→ 这就是"每天有人登录唤醒系统就自动抓一次天气"
+- 导出 `getWeather` / `cachedWeather`
+
+**`pages/index/index.js`**
+- `onShow` 里并行调 `loadMonthlyStats()` + `loadWeather()`
+- `loadToday()` 不再渲染 `scheduleNotice`（今日班次下的提示框已删）
+
+**`pages/index/index.wxml` / `.wxss`**
+- 删掉 `scheduleNotice` 那个 `<view class="notice">`
+- 加 `.stat-grid`（2×2 grid），四格：值班次数 / 总工时 / 预计薪酬 / 明日天气
+
+### 部署注意
+
+- **Render 的 rootDir 是 `backend`**（不是仓库根）—— 所以 `exceljs` 只加在 `backend/package.json` 就够，root 的 package.json 没动
+- 本地跑 `node backend/server.js` 时依赖从 `backend/node_modules` 解析；**新 clone 后要先 `cd backend && npm install`**
+- 小程序端改完要在微信开发者工具里重新上传/预览

@@ -2223,6 +2223,209 @@ app.get('/api/member/today-status', async (req, res) => {
   }
 })
 
+// 成员：本月月度统计（小程序端打卡页四宫格用）
+// 口径与网页端首页一致：
+//   shiftCount = 本月签到次数（每个 in 记 1 次）+ 已批准补报次数
+//   totalHours = calculateMemberWorkTime 的 totalHours（已含补报）
+//   totalPay   = calculateMemberWorkTime 的 totalPay（25 元/小时）
+app.get('/api/member/monthly-stats', async (req, res) => {
+  try {
+    const name = req.query.name
+    if (!name) return res.json({ ok: false, msg: '缺少姓名' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const workData = calculateMemberWorkTime(store, name, year, month)
+    const daily = workData.daily || []
+    let shiftCount = 0
+    daily.forEach(d => {
+      shiftCount += (d.checkinSlots || []).length
+      shiftCount += (d.approvedOvertimes || []).length
+    })
+    res.json({
+      ok: true,
+      year,
+      month,
+      shiftCount,
+      totalHours: Math.round((workData.totalHours || 0) * 10) / 10,
+      totalPay: Math.round((workData.totalPay || 0) * 10) / 10,
+      workDays: workData.workDays || 0
+    })
+  } catch (e) {
+    console.error('[monthly-stats] 计算失败:', e)
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
+// ========== v7.2 天气（广州市海珠区次日预报） ==========
+// 数据源：Open-Meteo（免费、无需 API key）
+// 按天缓存：每天第一次请求时抓取并缓存；后端重启（Render 休眠唤醒）后自然重新抓取
+const WEATHER_LAT = 23.0836   // 广州市海珠区
+const WEATHER_LON = 113.2666
+const WEATHER_PLACE = '广州市海珠区'
+let _weatherCache = { day: null, payload: null }
+
+// WMO weather code → 中文描述 + 提示语
+function decodeWeatherCode(code) {
+  const c = Number(code)
+  if (c === 0) return { text: '晴', icon: '☀️', tip: '天气不错，适合出行' }
+  if (c === 1) return { text: '晴间多云', icon: '🌤️', tip: '天气不错，适合出行' }
+  if (c === 2) return { text: '多云', icon: '⛅', tip: '多云，带件薄外套更稳妥' }
+  if (c === 3) return { text: '阴', icon: '☁️', tip: '阴天，注意保暖' }
+  if (c === 45 || c === 48) return { text: '雾', icon: '🌫️', tip: '有雾，能见度低，出行注意安全' }
+  if (c === 51 || c === 53 || c === 55) return { text: '毛毛雨', icon: '🌦️', tip: '有零星小雨，记得带伞' }
+  if (c === 56 || c === 57) return { text: '冻雨', icon: '🌧️', tip: '有冻雨，路滑，记得带伞' }
+  if (c === 61) return { text: '小雨', icon: '🌦️', tip: '有小雨，记得带伞' }
+  if (c === 63) return { text: '中雨', icon: '🌧️', tip: '有中雨，记得带伞' }
+  if (c === 65) return { text: '大雨', icon: '🌧️', tip: '大雨，记得带伞' }
+  if (c === 66 || c === 67) return { text: '冻雨', icon: '🌧️', tip: '有冻雨，路滑，记得带伞' }
+  if (c === 71) return { text: '小雪', icon: '🌨️', tip: '有小雪，注意保暖' }
+  if (c === 73) return { text: '中雪', icon: '❄️', tip: '有中雪，注意保暖' }
+  if (c === 75) return { text: '大雪', icon: '❄️', tip: '有大雪，注意保暖和路滑' }
+  if (c === 77) return { text: '米雪', icon: '🌨️', tip: '有零星雪，注意保暖' }
+  if (c === 80) return { text: '小阵雨', icon: '🌦️', tip: '有阵雨，记得带伞' }
+  if (c === 81) return { text: '阵雨', icon: '🌧️', tip: '有阵雨，记得带伞' }
+  if (c === 82) return { text: '强阵雨', icon: '⛈️', tip: '有强阵雨，记得带伞并注意安全' }
+  if (c === 85) return { text: '小阵雪', icon: '🌨️', tip: '有阵雪，注意保暖' }
+  if (c === 86) return { text: '阵雪', icon: '❄️', tip: '有阵雪，注意保暖和路滑' }
+  if (c === 95) return { text: '雷阵雨', icon: '⛈️', tip: '雷阵雨，注意安全并及时收好物品' }
+  if (c === 96 || c === 99) return { text: '雷阵雨伴冰雹', icon: '⛈️', tip: '雷暴冰雹风险，尽量避免外出' }
+  return { text: '未知', icon: '🌡️', tip: '天气情况待更新' }
+}
+
+// 带超时的 fetch
+async function fetchWithTimeout(url, timeoutMs) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    const r = await fetch(url, { signal: ctrl.signal })
+    if (!r.ok) throw new Error('HTTP ' + r.status)
+    return await r.json()
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// 源 1：Open-Meteo（Render 在境外，访问快；国内约 7s）
+async function fetchWeatherOpenMeteo() {
+  const url = 'https://api.open-meteo.com/v1/forecast'
+    + '?latitude=' + WEATHER_LAT
+    + '&longitude=' + WEATHER_LON
+    + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+    + '&timezone=Asia%2FShanghai'
+    + '&forecast_days=3'
+  const data = await fetchWithTimeout(url, 15000)
+  const daily = (data && data.daily) || {}
+  const times = daily.time || []
+  // index 0 = 今天；index 1 = 次日
+  if (times.length < 2) throw new Error('Open-Meteo 预报数据不足')
+  const idx = 1
+  const decoded = decodeWeatherCode((daily.weather_code || [])[idx])
+  const tempMax = (daily.temperature_2m_max || [])[idx]
+  const tempMin = (daily.temperature_2m_min || [])[idx]
+  const precip = (daily.precipitation_probability_max || [])[idx]
+  return {
+    place: WEATHER_PLACE,
+    date: times[idx],
+    text: decoded.text,
+    icon: decoded.icon,
+    tip: decoded.tip,
+    tempMax: typeof tempMax === 'number' ? Math.round(tempMax) : null,
+    tempMin: typeof tempMin === 'number' ? Math.round(tempMin) : null,
+    precipProb: typeof precip === 'number' ? precip : null,
+    source: 'open-meteo'
+  }
+}
+
+// 源 2：wttr.in（国内约 1.5s，但会限流，需重试）
+async function fetchWeatherWttr() {
+  const data = await fetchWithTimeout('https://wttr.in/Guangzhou?format=j1', 10000)
+  const w = ((data && data.weather) || [])[1]
+  if (!w) throw new Error('wttr.in 预报数据不足')
+  const hourly = w.hourly || []
+  if (!hourly.length) throw new Error('wttr.in 无逐时数据')
+  // 取降水概率最高的那一小时作为"明天天气"代表
+  const pick = hourly.reduce((a, b) => (Number(b.chanceofrain || 0) > Number(a.chanceofrain || 0) ? b : a), hourly[0])
+  const decoded = decodeWeatherCode(pick.weatherCode)
+  const rainProb = hourly.reduce((m, h) => Math.max(m, Number(h.chanceofrain || 0)), 0)
+  const tMax = Number(w.maxtempC)
+  const tMin = Number(w.mintempC)
+  return {
+    place: WEATHER_PLACE,
+    date: w.date || '',
+    text: decoded.text,
+    icon: decoded.icon,
+    tip: decoded.tip,
+    tempMax: Number.isFinite(tMax) ? Math.round(tMax) : null,
+    tempMin: Number.isFinite(tMin) ? Math.round(tMin) : null,
+    precipProb: Number.isFinite(rainProb) ? rainProb : null,
+    source: 'wttr.in'
+  }
+}
+
+// 依次尝试各数据源，任意一个成功即可
+async function fetchTomorrowWeather() {
+  const sources = [
+    { name: 'open-meteo', fn: fetchWeatherOpenMeteo, retries: 2 },
+    { name: 'wttr.in', fn: fetchWeatherWttr, retries: 2 }
+  ]
+  let lastErr = null
+  for (const src of sources) {
+    for (let attempt = 0; attempt < src.retries; attempt++) {
+      try {
+        return await src.fn()
+      } catch (e) {
+        lastErr = e
+        console.warn('[weather] 数据源 ' + src.name + ' 第 ' + (attempt + 1) + ' 次失败: ' + e.message)
+        if (attempt < src.retries - 1) await new Promise(r => setTimeout(r, 600))
+      }
+    }
+  }
+  throw lastErr || new Error('所有天气数据源均不可用')
+}
+
+// GET /api/weather — 海珠区次日天气（按天缓存）
+app.get('/api/weather', async (req, res) => {
+  try {
+    const today = getBeijingDateString()
+    if (_weatherCache.day === today && _weatherCache.payload) {
+      return res.json({ ok: true, cached: true, ..._weatherCache.payload })
+    }
+    const payload = await fetchTomorrowWeather()
+    _weatherCache = { day: today, payload }
+    res.json({ ok: true, cached: false, ...payload })
+  } catch (e) {
+    console.error('[weather] 抓取失败:', e.message)
+    // 抓取失败时回退到上一次成功的结果（标 stale）
+    if (_weatherCache.payload) {
+      return res.json({ ok: true, cached: true, stale: true, ..._weatherCache.payload })
+    }
+    res.status(503).json({ ok: false, msg: '天气信息获取失败，请稍后重试' })
+  }
+})
+
+// GET /api/weather — 海珠区次日天气（按天缓存）
+app.get('/api/weather', async (req, res) => {
+  try {
+    const today = getBeijingDateString()
+    if (_weatherCache.day === today && _weatherCache.payload) {
+      return res.json({ ok: true, cached: true, ..._weatherCache.payload })
+    }
+    const payload = await fetchTomorrowWeather()
+    _weatherCache = { day: today, payload }
+    res.json({ ok: true, cached: false, ...payload })
+  } catch (e) {
+    console.error('[weather] 抓取失败:', e.message)
+    // 抓取失败时回退到上一次成功的结果（标 stale）
+    if (_weatherCache.payload) {
+      return res.json({ ok: true, cached: true, stale: true, ..._weatherCache.payload })
+    }
+    res.status(503).json({ ok: false, msg: '天气信息获取失败，请稍后重试' })
+  }
+})
+
 // POST /api/checkin — 签到（必须在排班时间窗口内）
 app.post('/api/checkin', async (req, res) => {
   try {
