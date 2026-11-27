@@ -16,7 +16,10 @@
 
       <block wx:if="{{item.slots.length}}">
         <view class="slot-line" wx:for="{{item.slots}}" wx:key="key">
-          <view class="slot-time">{{item.slotLabel}}</view>
+          <view class="slot-time">
+            <text>{{item.slotLabel}}</text>
+            <text class="slot-rate" wx:if="{{item.avgRating}}">{{item.avgRating}}★</text>
+          </view>
           <view class="slot-members">{{item.membersText}}</view>
         </view>
       </block>

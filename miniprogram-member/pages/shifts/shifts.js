@@ -37,7 +37,8 @@ Page({
           key: `${day.date}_${slot.slotId}`,
           slotId: slot.slotId,
           slotLabel: slot.label || slotLabel(slot.slotId),
-          membersText: (slot.members || []).join('、') || '—'
+          membersText: (slot.members || []).join('、') || '—',
+          avgRating: (slot.avgRating === undefined ? null : slot.avgRating)
         }))
       }))
       const weekRange = week.weekStart && week.weekEnd

@@ -329,43 +329,64 @@ pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
 - exceljs 读模板时 D 列 `General` 会被读成 `'@'`，写回时列宽不受影响（已验证 A/C/E/F 宽度与模板完全一致）
 
 
-## 小程序端四宫格 + 天气（v7.2，2026-11-27）
+## 小程序端四宫格 + 班次评价系统（v7.3，2026-11-27）
 
-小程序端（`miniprogram-member/`）打卡页（`pages/index/`）新增**月度统计 + 天气四宫格**，放在 hero 卡片下方、today-shift 卡片上方。
+打卡页四宫格：**本月值班 / 总工时 / 预计薪酬 / 班次评价**（1–5 星，评价「这一班有多忙」）。
 
-### 后端新增 2 个接口
+> v7.2 曾做过「明日天气」，已按用户要求**整体移除**：后端 `/api/weather`、小程序 `getWeather()` 与 `WEATHER_KEY` 缓存、`warmupService()` 里的自动抓取全部删掉。
 
-**`GET /api/member/monthly-stats?name=xxx`**
-- 口径与网页端首页一致：
-  - `shiftCount` = 本月签到次数（每个 `in` 记 1 次）+ 已批准补报次数（`daily[].checkinSlots.length` + `daily[].approvedOvertimes.length`）
-  - `totalHours` = `calculateMemberWorkTime` 的 `totalHours`（已含补报）
-  - `totalPay` = `calculateMemberWorkTime` 的 `totalPay`（25 元/小时）
+### 后端新增 3 个接口
 
-**`GET /api/weather`** — 广州市海珠区**次日**预报
-- 坐标硬编码 `WEATHER_LAT=23.0836` / `WEATHER_LON=113.2666`
-- **多源自动降级**（重要）：
-  1. `open-meteo`（无 key；Render 在境外约 200ms，**国内约 7s**）— 重试 2 次，超时 15s
-  2. `wttr.in`（无 key；国内约 1.5s，但**会限流**，实测 3 次挂 2 次）— 重试 2 次，超时 10s
-  - 任意一个成功即可；全失败则回退 `_weatherCache`（标 `stale:true`）
-- `_weatherCache` 按天缓存（`getBeijingDateString()` 作 key）→ 每天只抓一次；Render 休眠唤醒后进程重启自然重新抓
-- `decodeWeatherCode(code)` 把 WMO code 映射成 `{ text, icon, tip }`（tip 就是"大雨，记得带伞"这类提示语）
-- 两个源都用 **WMO weather code**（wttr.in 的 `hourly[].weatherCode` 也是 WMO），所以共用同一套映射
+**`POST /api/member/rate-shift`** — 提交 / 更新评价
+- body：`{ name, date, day, slotId, stars, comment }`
+- 校验：`stars` 为 1–5 整数；`dateToWeekday(date) === day`；成员**确实值过该班次**
+  （`wasMemberOnSlot()`：查当前 `schedule` 的生效名单 + `confirmedPeriods` 历史归档，两者都查才能覆盖往期班次）
+- 同一成员对同一「日期+周几+时段」只有一条记录，重复提交 = 更新
+- 返回 `{ ok, msg, rating, slotAvg, slotCount }`
+
+**`GET /api/member/my-ratings?name=xxx`** → `{ ok, ratings, slotAverages }`
+- `slotAverages` 是 `周几|slotId` → `{ day, slotId, count, sum, avg }` 的聚合表
+
+**`GET /api/admin/shift-ratings`**（需管理员 token）→ `{ ok, ratings, slots }`
+- `slots` = 5 天 × 4 时段全矩阵，每项 `{ day, slotId, label, avg, count }`，未评价的 `avg = null`
+- `ratings` 每条带 `slotLabel`（时段名称）
+
+### 数据模型与聚合口径
+
+- `store.shiftRatings = [{ id, name, date, day, slotId, stars, comment, createdAt, updatedAt }]`
+- 聚合按 **`day + slotId`**（不按日期）汇总平均星级 —— 用途是「下一次选班时看某个时段忙不忙」，不是评价某一次具体值班
+- `GET /api/member/week-schedule` 的每个 slot 新增 `avgRating`（数字）与 `avgRatingCount`
 
 ### 小程序端改动
 
 **`utils/api.js`**
-- 新增 `WEATHER_KEY` 本地缓存（`wx.setStorageSync`，key 带当天日期，同一天不重复请求）
-- 新增 `getWeather(force)`：本地缓存 → 服务端 `/weather` → 网络失败退回上一次缓存
-- **`warmupService()` 成功后自动 `getWeather()`**（fire-and-forget，不阻塞唤醒）→ 这就是"每天有人登录唤醒系统就自动抓一次天气"
-- 导出 `getWeather` / `cachedWeather`
+- 新增 `rateShift(payload)` / `getMyRatings(name)`
+- 删除 `getWeather()`、`WEATHER_KEY` 缓存、`warmupService()` 里的自动抓天气
 
 **`pages/index/index.js`**
-- `onShow` 里并行调 `loadMonthlyStats()` + `loadWeather()`
-- `loadToday()` 不再渲染 `scheduleNotice`（今日班次下的提示框已删）
+- `loadRating()` 并行调 `/member/today-status` + `/member/my-ratings` + `/member/week-schedule`
+- 评价对象优先级：**今天的第一班** → 本周最近的**未评价**班次 → 本周最近的班次 → 最近一条历史评价
+- `pickStar()` 点星即时提交（乐观更新 UI，失败回滚提示）
+- `loadToday()` 不再保留 `scheduleNotice` 字段（两个提示框都已删）
 
 **`pages/index/index.wxml` / `.wxss`**
-- 删掉 `scheduleNotice` 那个 `<view class="notice">`
-- 加 `.stat-grid`（2×2 grid），四格：值班次数 / 总工时 / 预计薪酬 / 明日天气
+- 第四格 = 「班次评价」：5 颗可点星 + 我的星级 + 该时段平均分与评价人数
+- 删除今日班次下的提示框、删除页面底部「提示」卡片
+
+**`pages/shifts/shifts.*`**
+- 时段行右侧显示 `4.2★` 徽章（选班参考）
+
+### 网页端改动
+
+**`backend/public/index.html`**
+- 「本月值班情况」页（`adminMonthlyView`）新增「班次评价（忙碌程度）」板块：
+  - 上半部分卡片：各时段平均星级 + 评价人数
+  - 下半部分表格：日期 / 星期 / 时段 / 成员 / 星级 / 备注
+- 数据源 `GET /api/admin/shift-ratings`，随 `loadAdminMonthly()` 自动加载（管理员 token 由全局 fetch 包装器自动带 `X-Admin-Token`）
+
+### 踩坑
+
+- `aggregateSlotRatings()` 里 `Object.keys(map).forEach(k => ...)` 回调参数是 `k`，写成 `map[key]` 会抛 `ReferenceError: key is not defined`（只在有评价记录时才触发）
 
 ### 部署注意
 

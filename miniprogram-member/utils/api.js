@@ -129,6 +129,15 @@ function statusLabel(status) {
   return map[status] || status || ''
 }
 
+// v7.3：给某个具体班次打星（1-5）
+async function rateShift(payload) {
+  return request('/member/rate-shift', { method: 'POST', data: payload })
+}
+
+// v7.3：我给出的评价 + 各时段平均星级
+async function getMyRatings(name) {
+  return request('/member/my-ratings?name=' + encodeURIComponent(name))
+}
 function getLocation() {
   return new Promise((resolve, reject) => {
     wx.getLocation({
@@ -148,5 +157,7 @@ module.exports = {
   toast,
   slotLabel,
   statusLabel,
-  getLocation
+  getLocation,
+  rateShift,
+  getMyRatings
 }

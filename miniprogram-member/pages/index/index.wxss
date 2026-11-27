@@ -28,6 +28,112 @@
   color: #9a3412;
 }
 
+/* ========== v7.3 月度统计 + 班次评价 四宫格 ========== */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+  margin-bottom: 24rpx;
+}
+
+.stat-cell {
+  background: #fff;
+  border-radius: 12rpx;
+  padding: 24rpx 24rpx 22rpx;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
+  min-height: 200rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 10rpx;
+}
+
+.stat-value {
+  font-size: 48rpx;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #111827;
+}
+
+.stat-unit {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #6b7280;
+  margin-left: 6rpx;
+}
+
+.stat-sub {
+  font-size: 22rpx;
+  color: #9ca3af;
+  margin-top: 10rpx;
+}
+
+.stat-shift {
+  border-top: 6rpx solid #8B1A1A;
+}
+
+.stat-shift .stat-value {
+  color: #8B1A1A;
+}
+
+.stat-hours {
+  border-top: 6rpx solid #2563eb;
+}
+
+.stat-hours .stat-value {
+  color: #2563eb;
+}
+
+.stat-pay {
+  border-top: 6rpx solid #d97706;
+}
+
+.stat-pay .stat-value {
+  color: #d97706;
+}
+
+/* 班次评价格 */
+.stat-rate {
+  border-top: 6rpx solid #7c3aed;
+}
+
+.stat-rate .stat-value {
+  color: #7c3aed;
+}
+
+.stat-rate-num {
+  font-size: 40rpx;
+  margin-top: 6rpx;
+}
+
+.stars {
+  display: flex;
+  gap: 4rpx;
+  margin-bottom: 4rpx;
+}
+
+.star {
+  font-size: 40rpx;
+  line-height: 1;
+  color: #e5e7eb;
+}
+
+.star.on {
+  color: #f59e0b;
+}
+
+.stat-rate-avg {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
 .action-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

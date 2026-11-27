@@ -874,6 +874,7 @@ function buildMemberWeekSchedule(store, baseDate) {
   const weekStart = getWeekStartMonday(today)
   const slots = store.timeSlots || defaultStore().timeSlots
   const slotIds = slots.map(s => s.id)
+  const slotRatingAvg = aggregateSlotRatings(store)   // v7.3 各时段平均星级（选班参考）
   const days = []
   for (let i = 0; i < 5; i++) {
     const date = addDaysString(weekStart, i)
@@ -888,7 +889,13 @@ function buildMemberWeekSchedule(store, baseDate) {
             slotId,
             label: slotInfo ? slotInfo.label : slotId,
             period: slotInfo ? slotInfo.period : '',
-            members: slotMembers
+            members: slotMembers,
+            avgRating: slotRatingAvg[weekday + '|' + slotId]
+              ? slotRatingAvg[weekday + '|' + slotId].avg
+              : null,
+            avgRatingCount: slotRatingAvg[weekday + '|' + slotId]
+              ? slotRatingAvg[weekday + '|' + slotId].count
+              : 0
           })
         }
       }
@@ -2258,175 +2265,143 @@ app.get('/api/member/monthly-stats', async (req, res) => {
     res.status(500).json({ ok: false, msg: '服务器错误' })
   }
 })
-
-// ========== v7.2 天气（广州市海珠区次日预报） ==========
-// 数据源：Open-Meteo（免费、无需 API key）
-// 按天缓存：每天第一次请求时抓取并缓存；后端重启（Render 休眠唤醒）后自然重新抓取
-const WEATHER_LAT = 23.0836   // 广州市海珠区
-const WEATHER_LON = 113.2666
-const WEATHER_PLACE = '广州市海珠区'
-let _weatherCache = { day: null, payload: null }
-
-// WMO weather code → 中文描述 + 提示语
-function decodeWeatherCode(code) {
-  const c = Number(code)
-  if (c === 0) return { text: '晴', icon: '☀️', tip: '天气不错，适合出行' }
-  if (c === 1) return { text: '晴间多云', icon: '🌤️', tip: '天气不错，适合出行' }
-  if (c === 2) return { text: '多云', icon: '⛅', tip: '多云，带件薄外套更稳妥' }
-  if (c === 3) return { text: '阴', icon: '☁️', tip: '阴天，注意保暖' }
-  if (c === 45 || c === 48) return { text: '雾', icon: '🌫️', tip: '有雾，能见度低，出行注意安全' }
-  if (c === 51 || c === 53 || c === 55) return { text: '毛毛雨', icon: '🌦️', tip: '有零星小雨，记得带伞' }
-  if (c === 56 || c === 57) return { text: '冻雨', icon: '🌧️', tip: '有冻雨，路滑，记得带伞' }
-  if (c === 61) return { text: '小雨', icon: '🌦️', tip: '有小雨，记得带伞' }
-  if (c === 63) return { text: '中雨', icon: '🌧️', tip: '有中雨，记得带伞' }
-  if (c === 65) return { text: '大雨', icon: '🌧️', tip: '大雨，记得带伞' }
-  if (c === 66 || c === 67) return { text: '冻雨', icon: '🌧️', tip: '有冻雨，路滑，记得带伞' }
-  if (c === 71) return { text: '小雪', icon: '🌨️', tip: '有小雪，注意保暖' }
-  if (c === 73) return { text: '中雪', icon: '❄️', tip: '有中雪，注意保暖' }
-  if (c === 75) return { text: '大雪', icon: '❄️', tip: '有大雪，注意保暖和路滑' }
-  if (c === 77) return { text: '米雪', icon: '🌨️', tip: '有零星雪，注意保暖' }
-  if (c === 80) return { text: '小阵雨', icon: '🌦️', tip: '有阵雨，记得带伞' }
-  if (c === 81) return { text: '阵雨', icon: '🌧️', tip: '有阵雨，记得带伞' }
-  if (c === 82) return { text: '强阵雨', icon: '⛈️', tip: '有强阵雨，记得带伞并注意安全' }
-  if (c === 85) return { text: '小阵雪', icon: '🌨️', tip: '有阵雪，注意保暖' }
-  if (c === 86) return { text: '阵雪', icon: '❄️', tip: '有阵雪，注意保暖和路滑' }
-  if (c === 95) return { text: '雷阵雨', icon: '⛈️', tip: '雷阵雨，注意安全并及时收好物品' }
-  if (c === 96 || c === 99) return { text: '雷阵雨伴冰雹', icon: '⛈️', tip: '雷暴冰雹风险，尽量避免外出' }
-  return { text: '未知', icon: '🌡️', tip: '天气情况待更新' }
+// ========== v7.3 班次评价（忙碌程度星级，1-5 星） ==========
+// 成员对自己值过的班次打分（一次班次一条记录，重复评价 = 更新）。
+// 聚合口径：按 day+slotId 汇总平均星级 → 作为下一次选班的参考。
+function getShiftRatingList(store) {
+  if (!Array.isArray(store.shiftRatings)) store.shiftRatings = []
+  return store.shiftRatings
 }
 
-// 带超时的 fetch
-async function fetchWithTimeout(url, timeoutMs) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+// 按 slot（周X+时段）聚合平均星级
+function aggregateSlotRatings(store) {
+  const list = getShiftRatingList(store)
+  const map = {}
+  list.forEach(r => {
+    const key = r.day + '|' + r.slotId
+    if (!map[key]) map[key] = { day: r.day, slotId: r.slotId, count: 0, sum: 0, avg: 0 }
+    map[key].count += 1
+    map[key].sum += Number(r.stars) || 0
+  })
+  Object.keys(map).forEach(k => {
+    map[k].avg = Math.round((map[k].sum / map[k].count) * 100) / 100
+  })
+  return map
+}
+
+// 判断某成员是否真的值过某个具体日期的班次。
+// 注意：历史班次在 confirmedPeriods 归档里，当前 schedule 里查不到。
+function wasMemberOnSlot(store, name, date, day, slotId) {
+  if (!date || !day || !slotId) return false
   try {
-    const r = await fetch(url, { signal: ctrl.signal })
-    if (!r.ok) throw new Error('HTTP ' + r.status)
-    return await r.json()
-  } finally {
-    clearTimeout(timer)
+    if (getEffectiveSlotMembers(store, date, day, slotId).includes(name)) return true
+  } catch (e) { /* ignore */ }
+  const periods = Array.isArray(store.confirmedPeriods) ? store.confirmedPeriods : []
+  for (const p of periods) {
+    const s = p.start ? String(p.start).slice(0, 10) : null
+    const e = p.end ? String(p.end).slice(0, 10) : null
+    if (!s || !e || date < s || date > e) continue
+    const list = getScheduleList(p.schedule || {}, day, slotId)
+    if (Array.isArray(list) && list.includes(name)) return true
   }
+  return false
 }
 
-// 源 1：Open-Meteo（Render 在境外，访问快；国内约 7s）
-async function fetchWeatherOpenMeteo() {
-  const url = 'https://api.open-meteo.com/v1/forecast'
-    + '?latitude=' + WEATHER_LAT
-    + '&longitude=' + WEATHER_LON
-    + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'
-    + '&timezone=Asia%2FShanghai'
-    + '&forecast_days=3'
-  const data = await fetchWithTimeout(url, 15000)
-  const daily = (data && data.daily) || {}
-  const times = daily.time || []
-  // index 0 = 今天；index 1 = 次日
-  if (times.length < 2) throw new Error('Open-Meteo 预报数据不足')
-  const idx = 1
-  const decoded = decodeWeatherCode((daily.weather_code || [])[idx])
-  const tempMax = (daily.temperature_2m_max || [])[idx]
-  const tempMin = (daily.temperature_2m_min || [])[idx]
-  const precip = (daily.precipitation_probability_max || [])[idx]
-  return {
-    place: WEATHER_PLACE,
-    date: times[idx],
-    text: decoded.text,
-    icon: decoded.icon,
-    tip: decoded.tip,
-    tempMax: typeof tempMax === 'number' ? Math.round(tempMax) : null,
-    tempMin: typeof tempMin === 'number' ? Math.round(tempMin) : null,
-    precipProb: typeof precip === 'number' ? precip : null,
-    source: 'open-meteo'
-  }
-}
-
-// 源 2：wttr.in（国内约 1.5s，但会限流，需重试）
-async function fetchWeatherWttr() {
-  const data = await fetchWithTimeout('https://wttr.in/Guangzhou?format=j1', 10000)
-  const w = ((data && data.weather) || [])[1]
-  if (!w) throw new Error('wttr.in 预报数据不足')
-  const hourly = w.hourly || []
-  if (!hourly.length) throw new Error('wttr.in 无逐时数据')
-  // 取降水概率最高的那一小时作为"明天天气"代表
-  const pick = hourly.reduce((a, b) => (Number(b.chanceofrain || 0) > Number(a.chanceofrain || 0) ? b : a), hourly[0])
-  const decoded = decodeWeatherCode(pick.weatherCode)
-  const rainProb = hourly.reduce((m, h) => Math.max(m, Number(h.chanceofrain || 0)), 0)
-  const tMax = Number(w.maxtempC)
-  const tMin = Number(w.mintempC)
-  return {
-    place: WEATHER_PLACE,
-    date: w.date || '',
-    text: decoded.text,
-    icon: decoded.icon,
-    tip: decoded.tip,
-    tempMax: Number.isFinite(tMax) ? Math.round(tMax) : null,
-    tempMin: Number.isFinite(tMin) ? Math.round(tMin) : null,
-    precipProb: Number.isFinite(rainProb) ? rainProb : null,
-    source: 'wttr.in'
-  }
-}
-
-// 依次尝试各数据源，任意一个成功即可
-async function fetchTomorrowWeather() {
-  const sources = [
-    { name: 'open-meteo', fn: fetchWeatherOpenMeteo, retries: 2 },
-    { name: 'wttr.in', fn: fetchWeatherWttr, retries: 2 }
-  ]
-  let lastErr = null
-  for (const src of sources) {
-    for (let attempt = 0; attempt < src.retries; attempt++) {
-      try {
-        return await src.fn()
-      } catch (e) {
-        lastErr = e
-        console.warn('[weather] 数据源 ' + src.name + ' 第 ' + (attempt + 1) + ' 次失败: ' + e.message)
-        if (attempt < src.retries - 1) await new Promise(r => setTimeout(r, 600))
-      }
-    }
-  }
-  throw lastErr || new Error('所有天气数据源均不可用')
-}
-
-// GET /api/weather — 海珠区次日天气（按天缓存）
-app.get('/api/weather', async (req, res) => {
+// 成员：给某个具体班次打星（1-5）
+app.post('/api/member/rate-shift', async (req, res) => {
   try {
-    const today = getBeijingDateString()
-    if (_weatherCache.day === today && _weatherCache.payload) {
-      return res.json({ ok: true, cached: true, ..._weatherCache.payload })
+    const { name, date, day, slotId, stars, comment } = req.body
+    if (!name || !date || !day || !slotId) return res.json({ ok: false, msg: '参数缺失' })
+    const s = Number(stars)
+    if (!Number.isInteger(s) || s < 1 || s > 5) return res.json({ ok: false, msg: '星级必须是 1-5 的整数' })
+    const store = await readStore()
+    if (!store.members.includes(name)) return res.json({ ok: false, msg: '成员不存在' })
+    if (dateToWeekday(date) !== day) return res.json({ ok: false, msg: '日期与周几不匹配' })
+    if (!wasMemberOnSlot(store, name, date, day, slotId)) {
+      return res.json({ ok: false, msg: '你不在该班次中，无法评价' })
     }
-    const payload = await fetchTomorrowWeather()
-    _weatherCache = { day: today, payload }
-    res.json({ ok: true, cached: false, ...payload })
+    const list = getShiftRatingList(store)
+    const existing = list.find(r => r.name === name && r.date === date && r.day === day && r.slotId === slotId)
+    const now = getBeijingDateTimeString()
+    if (existing) {
+      existing.stars = s
+      existing.comment = String(comment || '').slice(0, 200)
+      existing.updatedAt = now
+    } else {
+      list.push({
+        id: 'rate_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        name, date, day, slotId,
+        stars: s,
+        comment: String(comment || '').slice(0, 200),
+        createdAt: now,
+        updatedAt: now
+      })
+    }
+    await writeStore({ shiftRatings: list })
+    const agg = aggregateSlotRatings(store)
+    const key = day + '|' + slotId
+    res.json({
+      ok: true,
+      msg: existing ? '评价已更新' : '评价成功',
+      rating: existing || list[list.length - 1],
+      slotAvg: agg[key] ? agg[key].avg : s,
+      slotCount: agg[key] ? agg[key].count : 1
+    })
   } catch (e) {
-    console.error('[weather] 抓取失败:', e.message)
-    // 抓取失败时回退到上一次成功的结果（标 stale）
-    if (_weatherCache.payload) {
-      return res.json({ ok: true, cached: true, stale: true, ..._weatherCache.payload })
-    }
-    res.status(503).json({ ok: false, msg: '天气信息获取失败，请稍后重试' })
+    console.error('[rate-shift] 评价失败:', e)
+    res.status(500).json({ ok: false, msg: '服务器错误' })
   }
 })
 
-// GET /api/weather — 海珠区次日天气（按天缓存）
-app.get('/api/weather', async (req, res) => {
+// 成员：我给出的评价列表
+app.get('/api/member/my-ratings', async (req, res) => {
   try {
-    const today = getBeijingDateString()
-    if (_weatherCache.day === today && _weatherCache.payload) {
-      return res.json({ ok: true, cached: true, ..._weatherCache.payload })
-    }
-    const payload = await fetchTomorrowWeather()
-    _weatherCache = { day: today, payload }
-    res.json({ ok: true, cached: false, ...payload })
+    const name = req.query.name
+    if (!name) return res.json({ ok: true, ratings: [] })
+    const store = await readStore()
+    const ratings = getShiftRatingList(store)
+      .filter(r => r.name === name)
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    const agg = aggregateSlotRatings(store)
+    res.json({ ok: true, ratings, slotAverages: agg })
   } catch (e) {
-    console.error('[weather] 抓取失败:', e.message)
-    // 抓取失败时回退到上一次成功的结果（标 stale）
-    if (_weatherCache.payload) {
-      return res.json({ ok: true, cached: true, stale: true, ..._weatherCache.payload })
-    }
-    res.status(503).json({ ok: false, msg: '天气信息获取失败，请稍后重试' })
+    res.status(500).json({ ok: false, msg: '服务器错误' })
   }
 })
 
-// POST /api/checkin — 签到（必须在排班时间窗口内）
+// 管理员：全部班次评价 + 各时段平均星级
+app.get('/api/admin/shift-ratings', async (req, res) => {
+  try {
+    const store = await readStore()
+    const list = getShiftRatingList(store)
+    const slots = store.timeSlots || defaultStore().timeSlots
+    const agg = aggregateSlotRatings(store)
+    const slotRows = []
+    const days = ['周一','周二','周三','周四','周五']
+    days.forEach(day => {
+      slots.forEach(slot => {
+        const key = day + '|' + slot.id
+        const a = agg[key]
+        slotRows.push({
+          day,
+          slotId: slot.id,
+          label: slot.label || slot.id,
+          avg: a ? a.avg : null,
+          count: a ? a.count : 0
+        })
+      })
+    })
+    const slotLabelMap = {}
+    slots.forEach(sl => { slotLabelMap[sl.id] = sl.label || sl.id })
+    const ratings = list.map(r => Object.assign({}, r, { slotLabel: slotLabelMap[r.slotId] || r.slotId }))
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    res.json({ ok: true, ratings, slots: slotRows })
+  } catch (e) {
+    console.error('[shift-ratings] 读取失败:', e)
+    res.status(500).json({ ok: false, msg: '服务器错误' })
+  }
+})
+
 app.post('/api/checkin', async (req, res) => {
   try {
     const { name, lat, lng } = req.body

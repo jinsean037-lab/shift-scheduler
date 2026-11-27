@@ -117,3 +117,20 @@
 .compact-empty {
   padding: 16rpx 0 4rpx;
 }
+
+/* v7.3 班次平均星级（选班参考） */
+.slot-time {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.slot-rate {
+  font-size: 20rpx;
+  color: #f59e0b;
+  font-weight: 700;
+  background: #fffbeb;
+  border: 1rpx solid #fde68a;
+  border-radius: 999rpx;
+  padding: 1rpx 10rpx;
+}
