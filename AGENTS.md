@@ -388,6 +388,33 @@ pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
 
 - `aggregateSlotRatings()` 里 `Object.keys(map).forEach(k => ...)` 回调参数是 `k`，写成 `map[key]` 会抛 `ReferenceError: key is not defined`（只在有评价记录时才触发）
 
+## 网页端打卡维护窗口（v7.4，2026-11-27 ~ 2026-12-04）
+
+网页端**签到 / 签退**暂时停用一周，引导成员改用微信小程序打卡；**12 月 4 日自动恢复**，不需要再改代码。
+
+### 后端 `backend/server.js`
+
+- 新增常量与判断：
+  - `WEB_CHECKIN_MAINTENANCE = { start: '2026-11-27', end: '2026-12-04', notice: '网页端打卡维护中（12 月 4 日恢复），请前往微信小程序打卡' }`
+  - `isWebCheckinMaintenance()`：按**北京时间日期**判断，`today >= start && today < end`
+  - `isWebClientRequest(req)`：body 里 `source === 'web'` / `client === 'web'`，或 header `X-Client: web`
+- `POST /api/checkin` 与 `POST /api/checkout` 开头拦截：维护期内且判定为网页端 → 返回 `{ ok:false, maintenance:true, msg: notice }`
+- 新增**公开**接口 `GET /api/web-maintenance` → `{ ok, maintenance, start, end, notice, qr: '/wechat-mini-qr.png' }`
+- **小程序端不受影响**：小程序不传 `source`，走不到拦截
+- 网页端的「申请补签退」「工作补报」**不拦**，仍然照常提交
+
+### 前端 `backend/public/index.html`
+
+- 「值班打卡」页顶部新增维护提示卡片 `#webCheckinMaintenance`（默认 `display:none`）
+- 新增 `loadWebMaintenance()`：切到值班打卡页时调用；命中维护期则显示卡片（含小程序二维码），并隐藏 `btnCheckin` / `btnCheckout` / `btnRevokeOut`
+- `sendCheckin()` / `sendCheckout()` 请求体加 `source: 'web'` —— 后端兜底拦截，防止绕过 UI 直接调接口
+- 二维码图片放在 `backend/public/wechat-mini-qr.png`（`express.static` 直接暴露，无需额外路由）
+
+### 恢复 / 调整方式
+
+- 到 **2026-12-04** 自动恢复：`isWebCheckinMaintenance()` 返回 false，前端下次进页面时卡片自动隐藏、按钮自动回来
+- 想提前恢复或延长：只改 `WEB_CHECKIN_MAINTENANCE.start` / `.end` 两个日期即可，前后端不用动
+
 ### 部署注意
 
 - **Render 的 rootDir 是 `backend`**（不是仓库根）—— 所以 `exceljs` 只加在 `backend/package.json` 就够，root 的 package.json 没动

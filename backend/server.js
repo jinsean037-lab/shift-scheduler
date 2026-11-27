@@ -291,6 +291,39 @@ const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
 
+// ========== 网页端打卡维护窗口（v7.4，2026-11-27 ~ 2026-12-04）============
+// 网页端签到/签退暂时停用，引导成员改用微信小程序打卡；到 end 日期自动恢复。
+const WEB_CHECKIN_MAINTENANCE = {
+  start: '2026-11-27',
+  end: '2026-12-04',
+  notice: '网页端打卡维护中（12 月 4 日恢复），请前往微信小程序打卡'
+}
+
+function isWebCheckinMaintenance() {
+  const today = getBeijingDateString()
+  return today >= WEB_CHECKIN_MAINTENANCE.start && today < WEB_CHECKIN_MAINTENANCE.end
+}
+
+// 只有网页端（带 source=web / X-Client: web）会被拦，小程序端不受影响
+function isWebClientRequest(req) {
+  const body = req.body || {}
+  if (body.source === 'web' || body.client === 'web') return true
+  const h = req.get('X-Client') || ''
+  return String(h).toLowerCase() === 'web'
+}
+
+// 网页端查询维护状态（公开接口，供前端显示提示卡片）
+app.get('/api/web-maintenance', (req, res) => {
+  res.json({
+    ok: true,
+    maintenance: isWebCheckinMaintenance(),
+    start: WEB_CHECKIN_MAINTENANCE.start,
+    end: WEB_CHECKIN_MAINTENANCE.end,
+    notice: WEB_CHECKIN_MAINTENANCE.notice,
+    qr: '/wechat-mini-qr.png'
+  })
+})
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() })
 })
@@ -2406,6 +2439,9 @@ app.post('/api/checkin', async (req, res) => {
   try {
     const { name, lat, lng } = req.body
     if (!name) return res.json({ ok: false, msg: '参数缺失' })
+    if (isWebCheckinMaintenance() && isWebClientRequest(req)) {
+      return res.json({ ok: false, maintenance: true, msg: WEB_CHECKIN_MAINTENANCE.notice })
+    }
     const store = await readStore()
     const now = new Date()
     const today = getBeijingDateString()
@@ -2449,6 +2485,9 @@ app.post('/api/checkout', async (req, res) => {
   try {
     const { name, lat, lng } = req.body
     if (!name) return res.json({ ok: false, msg: '参数缺失' })
+    if (isWebCheckinMaintenance() && isWebClientRequest(req)) {
+      return res.json({ ok: false, maintenance: true, msg: WEB_CHECKIN_MAINTENANCE.notice })
+    }
     const store = await readStore()
     const now = new Date()
     const today = getBeijingDateString()

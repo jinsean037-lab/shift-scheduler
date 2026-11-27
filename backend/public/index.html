@@ -1923,6 +1923,21 @@ body {
         <div class="page-title-row">
           <h2>值班打卡</h2>
         </div>
+        <!-- v7.4 网页端打卡维护提示（12 月 4 日自动恢复） -->
+        <div class="section-card" id="webCheckinMaintenance" style="display:none;border:2px solid #e8c88a;background:#fffaf0;margin-bottom:16px">
+          <div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
+            <div style="flex:1;min-width:240px">
+              <h3 style="margin:0 0 10px;color:#b8860b;font-size:17px">网页端打卡维护中</h3>
+              <p style="font-size:14px;color:#555;line-height:1.8;margin:0 0 8px">网页端<b>签到 / 签退</b>功能暂时停用，将于 <b>12 月 4 日</b> 自动恢复正常。</p>
+              <p style="font-size:14px;color:#555;line-height:1.8;margin:0 0 10px">请前往<b>微信小程序</b>打卡（下方二维码扫码进入「猪猪的小栈」体验版，该二维码 12 月 4 日前有效）。</p>
+              <p style="font-size:12px;color:#999;margin:0">值班记录、班次评价、换班申请在小程序中均可正常使用。</p>
+            </div>
+            <div style="text-align:center;flex-shrink:0">
+              <img src="/wechat-mini-qr.png" alt="微信小程序二维码" style="width:170px;height:170px;object-fit:contain;border:1px solid #eee;border-radius:8px;background:#fff">
+              <div style="font-size:12px;color:#999;margin-top:6px">猪猪的小栈 · 体验版</div>
+            </div>
+          </div>
+        </div>
         <!-- 今日打卡 -->
         <div class="section-card">
           <h3>今日打卡</h3>
@@ -2596,6 +2611,7 @@ function switchTab(tab) {
     const nav = document.querySelector('.nav-item[data-page="checkin"]');
     if (nav) nav.classList.add('active');
     loadCheckinStatus();
+    loadWebMaintenance();
   } else if (tab === 'messages') {
     document.getElementById('messagesView').classList.add('active');
     const nav = document.querySelector('.nav-item[data-page="messages"]');
@@ -4508,11 +4524,37 @@ function doCheckin() {
   );
 }
 
+// v7.4：网页端打卡维护状态（12 月 4 日自动恢复）
+async function loadWebMaintenance() {
+  const card = document.getElementById('webCheckinMaintenance');
+  try {
+    const res = await fetch(API + '/web-maintenance');
+    const data = await res.json();
+    if (!data || !data.ok) return;
+    if (!data.maintenance) {
+      if (card) card.style.display = 'none';
+      return;
+    }
+    if (card) {
+      card.style.display = 'block';
+      const img = card.querySelector('img');
+      if (img && data.qr) img.src = data.qr;
+    }
+    // 隐藏网页端签到 / 签退 / 撤回按钮
+    ['btnCheckin', 'btnCheckout', 'btnRevokeOut'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+  } catch (e) {
+    console.warn('loadWebMaintenance failed:', e);
+  }
+}
+
 function sendCheckin(lat, lng) {
   fetch(API + '/checkin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: currentUser, lat, lng })
+    body: JSON.stringify({ name: currentUser, lat, lng, source: 'web' })
   })
   .then(r => r.json())
   .then(data => {
@@ -4547,7 +4589,7 @@ function sendCheckout(lat, lng) {
   fetch(API + '/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: currentUser, lat, lng })
+    body: JSON.stringify({ name: currentUser, lat, lng, source: 'web' })
   })
   .then(r => r.json())
   .then(data => {
