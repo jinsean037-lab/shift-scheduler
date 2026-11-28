@@ -296,7 +296,13 @@ app.use(express.static(path.join(__dirname, 'public')))
 const WEB_CHECKIN_MAINTENANCE = {
   start: '2026-11-27',
   end: '2026-12-04',
-  notice: '网页端打卡维护中（12 月 4 日恢复），请前往微信小程序打卡'
+  notice: '网页端打卡维护中（12 月 4 日恢复），请前往微信小程序打卡',
+  // 维护期内网页端一起停用的功能（小程序端照常可用）
+  features: {
+    checkin: true,       // 上班签到 / 下班签退 / 撤回签退
+    suppCheckout: true,  // 申请补签退
+    overtime: true       // 工作补报
+  }
 }
 
 function isWebCheckinMaintenance() {
@@ -312,6 +318,13 @@ function isWebClientRequest(req) {
   return String(h).toLowerCase() === 'web'
 }
 
+// 判断某个网页端功能当前是否被维护期拦下
+function isWebFeatureBlocked(req, feature) {
+  if (!isWebCheckinMaintenance()) return false
+  if (!WEB_CHECKIN_MAINTENANCE.features[feature]) return false
+  return isWebClientRequest(req)
+}
+
 // 网页端查询维护状态（公开接口，供前端显示提示卡片）
 app.get('/api/web-maintenance', (req, res) => {
   res.json({
@@ -320,6 +333,7 @@ app.get('/api/web-maintenance', (req, res) => {
     start: WEB_CHECKIN_MAINTENANCE.start,
     end: WEB_CHECKIN_MAINTENANCE.end,
     notice: WEB_CHECKIN_MAINTENANCE.notice,
+    features: WEB_CHECKIN_MAINTENANCE.features,
     qr: '/wechat-mini-qr.png'
   })
 })
@@ -2476,7 +2490,7 @@ app.post('/api/checkin', async (req, res) => {
   try {
     const { name, lat, lng } = req.body
     if (!name) return res.json({ ok: false, msg: '参数缺失' })
-    if (isWebCheckinMaintenance() && isWebClientRequest(req)) {
+    if (isWebFeatureBlocked(req, 'checkin')) {
       return res.json({ ok: false, maintenance: true, msg: WEB_CHECKIN_MAINTENANCE.notice })
     }
     const store = await readStore()
@@ -2615,6 +2629,9 @@ app.post('/api/checkout/revoke', async (req, res) => {
 app.post('/api/overtime', async (req, res) => {
   try {
     const { name, date, hours, content } = req.body
+    if (isWebFeatureBlocked(req, 'overtime')) {
+      return res.json({ ok: false, maintenance: true, msg: WEB_CHECKIN_MAINTENANCE.notice })
+    }
     if (!name || !date || !hours || !content) return res.json({ ok: false, msg: '请填写完整信息' })
     const h = parseFloat(hours)
     if (isNaN(h) || h <= 0 || h > 24) return res.json({ ok: false, msg: '工作时长需为正数且不超过24小时' })
@@ -4374,6 +4391,9 @@ app.put('/api/partner-message/:id/read', async (req, res) => {
 app.post('/api/supp-checkout', async (req, res) => {
   try {
     const { name, date, time, reason } = req.body
+    if (isWebFeatureBlocked(req, 'suppCheckout')) {
+      return res.json({ ok: false, maintenance: true, msg: WEB_CHECKIN_MAINTENANCE.notice })
+    }
     if (!name || !date || !time) return res.json({ ok: false, msg: '参数不完整' })
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return res.json({ ok: false, msg: '日期格式不正确' })
     if (!/^\d{1,2}:\d{2}$/.test(String(time))) return res.json({ ok: false, msg: '时间格式不正确' })

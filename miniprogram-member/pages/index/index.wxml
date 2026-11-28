@@ -69,4 +69,64 @@
     <button class="btn" loading="{{checkingIn}}" bindtap="checkin">签到</button>
     <button class="btn secondary" loading="{{checkingOut}}" bindtap="checkout">签退</button>
   </view>
+
+  <view class="extra-actions">
+    <button class="btn ghost" bindtap="openSuppForm">补签退</button>
+    <button class="btn ghost" bindtap="openOtForm">工作补报</button>
+  </view>
+  <view class="extra-tip">忘记签退？用「补签退」补上实际离开时间，提交后由管理员审核。</view>
+
+  <!-- v7.6 补签退申请 -->
+  <view class="modal-mask" wx:if="{{suppVisible}}" bindtap="closeSuppForm">
+    <view class="modal-box" catchtap="noop">
+      <view class="modal-title">申请补签退</view>
+      <view class="modal-tip">忘记签退时，填写实际离开的时间，提交后等待管理员审核。</view>
+      <view class="field">
+        <view class="label">签到日期</view>
+        <picker mode="date" value="{{suppDate}}" bindchange="onSuppDateChange">
+          <view class="picker">{{suppDate}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="label">补签退时间</view>
+        <picker mode="time" value="{{suppTime}}" bindchange="onSuppTimeChange">
+          <view class="picker">{{suppTime}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="label">备注说明</view>
+        <input class="input" value="{{suppReason}}" bindinput="onSuppReasonInput" placeholder="如：忘记打卡、系统故障等..." placeholder-class="input-placeholder" />
+      </view>
+      <view class="modal-actions">
+        <button class="btn secondary" bindtap="closeSuppForm">取消</button>
+        <button class="btn" loading="{{submittingSupp}}" bindtap="submitSupp">提交申请</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- v7.6 工作补报 -->
+  <view class="modal-mask" wx:if="{{otVisible}}" bindtap="closeOtForm">
+    <view class="modal-box" catchtap="noop">
+      <view class="modal-title">工作补报</view>
+      <view class="modal-tip">上报老师额外安排的不在值班表里的工作时间，提交后由管理员审核。</view>
+      <view class="field">
+        <view class="label">日期</view>
+        <picker mode="date" value="{{otDate}}" bindchange="onOtDateChange">
+          <view class="picker">{{otDate}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="label">时长（小时）</view>
+        <input class="input" type="digit" value="{{otHours}}" bindinput="onOtHoursInput" placeholder="如：2" placeholder-class="input-placeholder" />
+      </view>
+      <view class="field">
+        <view class="label">工作内容</view>
+        <textarea class="textarea" value="{{otContent}}" bindinput="onOtContentInput" placeholder="简要描述工作内容..." placeholder-class="textarea-placeholder"></textarea>
+      </view>
+      <view class="modal-actions">
+        <button class="btn secondary" bindtap="closeOtForm">取消</button>
+        <button class="btn" loading="{{submittingOt}}" bindtap="submitOt">提交申请</button>
+      </view>
+    </view>
+  </view>
 </view>

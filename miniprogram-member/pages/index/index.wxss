@@ -166,6 +166,70 @@
   margin-bottom: 24rpx;
 }
 
+/* ========== v7.6 补签退 / 工作补报 ========== */
+.extra-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+  margin-bottom: 12rpx;
+}
+
+.extra-actions .btn {
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.extra-tip {
+  font-size: 22rpx;
+  color: #9ca3af;
+  line-height: 1.6;
+  margin-bottom: 24rpx;
+}
+
+.modal-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 40rpx;
+  box-sizing: border-box;
+}
+
+.modal-box {
+  width: 100%;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 32rpx;
+  box-sizing: border-box;
+}
+
+.modal-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #7f1d1d;
+  margin-bottom: 10rpx;
+}
+
+.modal-tip {
+  font-size: 24rpx;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 24rpx;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+  margin-top: 8rpx;
+}
+
 .pill.completed {
   background: #dcfce7;
   color: #166534;

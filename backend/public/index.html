@@ -1930,6 +1930,7 @@ body {
               <h3 style="margin:0 0 10px;color:#b8860b;font-size:17px">网页端打卡维护中</h3>
               <p style="font-size:14px;color:#555;line-height:1.8;margin:0 0 8px">网页端<b>签到 / 签退</b>功能暂时停用，将于 <b>12 月 4 日</b> 自动恢复正常。</p>
               <p style="font-size:14px;color:#555;line-height:1.8;margin:0 0 10px">请前往<b>微信小程序</b>打卡（下方二维码扫码进入「猪猪的小栈」体验版，该二维码 12 月 4 日前有效）。</p>
+              <p style="font-size:13px;color:#555;line-height:1.8;margin:0 0 6px">网页端的<b>签到 / 签退</b>、<b>申请补签退</b>、<b>工作补报</b>均已暂时停用，请统一在小程序中办理。</p>
               <p style="font-size:12px;color:#999;margin:0">值班记录、班次评价、换班申请在小程序中均可正常使用。</p>
             </div>
             <div style="text-align:center;flex-shrink:0">
@@ -1946,13 +1947,13 @@ body {
             <button class="quick-btn quick-btn-primary" id="btnCheckin" onclick="doCheckin()">上班签到</button>
             <button class="quick-btn" style="background:linear-gradient(135deg,#8B1A1A,#c4a35a);color:#fff;border:none" id="btnCheckout" onclick="doCheckout()">下班签退</button>
             <button class="quick-btn" style="background:#e0e0e0;color:#666;display:none" id="btnRevokeOut" onclick="doRevokeCheckout()">撤回签退</button>
-          <button onclick="showSuppCheckoutDialog()" style="padding:10px 20px;background:#fff;border:2px solid #c4a35a;color:#c4a35a;border-radius:10px;font-size:14px;cursor:pointer;transition:all 0.2s;margin-top:8px;width:100%;max-width:200px" onmouseover="this.style.background='#c4a35a';this.style.color='#fff'" onmouseout="this.style.background='#fff';this.style.color='#c4a35a'">申请补签退</button>
+          <button id="btnSuppCheckout" onclick="showSuppCheckoutDialog()" style="padding:10px 20px;background:#fff;border:2px solid #c4a35a;color:#c4a35a;border-radius:10px;font-size:14px;cursor:pointer;transition:all 0.2s;margin-top:8px;width:100%;max-width:200px" onmouseover="this.style.background='#c4a35a';this.style.color='#fff'" onmouseout="this.style.background='#fff';this.style.color='#c4a35a'">申请补签退</button>
           </div>
           <div id="checkinError" style="color:#c41230;font-size:12px;margin-top:8px;display:none"></div>
           <div id="recentCheckins" style="margin-top:14px"></div>
         </div>
         <!-- 工作补报 -->
-        <div class="section-card" style="margin-top:16px">
+        <div class="section-card" id="webOvertimeCard" style="margin-top:16px">
           <h3>工作补报</h3>
           <p style="color:#999;font-size:13px;margin-bottom:12px">上报老师额外安排的不在值班表里的工作时间，提交后由管理员审核。</p>
           <div style="display:flex;flex-direction:column;gap:10px">
@@ -4540,8 +4541,8 @@ async function loadWebMaintenance() {
       const img = card.querySelector('img');
       if (img && data.qr) img.src = data.qr;
     }
-    // 隐藏网页端签到 / 签退 / 撤回按钮
-    ['btnCheckin', 'btnCheckout', 'btnRevokeOut'].forEach(id => {
+    // 隐藏网页端签到 / 签退 / 撤回 / 申请补签退 / 工作补报
+    ['btnCheckin', 'btnCheckout', 'btnRevokeOut', 'btnSuppCheckout', 'webOvertimeCard'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -4638,7 +4639,7 @@ async function submitSuppCheckout() {
     var res = await fetch(API + '/supp-checkout', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name: currentUser, date: dateVal, time: timeVal, reason: reason})
+      body: JSON.stringify({name: currentUser, date: dateVal, time: timeVal, reason: reason, source: 'web'})
     });
     var data = await res.json();
     if (data.ok) {
@@ -4683,7 +4684,7 @@ function submitOvertime() {
   fetch(API + '/overtime', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: currentUser, date: dateVal, hours: parseFloat(hoursVal), content: contentVal })
+    body: JSON.stringify({ name: currentUser, date: dateVal, hours: parseFloat(hoursVal), content: contentVal, source: 'web' })
   })
   .then(r => r.json())
   .then(data => {

@@ -143,6 +143,16 @@ async function getMyRatings(name) {
 async function deleteShiftRating(payload) {
   return request('/member/rate-shift/delete', { method: 'POST', data: payload })
 }
+
+// v7.6：申请补签退（忘记签退时用，规则与网页端一致）
+async function suppCheckout(payload) {
+  return request('/supp-checkout', { method: 'POST', data: payload })
+}
+
+// v7.6：工作补报（老师额外安排的工作时间，提交后由管理员审核）
+async function reportOvertime(payload) {
+  return request('/overtime', { method: 'POST', data: payload })
+}
 function getLocation() {
   return new Promise((resolve, reject) => {
     wx.getLocation({
@@ -165,5 +175,7 @@ module.exports = {
   getLocation,
   rateShift,
   getMyRatings,
-  deleteShiftRating
+  deleteShiftRating,
+  suppCheckout,
+  reportOvertime
 }

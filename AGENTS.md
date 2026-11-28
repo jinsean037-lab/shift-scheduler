@@ -427,6 +427,32 @@ pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
 - 到 **2026-12-04** 自动恢复：`isWebCheckinMaintenance()` 返回 false，前端下次进页面时卡片自动隐藏、按钮自动回来
 - 想提前恢复或延长：只改 `WEB_CHECKIN_MAINTENANCE.start` / `.end` 两个日期即可，前后端不用动
 
+## 小程序端补签退 + 工作补报（v7.6，2026-11-28）
+
+网页端维护期内关停了「签到/签退、申请补签退、工作补报」，成员统一改在小程序办理。
+
+### 后端 `backend/server.js`
+
+- `WEB_CHECKIN_MAINTENANCE.features = { checkin: true, suppCheckout: true, overtime: true }`（逐功能开关）
+- 新增 `isWebFeatureBlocked(req, feature)`：维护期内 + 网页端来源 + 该功能开启 → 返回 `{ ok:false, maintenance:true, msg }`
+- `POST /api/supp-checkout`、`POST /api/overtime` 加维护期拦截；**小程序不传 `source`，不受影响**
+- `GET /api/web-maintenance` 额外返回 `features`
+
+### 网页端 `backend/public/index.html`
+
+- `submitOvertime()` / `submitSuppCheckout()` 请求体加 `source: 'web'`
+- 维护期隐藏：`btnCheckin` / `btnCheckout` / `btnRevokeOut` / `btnSuppCheckout` / `webOvertimeCard`
+- 维护提示卡片文案补充：签到/签退、申请补签退、工作补报均已停用，请去小程序
+
+### 小程序 `miniprogram-member/pages/index/`
+
+- 签到/签退按钮下方新增「补签退」「工作补报」两个次要按钮 + 弹层表单（`.modal-mask` / `.modal-box`）
+- **补签退规则完全沿用网页端**：签到日期（picker，默认今天）+ 补签退时间（picker，默认 17:30）+ 备注说明 → `POST /api/supp-checkout`
+  - 同一天已有 pending 申请会被后端拒绝：「该日期已有待审核的补签退申请」
+- **工作补报规则沿用网页端**：日期 + 时长（>0 且 ≤24 小时）+ 工作内容 → `POST /api/overtime`
+- `utils/api.js` 新增 `suppCheckout()` / `reportOvertime()`
+- 两者提交后都进管理员端审核队列（补签退审核 / 工作补报审核）
+
 ### 部署注意
 
 - **Render 的 rootDir 是 `backend`**（不是仓库根）—— 所以 `exceljs` 只加在 `backend/package.json` 就够，root 的 package.json 没动

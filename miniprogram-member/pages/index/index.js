@@ -1,8 +1,15 @@
-const { request, requireUser, toast, slotLabel, getLocation, rateShift, deleteShiftRating } = require('../../utils/api')
+const { request, requireUser, toast, slotLabel, getLocation, rateShift, deleteShiftRating, suppCheckout, reportOvertime } = require('../../utils/api')
 
 function currentUserName() {
   const u = requireUser()
   return u ? u.name : ''
+}
+
+// 本地日期 YYYY-MM-DD（国内设备即北京时间）
+function todayStr() {
+  const d = new Date()
+  const p = n => String(n).padStart(2, '0')
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
 }
 
 Page({
@@ -17,7 +24,19 @@ Page({
     slotAvg: null,             // 该时段历史平均星级
     slotCount: 0,              // 该时段评价人数
     checkingIn: false,
-    checkingOut: false
+    checkingOut: false,
+    // v7.6 补签退申请
+    suppVisible: false,
+    suppDate: '',
+    suppTime: '17:30',
+    suppReason: '',
+    submittingSupp: false,
+    // v7.6 工作补报
+    otVisible: false,
+    otDate: '',
+    otHours: '',
+    otContent: '',
+    submittingOt: false
   },
   onShow() {
     const user = requireUser()
@@ -178,6 +197,96 @@ Page({
       }
     } catch (e) {
       toast(e.message || '评价失败')
+    }
+  },
+  // ========== v7.6 补签退（忘记签退时申请，规则与网页端一致） ==========
+  noop() {},
+  openSuppForm() {
+    this.setData({ suppVisible: true, suppDate: todayStr(), suppTime: '17:30', suppReason: '' })
+  },
+  closeSuppForm() {
+    this.setData({ suppVisible: false })
+  },
+  onSuppDateChange(e) {
+    this.setData({ suppDate: e.detail.value })
+  },
+  onSuppTimeChange(e) {
+    this.setData({ suppTime: e.detail.value })
+  },
+  onSuppReasonInput(e) {
+    this.setData({ suppReason: e.detail.value })
+  },
+  async submitSupp() {
+    const user = requireUser()
+    if (!user) return
+    const { suppDate, suppTime, suppReason } = this.data
+    if (!suppDate) return toast('请选择签到日期')
+    if (!suppTime) return toast('请选择补签退时间')
+    this.setData({ submittingSupp: true })
+    try {
+      const data = await suppCheckout({
+        name: user.name,
+        date: suppDate,
+        time: suppTime,
+        reason: suppReason
+      })
+      if (data && data.ok) {
+        this.setData({ suppVisible: false })
+        toast(data.msg || '补签退申请已提交，等待管理员审核', 'success')
+        this.loadToday()
+      } else {
+        toast((data && data.msg) || '提交失败')
+      }
+    } catch (e) {
+      toast(e.message || '提交失败')
+    } finally {
+      this.setData({ submittingSupp: false })
+    }
+  },
+
+  // ========== v7.6 工作补报 ==========
+  openOtForm() {
+    this.setData({ otVisible: true, otDate: todayStr(), otHours: '', otContent: '' })
+  },
+  closeOtForm() {
+    this.setData({ otVisible: false })
+  },
+  onOtDateChange(e) {
+    this.setData({ otDate: e.detail.value })
+  },
+  onOtHoursInput(e) {
+    this.setData({ otHours: e.detail.value })
+  },
+  onOtContentInput(e) {
+    this.setData({ otContent: e.detail.value })
+  },
+  async submitOt() {
+    const user = requireUser()
+    if (!user) return
+    const { otDate, otHours, otContent } = this.data
+    if (!otDate) return toast('请选择日期')
+    const h = parseFloat(otHours)
+    if (!h || h <= 0) return toast('请填写有效的工作时长')
+    if (h > 24) return toast('工作时长不能超过 24 小时')
+    if (!otContent || !otContent.trim()) return toast('请填写工作内容')
+    this.setData({ submittingOt: true })
+    try {
+      const data = await reportOvertime({
+        name: user.name,
+        date: otDate,
+        hours: h,
+        content: otContent.trim()
+      })
+      if (data && data.ok) {
+        this.setData({ otVisible: false })
+        toast(data.msg || '补报申请已提交，等待管理员审核', 'success')
+      } else {
+        toast((data && data.msg) || '提交失败')
+      }
+    } catch (e) {
+      toast(e.message || '提交失败')
+    } finally {
+      this.setData({ submittingOt: false })
     }
   },
   async checkin() {
