@@ -17,20 +17,14 @@
       <view class="stat-value">{{monthly.shiftCount}}<text class="stat-unit">次</text></view>
       <view class="stat-sub">含补报</view>
     </view>
-    <view class="stat-cell stat-hours">
-      <view class="stat-label">总工时</view>
-      <view class="stat-value">{{monthly.totalHours}}<text class="stat-unit">h</text></view>
-      <view class="stat-sub">{{monthly.year}}年{{monthly.month}}月</view>
-    </view>
     <view class="stat-cell stat-pay">
-      <view class="stat-label">预计薪酬</view>
-      <view class="stat-value">{{monthly.totalPay}}<text class="stat-unit">元</text></view>
-      <view class="stat-sub">25 元/小时</view>
-    </view>
-    <view class="stat-cell stat-rate">
-      <view class="stat-label">班次评价</view>
-      <view class="stat-value stat-emoji">{{myEmoji}}</view>
-      <view class="stat-sub">忙碌程度 · {{myLabel}}</view>
+      <view class="stat-label">工时与薪酬</view>
+      <view class="stat-value-row">
+        <view class="stat-value stat-hours">{{monthly.totalHours}}<text class="stat-unit">h</text></view>
+        <view class="stat-sep"></view>
+        <view class="stat-value stat-pay-v">{{monthly.totalPay}}<text class="stat-unit">元</text></view>
+      </view>
+      <view class="stat-sub">{{monthly.year}}年{{monthly.month}}月 · 25 元/小时</view>
     </view>
   </view>
 
@@ -42,20 +36,20 @@
     </view>
     <view class="card-desc">给这一班的忙碌程度打个分，帮大家下次选班时做参考</view>
     <block wx:if="{{ratingTarget}}">
-      <view class="emoji-picker">
+      <view class="pig-picker">
         <view
-          class="emoji-item {{lv.value === myStars ? 'on' : ''}}"
+          class="pig-item {{lv.value === myStars ? 'on' : ''}}"
           wx:for="{{busyLevels}}"
           wx:for-item="lv"
           wx:key="value"
           data-stars="{{lv.value}}"
           bindtap="pickStar">
-          <text class="emoji-face">{{lv.emoji}}</text>
-          <text class="emoji-text">{{lv.label}}</text>
+          <image class="pig-img" src="{{lv.img}}" mode="aspectFit" />
+          <text class="pig-text">{{lv.label}}</text>
         </view>
       </view>
       <view class="rate-current">
-        <text class="rate-current-emoji">{{myEmoji}}</text>
+        <image class="rate-current-img" wx:if="{{myPig}}" src="{{myPig}}" mode="aspectFit" />
         <text class="rate-current-text">{{ratingTarget.day}} {{ratingTarget.slotLabel}} · {{myLabel}}</text>
       </view>
       <view class="rate-avg" wx:if="{{slotAvg}}">该时段平均 {{avgEmoji}} {{slotAvg}} · {{slotCount}} 人评价</view>
@@ -97,6 +91,22 @@
       <button class="btn btn-ghost" bindtap="openOtForm">工作补报</button>
     </view>
     <view class="extra-tip">忘记签退？用「补签退」补上实际离开的时间，提交后由管理员审核</view>
+  </view>
+
+  <!-- 签到 / 签退成功庆祝 -->
+  <view class="celebrate" wx:if="{{celebrate.visible}}">
+    <view class="confetti-layer">
+      <view
+        class="cf"
+        wx:for="{{confetti}}"
+        wx:key="id"
+        style="left:{{item.left}}rpx;background:{{item.color}};animation-delay:{{item.delay}}s;animation-duration:{{item.dur}}s"></view>
+    </view>
+    <view class="celebrate-box">
+      <image class="celebrate-pig" src="{{celebrate.img}}" mode="aspectFit" />
+      <view class="celebrate-title">{{celebrate.title}}</view>
+      <view class="celebrate-sub">{{celebrate.sub}}</view>
+    </view>
   </view>
 
   <!-- 补签退申请 -->

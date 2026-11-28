@@ -225,3 +225,14 @@
   color: #9ca3af;
   margin-top: 4rpx;
 }
+
+.ws-pig {
+  width: 46rpx;
+  height: 46rpx;
+}
+
+.tl-busy-pig {
+  width: 34rpx;
+  height: 34rpx;
+  margin-right: 6rpx;
+}

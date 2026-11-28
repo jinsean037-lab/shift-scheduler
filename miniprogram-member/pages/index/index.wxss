@@ -90,48 +90,51 @@
   font-weight: 600;
 }
 
-.emoji-picker {
+.pig-picker {
   display: flex;
   gap: 8rpx;
   margin-bottom: 18rpx;
 }
 
-.emoji-item {
+.pig-item {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4rpx;
-  padding: 14rpx 4rpx;
+  gap: 6rpx;
+  padding: 12rpx 4rpx 10rpx;
   border-radius: 16rpx;
   border: 1rpx solid #eef0f3;
   background: #fbfbfc;
+  box-sizing: border-box;
 }
 
-.emoji-item.on {
+.pig-item.on {
   background: #fff7ed;
   border-color: #fdba74;
-  box-shadow: 0 6rpx 16rpx rgba(217, 119, 6, 0.12);
+  box-shadow: 0 8rpx 18rpx rgba(217, 119, 6, 0.14);
 }
 
-.emoji-face {
-  font-size: 44rpx;
-  line-height: 1.15;
-  opacity: 0.4;
+.pig-img {
+  width: 76rpx;
+  height: 76rpx;
+  opacity: 0.5;
+  transition: transform 0.2s ease;
 }
 
-.emoji-item.on .emoji-face {
+.pig-item.on .pig-img {
   opacity: 1;
+  transform: scale(1.12);
 }
 
-.emoji-text {
+.pig-text {
   font-size: 19rpx;
   color: #9ca3af;
   white-space: nowrap;
 }
 
-.emoji-item.on .emoji-text {
+.pig-item.on .pig-text {
   color: #b45309;
   font-weight: 700;
 }
@@ -146,9 +149,10 @@
   border: 1rpx solid #eef0f3;
 }
 
-.rate-current-emoji {
-  font-size: 38rpx;
-  line-height: 1;
+.rate-current-img {
+  width: 62rpx;
+  height: 62rpx;
+  flex-shrink: 0;
 }
 
 .rate-current-text {
@@ -293,4 +297,105 @@
   grid-template-columns: 1fr 1fr;
   gap: 20rpx;
   margin-top: 8rpx;
+}
+
+/* ========== 签到 / 签退成功庆祝 ========== */
+.celebrate {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.96);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.confetti-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.cf {
+  position: absolute;
+  top: -40rpx;
+  width: 14rpx;
+  height: 22rpx;
+  border-radius: 4rpx;
+  opacity: 0.95;
+  animation-name: cfFall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes cfFall {
+  0% { transform: translateY(-60rpx) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(102vh) rotate(720deg); opacity: 0.15; }
+}
+
+.celebrate-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: popIn 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.celebrate-pig {
+  width: 220rpx;
+  height: 220rpx;
+}
+
+.celebrate-title {
+  margin-top: 18rpx;
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #8B1A1A;
+  letter-spacing: 2rpx;
+}
+
+.celebrate-sub {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ========== 工时与薪酬合并卡 ========== */
+.stat-value-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.stat-value-row .stat-value {
+  font-size: 40rpx;
+}
+
+.stat-hours {
+  color: #2563eb;
+}
+
+.stat-pay-v {
+  color: #d97706;
+}
+
+.stat-sep {
+  width: 1rpx;
+  height: 42rpx;
+  background: #e5e7eb;
 }

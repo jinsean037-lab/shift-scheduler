@@ -14,17 +14,33 @@ function todayStr() {
 
 // v7.7 忙碌程度五档（emoji 表达）
 const BUSY_LEVELS = [
-  { value: 1, emoji: '😌', label: '轻松' },
-  { value: 2, emoji: '😊', label: '比较轻松' },
-  { value: 3, emoji: '😐', label: '一般' },
-  { value: 4, emoji: '😫', label: '有点忙' },
-  { value: 5, emoji: '🤯', label: '忙到飞起' }
+  { value: 1, emoji: '😌', label: '轻松', img: '/assets/pig/busy-1.png' },
+  { value: 2, emoji: '😊', label: '比较轻松', img: '/assets/pig/busy-2.png' },
+  { value: 3, emoji: '😐', label: '一般', img: '/assets/pig/busy-3.png' },
+  { value: 4, emoji: '😫', label: '有点忙', img: '/assets/pig/busy-4.png' },
+  { value: 5, emoji: '🤯', label: '忙到飞起', img: '/assets/pig/busy-5.png' }
 ]
 
 function busyLevel(v) {
   const n = Math.round(Number(v) || 0)
-  if (!n) return { value: 0, emoji: '—', label: '未评价' }
+  if (!n) return { value: 0, emoji: '—', label: '未评价', img: '' }
   return BUSY_LEVELS[Math.min(Math.max(n, 1), 5) - 1]
+}
+
+// 彩带：每次随机生成一堆小色片
+const CONFETTI_COLORS = ['#F9A8B4', '#FDE68A', '#BFDBFE', '#BBF7D0', '#DDD6FE', '#FBCFE8', '#FED7AA']
+function buildConfetti(count) {
+  const arr = []
+  for (let i = 0; i < (count || 20); i++) {
+    arr.push({
+      id: 'cf' + i,
+      left: Math.round(Math.random() * 660) + 20,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      delay: (Math.random() * 1.8).toFixed(2),
+      dur: (2.2 + Math.random() * 1.4).toFixed(2)
+    })
+  }
+  return arr
 }
 
 Page({
@@ -42,8 +58,13 @@ Page({
     slotCount: 0,              // 该时段评价人数
     avgEmoji: '',              // 平均等级对应的 emoji
     busyLevels: BUSY_LEVELS,   // 五档 emoji
+    myPig: '',                  // 当前等级的小猪图
+    avgPig: '',                 // 平均等级的小猪图
     checkingIn: false,
     checkingOut: false,
+    // v7.9 签到 / 签退成功庆祝
+    celebrate: { visible: false, img: '', title: '', sub: '' },
+    confetti: [],
     // v7.6 补签退申请
     suppVisible: false,
     suppDate: '',
@@ -169,9 +190,11 @@ Page({
         myStars: myStars,
         myEmoji: myLv.emoji,
         myLabel: myLv.label,
+        myPig: myLv.img,
         slotAvg: agg ? agg.avg : null,
         slotCount: agg ? agg.count : 0,
-        avgEmoji: agg ? avgLv.emoji : ''
+        avgEmoji: agg ? avgLv.emoji : '',
+        avgPig: agg ? avgLv.img : ''
       })
     } catch (e) {
       console.error('loadRating', e)
@@ -195,9 +218,11 @@ Page({
           myStars: 0,
           myEmoji: '',
           myLabel: '',
+          myPig: '',
           slotAvg: data.slotAvg,
           slotCount: data.slotCount,
-          avgEmoji: data.slotAvg ? avgLv.emoji : ''
+          avgEmoji: data.slotAvg ? avgLv.emoji : '',
+          avgPig: data.slotAvg ? avgLv.img : ''
         })
         toast(data.msg || '已清除，可重新评价')
       } else {
@@ -227,9 +252,11 @@ Page({
         this.setData({
           myEmoji: lv.emoji,
           myLabel: lv.label,
+          myPig: lv.img,
           slotAvg: data.slotAvg,
           slotCount: data.slotCount,
-          avgEmoji: data.slotAvg ? avgLv.emoji : ''
+          avgEmoji: data.slotAvg ? avgLv.emoji : '',
+          avgPig: data.slotAvg ? avgLv.img : ''
         })
         toast(data.msg || '评价成功', 'success')
       } else {
@@ -329,6 +356,21 @@ Page({
       this.setData({ submittingOt: false })
     }
   },
+  // v7.9：签到 / 签退成功的小猪庆祝动画
+  showCelebrate(type) {
+    const cfg = type === 'checkout'
+      ? { img: '/assets/pig/cheer-thanks.png', title: '辛苦啦！', sub: '今天也辛苦啦，记得好好休息' }
+      : { img: '/assets/pig/cheer-go.png', title: '加油！', sub: '新的值班开始啦，打起精神～' }
+    this.setData({
+      celebrate: { visible: true, img: cfg.img, title: cfg.title, sub: cfg.sub },
+      confetti: buildConfetti(20)
+    })
+    if (this._celebrateTimer) clearTimeout(this._celebrateTimer)
+    this._celebrateTimer = setTimeout(() => {
+      this.setData({ celebrate: { visible: false, img: '', title: '', sub: '' } })
+    }, 2600)
+  },
+
   async checkin() {
     const user = requireUser()
     if (!user) return
@@ -340,6 +382,7 @@ Page({
         data: { name: user.name, lat: loc.latitude, lng: loc.longitude }
       })
       toast(data.msg || (data.ok ? '签到成功' : '签到失败'), data.ok ? 'success' : 'none')
+      if (data.ok) this.showCelebrate('checkin')
       this.loadToday()
     } catch (e) {
       toast(e.message || '签到失败')
@@ -366,6 +409,7 @@ Page({
       } else {
         toast(data.msg || (data.ok ? '签退成功' : '签退失败'), data.ok ? 'success' : 'none')
       }
+      if (data.ok) this.showCelebrate('checkout')
       this.loadToday()
     } catch (e) {
       toast(e.message || '签退失败')

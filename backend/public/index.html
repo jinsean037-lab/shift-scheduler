@@ -2335,7 +2335,7 @@ body {
         </div>
         <div class="admin-section">
           <h3>班次评价（忙碌程度）</h3>
-          <p class="page-subtitle" style="margin-bottom:10px">成员对自己值过的班次按忙碌程度打 1–5 级：😌 轻松 · 😊 比较轻松 · 😐 一般 · 😫 有点忙 · 🤯 忙到飞起；按「周几 + 时段」汇总平均分，作为下一次选班的参考。</p>
+          <p class="page-subtitle" style="margin-bottom:10px">成员对自己值过的班次按忙碌程度打 1–5 级（小猪从轻松到忙到飞起），按「周几 + 时段」汇总平均分，作为下一次选班的参考。</p>
           <div id="adminShiftRatingSlots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:8px">
             <p style="color:#999;font-size:13px;padding:8px 0">加载中...</p>
           </div>
@@ -6990,6 +6990,7 @@ async function loadAdminMonthly(monthDelta) {
 // v7.7 忙碌程度五档（emoji 表达）
 const BUSY_EMOJI = { 1: '😌', 2: '😊', 3: '😐', 4: '😫', 5: '🤯' };
 const BUSY_TEXT = { 1: '轻松', 2: '比较轻松', 3: '一般', 4: '有点忙', 5: '忙到飞起' };
+const BUSY_PIG = { 1: '/pig/busy-1.png', 2: '/pig/busy-2.png', 3: '/pig/busy-3.png', 4: '/pig/busy-4.png', 5: '/pig/busy-5.png' };
 function busyLevelOf(score) {
   const raw = Math.round(Number(score) || 0);
   if (!raw) return { emoji: '—', text: '未评价', n: 0 };
@@ -6998,8 +6999,9 @@ function busyLevelOf(score) {
 }
 function ratingEmojiHtml(score) {
   const lv = busyLevelOf(score);
-  return '<span style="font-size:19px;vertical-align:-2px">' + lv.emoji + '</span>'
-    + ' <span style="font-size:12px;color:#666">' + lv.text + '</span>';
+  const pig = BUSY_PIG[lv.n] || '';
+  return (pig ? '<img src="' + pig + '" alt="" style="width:24px;height:24px;vertical-align:-6px;margin-right:5px">' : '')
+    + '<span style="font-size:12px;color:#666">' + lv.text + '</span>';
 }
 
 async function loadAdminShiftRatings() {

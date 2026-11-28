@@ -18,11 +18,14 @@
         <view class="ws-label">我的班次</view>
       </view>
       <view class="ws-item">
-        <view class="ws-val">{{stats.avgEmoji || '—'}}</view>
+        <view class="ws-val">
+          <image class="ws-pig" wx:if="{{stats.pigImg}}" src="{{stats.pigImg}}" mode="aspectFit" />
+          <text wx:else>—</text>
+        </view>
         <view class="ws-label">平均忙碌度</view>
       </view>
     </view>
-    <view class="ws-legend">😌 轻松 · 😊 较轻松 · 😐 一般 · 😫 有点忙 · 🤯 忙到飞起</view>
+    <view class="ws-legend">时段右侧的小猪代表忙碌程度：从小猪到暴躁猪，越凶越忙</view>
   </view>
 
   <!-- 按天时间轴 -->
@@ -38,7 +41,10 @@
           <view class="tl-slot" wx:for="{{day.slots}}" wx:for-item="slot" wx:key="key">
             <view class="tl-slot-time">{{slot.slotLabel}}</view>
             <view class="tl-slot-members">{{slot.membersText}}</view>
-            <view class="tl-slot-busy {{slot.busyClass}}" wx:if="{{slot.avgRating}}">{{slot.avgEmoji}} {{slot.avgRating}}</view>
+            <view class="tl-slot-busy {{slot.busyClass}}" wx:if="{{slot.avgRating}}">
+              <image class="tl-busy-pig" src="{{slot.pigImg}}" mode="aspectFit" />
+              <text>{{slot.avgRating}}</text>
+            </view>
           </view>
         </block>
         <view class="tl-empty" wx:else>无班</view>

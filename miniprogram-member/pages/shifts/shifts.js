@@ -10,6 +10,12 @@ function avgEmojiOf(v) {
   return BUSY_EMOJI[n] || ''
 }
 
+function pigImgOf(v) {
+  if (v === undefined || v === null || v === '') return ''
+  const n = Math.min(5, Math.max(1, Math.round(Number(v))))
+  return '/assets/pig/busy-' + n + '.png'
+}
+
 function busyClassOf(v) {
   if (v === undefined || v === null || v === '') return 'busy-none'
   const n = Math.round(Number(v))
@@ -63,6 +69,7 @@ Page({
           membersText: (slot.members || []).join('、') || '—',
           avgRating: (slot.avgRating === undefined ? null : slot.avgRating),
           avgEmoji: avgEmojiOf(slot.avgRating),
+          pigImg: pigImgOf(slot.avgRating),
           busyClass: busyClassOf(slot.avgRating)
         }))
       }))
@@ -92,6 +99,7 @@ Page({
           myCount: shifts.length,
           avgAll: avgAll,
           avgEmoji: avgEmojiOf(avgAll),
+          pigImg: pigImgOf(avgAll),
           busyClass: busyClassOf(avgAll)
         }
       })
