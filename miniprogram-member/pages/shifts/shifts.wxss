@@ -118,7 +118,7 @@
   padding: 16rpx 0 4rpx;
 }
 
-** v7.3 班次平均星级（选班参考） */
+/* v7.7 班次平均忙碌程度（emoji，选班参考） */
 .slot-time {
   display: flex;
   align-items: center;

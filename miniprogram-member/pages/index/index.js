@@ -113,7 +113,7 @@ Page({
       console.error('loadMonthlyStats', e)
     }
   },
-  // v7.3：加载可评价的班次 + 我的评价 + 该时段平均星级
+  // v7.3：加载可评价的班次 + 我的评价 + 该时段平均等级（v7.7 星级改 emoji）
   async loadRating() {
     const user = requireUser()
     if (!user) return
@@ -207,7 +207,7 @@ Page({
       toast(e.message || '清除失败')
     }
   },
-  // v7.3：点星星即时提交评价
+  // v7.7：点表情即时提交评价（1-5 级）
   async pickStar(e) {
     const stars = Number(e.currentTarget.dataset.stars)
     const target = this.data.ratingTarget
