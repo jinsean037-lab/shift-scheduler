@@ -10,22 +10,43 @@
     <view class="hero-tag">学工办助理</view>
   </view>
 
-  <!-- 数据概览 -->
-  <view class="stat-grid">
-    <view class="stat-cell stat-shift">
-      <view class="stat-label">本月值班</view>
-      <view class="stat-value">{{monthly.shiftCount}}<text class="stat-unit">次</text></view>
-      <view class="stat-sub">含补报</view>
+  <!-- 今日班次 -->
+  <view class="card">
+    <view class="card-head">
+      <view class="card-title"><view class="card-bar"></view>今日班次</view>
+      <view class="card-meta">{{todayText}}</view>
     </view>
-    <view class="stat-cell stat-pay">
-      <view class="stat-label">工时与薪酬</view>
-      <view class="stat-value-row">
-        <view class="stat-value stat-hours">{{monthly.totalHours}}<text class="stat-unit">h</text></view>
-        <view class="stat-sep"></view>
-        <view class="stat-value stat-pay-v">{{monthly.totalPay}}<text class="stat-unit">元</text></view>
+    <block wx:if="{{todayShifts.length}}">
+      <view class="shift-row" wx:for="{{todayShifts}}" wx:key="key">
+        <view class="shift-time">{{item.slotLabel}}</view>
+        <view class="shift-body">
+          <view class="shift-main">{{item.day}}值班</view>
+          <view class="shift-note">{{item.date || '当前周期'}}</view>
+        </view>
+        <view class="pill {{item.status}}">{{item.statusText}}</view>
       </view>
-      <view class="stat-sub">{{monthly.year}}年{{monthly.month}}月 · 25 元/小时</view>
+    </block>
+    <view wx:else class="empty">今天暂无排班</view>
+  </view>
+
+  <!-- 打卡操作 -->
+  <view class="card">
+    <view class="card-head">
+      <view class="card-title"><view class="card-bar"></view>值班打卡</view>
     </view>
+    <!-- v8.0 签到 / 签退合并成一个大圆钮（签到后自动变成签退） -->
+    <view class="round-wrap">
+      <view class="round-btn {{checkState}}" bindtap="onRoundTap">
+        <image class="round-img" src="{{checkBtnImg}}" mode="aspectFit" />
+        <view class="round-loading" wx:if="{{checkingIn || checkingOut}}"></view>
+      </view>
+      <view class="round-hint">{{checkHint}}</view>
+    </view>
+    <view class="extra-actions">
+      <button class="btn btn-ghost" bindtap="openSuppForm">补签退</button>
+      <button class="btn btn-ghost" bindtap="openOtForm">工作补报</button>
+    </view>
+    <view class="extra-tip">忘记签退？用「补签退」补上实际离开的时间，提交后由管理员审核</view>
   </view>
 
   <!-- 班次评价 -->
@@ -58,39 +79,22 @@
     <view wx:else class="empty">暂无可评价班次</view>
   </view>
 
-  <!-- 今日班次 -->
-  <view class="card">
-    <view class="card-head">
-      <view class="card-title"><view class="card-bar"></view>今日班次</view>
-      <view class="card-meta">{{todayText}}</view>
+  <!-- 数据概览 -->
+  <view class="stat-grid">
+    <view class="stat-cell stat-shift">
+      <view class="stat-label">本月值班</view>
+      <view class="stat-value">{{monthly.shiftCount}}<text class="stat-unit">次</text></view>
+      <view class="stat-sub">含补报</view>
     </view>
-    <block wx:if="{{todayShifts.length}}">
-      <view class="shift-row" wx:for="{{todayShifts}}" wx:key="key">
-        <view class="shift-time">{{item.slotLabel}}</view>
-        <view class="shift-body">
-          <view class="shift-main">{{item.day}}值班</view>
-          <view class="shift-note">{{item.date || '当前周期'}}</view>
-        </view>
-        <view class="pill {{item.status}}">{{item.statusText}}</view>
+    <view class="stat-cell stat-pay">
+      <view class="stat-label">工时与薪酬</view>
+      <view class="stat-value-row">
+        <view class="stat-value stat-hours">{{monthly.totalHours}}<text class="stat-unit">h</text></view>
+        <view class="stat-sep"></view>
+        <view class="stat-value stat-pay-v">{{monthly.totalPay}}<text class="stat-unit">元</text></view>
       </view>
-    </block>
-    <view wx:else class="empty">今天暂无排班</view>
-  </view>
-
-  <!-- 打卡操作 -->
-  <view class="card">
-    <view class="card-head">
-      <view class="card-title"><view class="card-bar"></view>值班打卡</view>
+      <view class="stat-sub">{{monthly.year}}年{{monthly.month}}月 · 25 元/小时</view>
     </view>
-    <view class="action-grid">
-      <button class="btn btn-main" loading="{{checkingIn}}" bindtap="checkin">上班签到</button>
-      <button class="btn btn-second" loading="{{checkingOut}}" bindtap="checkout">下班签退</button>
-    </view>
-    <view class="extra-actions">
-      <button class="btn btn-ghost" bindtap="openSuppForm">补签退</button>
-      <button class="btn btn-ghost" bindtap="openOtForm">工作补报</button>
-    </view>
-    <view class="extra-tip">忘记签退？用「补签退」补上实际离开的时间，提交后由管理员审核</view>
   </view>
 
   <!-- 签到 / 签退成功庆祝 -->

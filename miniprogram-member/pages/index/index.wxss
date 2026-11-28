@@ -223,15 +223,72 @@
 }
 
 /* ========== 打卡操作 ========== */
-.action-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20rpx;
-  margin-bottom: 18rpx;
+/* v8.0 签到 / 签退 合并大圆钮 */
+.round-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10rpx 0 28rpx;
 }
 
-.action-grid .btn {
-  font-size: 29rpx;
+.round-btn {
+  width: 268rpx;
+  height: 268rpx;
+  border-radius: 50%;
+  border: 6rpx solid #FFFFFF;
+  background: linear-gradient(165deg, #FFC6D1 0%, #FF93A8 55%, #F57C95 100%);
+  box-shadow: 0 14rpx 30rpx rgba(244, 114, 140, 0.32), inset 0 -8rpx 0 rgba(190, 60, 90, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.12s ease;
+}
+
+.round-btn:active {
+  transform: scale(0.95);
+}
+
+.round-btn.in_progress {
+  background: linear-gradient(165deg, #C9F0E2 0%, #82D2B6 55%, #51BA9B 100%);
+  box-shadow: 0 14rpx 30rpx rgba(79, 185, 154, 0.32), inset 0 -8rpx 0 rgba(30, 120, 95, 0.12);
+}
+
+.round-btn.completed {
+  background: linear-gradient(165deg, #EDEFF2 0%, #CBD2D9 100%);
+  box-shadow: 0 8rpx 18rpx rgba(120, 130, 140, 0.2);
+  opacity: 0.9;
+}
+
+.round-btn.none {
+  background: linear-gradient(165deg, #F2F4F6 0%, #DCE1E6 100%);
+  opacity: 0.7;
+}
+
+.round-img {
+  width: 212rpx;
+  height: 212rpx;
+}
+
+.round-loading {
+  position: absolute;
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 50%;
+  border: 7rpx solid rgba(255, 255, 255, 0.35);
+  border-top-color: #FFFFFF;
+  animation: roundSpin 0.9s linear infinite;
+}
+
+@keyframes roundSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.round-hint {
+  margin-top: 18rpx;
+  font-size: 24rpx;
+  color: #8a9099;
   letter-spacing: 1rpx;
 }
 

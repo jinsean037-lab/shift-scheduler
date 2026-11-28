@@ -555,3 +555,49 @@ NaN
 - **Render 的 rootDir 是 `backend`**（不是仓库根）—— 所以 `exceljs` 只加在 `backend/package.json` 就够，root 的 package.json 没动
 - 本地跑 `node backend/server.js` 时依赖从 `backend/node_modules` 解析；**新 clone 后要先 `cd backend && npm install`**
 - 小程序端改完要在微信开发者工具里重新上传/预览
+
+## 签到 / 签退合并大圆钮（v8.0，2026-11-28）
+
+### 1. 交互
+
+- 打卡页原来的「上班签到 / 下班签退」两个按钮**合并成一个 268rpx 大圆钮**，同一个位置随状态切换
+- 状态由后端 `/member/today-status` 的 `shifts[].status` 推出（`index.js` 的 `checkButtonState()`）：
+  - `pending`（未签到）→ 粉色圆钮 + 白色粗字「签到」
+  - `in_progress`（值班中）→ 绿色圆钮 + 白色粗字「签退」
+  - `completed`（已签退）→ 灰色圆钮（按签退样式置灰）
+  - `none`（今天无排班）→ 灰色圆钮 + 提示「今天没有排班哦」
+- 点击统一走 `onRoundTap()`：按 `checkState` 分别调 `checkin()` / `checkout()`；已完成或无排班只弹 toast
+- 圆钮下方有一行小字提示当前状态（`checkHint`），提交中时圆钮上叠加转圈指示
+
+### 2. 素材（猪鼻子 + 白色圆卡通字）
+
+- 新增 `miniprogram-member/assets/pig/btn-sign-in.png` / `btn-sign-out.png`（240×240 透明底），由 `generate_pigs.py` 的 `save_check_buttons()` 生成
+- 猪鼻子画法（`draw_snout()`）：两侧腮红（`ellipse_pts` + `BLUSH`）+ 圆角扁鼻头（`squircle` power=2.2）+ 两个墨色鼻孔 + 白色高光，墨线描边，和小猪同一套配色
+  - 图标换过三轮：**猪蹄 → 猪脚印 → 猪鼻子**（猪鼻子最好认，用户两次否掉前两个）
+- 白色卡通字：`cartoon_text_mask()` 用雅黑 Bold（`msyhbd.ttc`）渲染后 → `MaxFilter(9)` 膨胀加粗 → 轻微高斯模糊二值化把方角磨圆 → 再补一次 `MaxFilter(3)`，得到圆滚滚的泡泡字
+- `cartoon_text_image()`：墨色 `MaxFilter(11)` 描边 + 白填充 + 字内顶部柔光高光，整体旋转 ±3°
+- ⚠️ 曾经试过「AI 生图 + 抠图」：本机 **图像生成额度不足**（`connector__matrix__generate_image` 返回 402，需充值 purchased credits），
+  仓库里没有其他生图 App 可用，所以最终仍走代码绘制
+
+### 2.1 AI 生图可用性
+
+- 生图工具：`mcode-tools connector call connector__matrix__generate_image --args-file <json>`（`requests[]` 数组，非扁平 prompt）
+- 抠背景：`connector__matrix__remove_image_background`（需先 `mcode-tools upload_temp_url` 传本地图）
+- 若报 402：提示用户充值 purchased credits（免费签到积分不能用于生图），不要反复重试
+
+
+### 3. 打卡页模块顺序（v8.1）
+
+- 用户要求把「今日排班」和「签到功能」提到最上面，「班次评价」和统计条目往下沉
+- 现在 `index.wxml` 的顺序：**顶部 Hero → 今日班次 → 值班打卡（大圆钮 + 补签退/工作补报）→ 班次评价 → 数据概览（本月值班 / 工时与薪酬）**
+- 改顺序时整块搬 `<view class="card">` 即可，注意 `stat-grid` 的两个 `stat-cell` 要一起搬
+
+### 踩坑
+
+- **坐标系要统一**：猪鼻子用现成的 `fill_shape` / `ink_path`（内部按 `S()` 放大 4 倍），所以传入的必须是 240 逻辑坐标；
+  而卡通字是直接按像素渲染的，要传 `B(70)` 这种已放大的值。混用会导致元素画到画布外（表现为「素材只剩字、没有脚印」）
+- **圆化用的高斯模糊半径要小**（`size_px * 0.012`）：半径一大就把字形糊成一坨，阈值化后只剩几块斑
+- 行楷字重太细，`MaxFilter` 描边一粗就把笔画填满，字变成一坨黑 → 描边用 11、加粗用膨胀
+- `setData` 里不要用对象展开（`...xxx`），小程序端编译可能不支持，改成逐字段赋值
+- 小程序 `setData` 的对象不能直接写 `...spread`，`checkButtonState()` 返回值要拆字段再传
+

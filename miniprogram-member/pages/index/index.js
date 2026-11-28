@@ -62,6 +62,10 @@ Page({
     avgPig: '',                 // 平均等级的小猪图
     checkingIn: false,
     checkingOut: false,
+    // v8.0 签到 / 签退合并成一个大圆钮
+    checkState: 'none',        // none 无排班 / pending 待签到 / in_progress 值班中 / completed 已签退
+    checkBtnImg: '/assets/pig/btn-sign-in.png',
+    checkHint: '',
     // v7.9 签到 / 签退成功庆祝
     celebrate: { visible: false, img: '', title: '', sub: '' },
     confetti: [],
@@ -106,12 +110,38 @@ Page({
           status: s.status || 'pending',
           statusText: s.statusText || '未签到'
         }))
+      const btn = this.checkButtonState(todayShifts)
       this.setData({
         todayText: (data.date || '') + ' ' + (data.weekday || ''),
-        todayShifts
+        todayShifts,
+        checkState: btn.checkState,
+        checkBtnImg: btn.checkBtnImg,
+        checkHint: btn.checkHint
       })
     } catch (e) {
       toast(e.message || '加载失败')
+    }
+  },
+  // v8.0：由今日班次状态算出大圆钮的样子（签到 ↔ 签退 共用一个位置）
+  checkButtonState(shifts) {
+    let state = 'none'
+    if (shifts && shifts.length) {
+      if (shifts.some(s => s.status === 'in_progress')) state = 'in_progress'
+      else if (shifts.some(s => s.status === 'pending')) state = 'pending'
+      else state = 'completed'
+    }
+    const hints = {
+      none: '今天没有排班哦',
+      pending: '上班打卡 · 签到后按钮自动变成签退',
+      in_progress: '已签到 · 下班记得点签退',
+      completed: '今天的打卡已经完成啦'
+    }
+    return {
+      checkState: state,
+      checkBtnImg: (state === 'in_progress' || state === 'completed')
+        ? '/assets/pig/btn-sign-out.png'
+        : '/assets/pig/btn-sign-in.png',
+      checkHint: hints[state]
     }
   },
   // v7.2：本月值班次数（含补报）/ 总工时 / 预计薪酬
@@ -369,6 +399,16 @@ Page({
     this._celebrateTimer = setTimeout(() => {
       this.setData({ celebrate: { visible: false, img: '', title: '', sub: '' } })
     }, 2600)
+  },
+
+  // v8.0：大圆钮点击 —— 按当前状态决定签到还是签退
+  async onRoundTap() {
+    if (this.data.checkingIn || this.data.checkingOut) return
+    const state = this.data.checkState
+    if (state === 'pending') return this.checkin()
+    if (state === 'in_progress') return this.checkout()
+    if (state === 'completed') return toast('今天的打卡已经完成啦')
+    toast('今天没有排班哦')
   },
 
   async checkin() {
