@@ -1,21 +1,46 @@
-.request-main {
-  font-size: 29rpx;
+.req-item {
+  padding: 22rpx 24rpx;
+  border-radius: 16rpx;
+  background: #fbfbfc;
+  border: 1rpx solid #eef0f3;
+  margin-bottom: 16rpx;
+}
+
+.req-item:last-child {
+  margin-bottom: 0;
+}
+
+.req-main {
+  font-size: 28rpx;
   font-weight: 700;
   color: #111827;
   margin-bottom: 8rpx;
 }
 
-.request-footer {
+.req-detail {
+  font-size: 24rpx;
+  color: #6b7280;
+  line-height: 1.55;
+}
+
+.req-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16rpx;
-  margin-top: 16rpx;
+  margin-top: 18rpx;
 }
 
 .actions {
   display: flex;
   gap: 10rpx;
+}
+
+.actions .btn {
+  font-size: 24rpx;
+  font-weight: 600;
+  padding: 0 26rpx;
+  line-height: 2.4;
 }
 
 .pill.approved {
@@ -25,7 +50,7 @@
 
 .pill.rejected,
 .pill.revoked {
-  background: #f3f4f6;
+  background: #f1f5f9;
   color: #4b5563;
 }
 

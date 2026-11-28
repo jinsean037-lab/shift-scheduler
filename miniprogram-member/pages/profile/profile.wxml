@@ -1,14 +1,18 @@
 <view class="page">
-  <view class="card row profile-header">
-    <view>
-      <view class="title">{{userName}}</view>
-      <view class="subtitle">个人信息维护</view>
+  <view class="hero-card">
+    <view class="hero-dot hero-dot-1"></view>
+    <view class="hero-dot hero-dot-2"></view>
+    <view class="hero-main">
+      <view class="hero-name">{{userName}}</view>
+      <view class="hero-date">个人信息维护</view>
     </view>
-    <button size="mini" class="btn ghost" bindtap="logout">退出</button>
+    <view class="hero-tag" bindtap="logout">退出登录</view>
   </view>
 
   <view class="card">
-    <view class="section-title">联系方式</view>
+    <view class="card-head">
+      <view class="card-title"><view class="card-bar"></view>联系方式</view>
+    </view>
     <view class="field">
       <view class="label">邮箱</view>
       <input class="input" type="text" placeholder-class="input-placeholder" value="{{email}}" placeholder="用于邮件兜底提醒" bindinput="onEmailInput" />
@@ -16,7 +20,9 @@
   </view>
 
   <view class="card">
-    <view class="section-title">基础信息</view>
+    <view class="card-head">
+      <view class="card-title"><view class="card-bar"></view>基础信息</view>
+    </view>
     <view class="field">
       <view class="label">院系</view>
       <input class="input" type="text" placeholder-class="input-placeholder" value="{{profile.department}}" placeholder="岭南学院" data-key="department" bindinput="onProfileInput" />
@@ -37,12 +43,12 @@
       <view class="label">银行卡号</view>
       <input class="input" type="number" placeholder-class="input-placeholder" value="{{profile.bankAccount}}" placeholder="工时申报使用" data-key="bankAccount" bindinput="onProfileInput" />
     </view>
-    <button class="btn" loading="{{saving}}" bindtap="saveProfile">保存信息</button>
+    <button class="btn btn-main" loading="{{saving}}" bindtap="saveProfile">保存信息</button>
   </view>
 
   <view class="card row subscribe-card" bindtap="goSubscribe">
     <view class="subscribe-text">
-      <view class="section-title compact">订阅提醒</view>
+      <view class="card-title"><view class="card-bar"></view>订阅提醒</view>
       <view class="muted">值班前、未签到、未签退等微信提醒</view>
     </view>
     <view class="arrow">›</view>

@@ -1,13 +1,16 @@
 <view class="page">
-  <view class="card hero">
-    <view>
-      <view class="title">{{userName || '成员'}}</view>
-      <view class="subtitle">{{todayText}}</view>
+  <!-- 顶部 Hero -->
+  <view class="hero-card">
+    <view class="hero-dot hero-dot-1"></view>
+    <view class="hero-dot hero-dot-2"></view>
+    <view class="hero-main">
+      <view class="hero-name">{{userName || '成员'}}</view>
+      <view class="hero-date">{{todayText}}</view>
     </view>
-    <view class="pill">成员端</view>
+    <view class="hero-tag">学工办助理</view>
   </view>
 
-  <!-- v7.3 月度统计 + 班次评价 四宫格 -->
+  <!-- 数据概览 -->
   <view class="stat-grid">
     <view class="stat-cell stat-shift">
       <view class="stat-label">本月值班</view>
@@ -25,58 +28,78 @@
       <view class="stat-sub">25 元/小时</view>
     </view>
     <view class="stat-cell stat-rate">
-      <view class="stat-rate-head">
-        <view class="stat-label">班次评价（忙碌程度）</view>
-        <view class="rate-reset" wx:if="{{ratingTarget && myStars}}" bindtap="reRate">重评</view>
-      </view>
-      <view class="emojis" wx:if="{{ratingTarget}}">
-        <text
-          class="emoji {{item.value === myStars ? 'on' : ''}}"
-          wx:for="{{busyLevels}}"
-          wx:key="value"
-          data-stars="{{item.value}}"
-          bindtap="pickStar">{{item.emoji}}</text>
-      </view>
-      <view class="stat-value stat-rate-num" wx:if="{{ratingTarget}}">{{myEmoji}}<text class="stat-unit">{{myLabel}}</text></view>
-      <view class="stat-sub" wx:if="{{ratingTarget}}">
-        {{ratingTarget.day}} {{ratingTarget.slotLabel}}
-      </view>
-      <view class="stat-sub stat-rate-avg" wx:if="{{ratingTarget && slotAvg}}">
-        平均 {{avgEmoji}} {{slotAvg}} · {{slotCount}} 人评
-      </view>
-      <view class="stat-sub" wx:elif="{{ratingTarget}}">尚未有人评价该时段</view>
-      <view class="stat-sub" wx:else>暂无可评价班次</view>
+      <view class="stat-label">班次评价</view>
+      <view class="stat-value stat-emoji">{{myEmoji}}</view>
+      <view class="stat-sub">忙碌程度 · {{myLabel}}</view>
     </view>
   </view>
 
+  <!-- 班次评价 -->
   <view class="card">
-    <view class="section-title">今日班次</view>
-    <block wx:if="{{todayShifts.length}}">
-      <view class="list-item" wx:for="{{todayShifts}}" wx:key="key">
-        <view class="row">
-          <view>
-            <view class="shift-main">{{item.day}} {{item.slotLabel}}</view>
-            <view class="muted">{{item.date || '当前周期'}}</view>
-          </view>
-          <view class="pill {{item.status}}">{{item.statusText}}</view>
+    <view class="card-head">
+      <view class="card-title"><view class="card-bar"></view>班次评价</view>
+      <view class="rate-reset" wx:if="{{ratingTarget && myStars}}" bindtap="reRate">重评</view>
+    </view>
+    <view class="card-desc">给这一班的忙碌程度打个分，帮大家下次选班时做参考</view>
+    <block wx:if="{{ratingTarget}}">
+      <view class="emoji-picker">
+        <view
+          class="emoji-item {{lv.value === myStars ? 'on' : ''}}"
+          wx:for="{{busyLevels}}"
+          wx:for-item="lv"
+          wx:key="value"
+          data-stars="{{lv.value}}"
+          bindtap="pickStar">
+          <text class="emoji-face">{{lv.emoji}}</text>
+          <text class="emoji-text">{{lv.label}}</text>
         </view>
+      </view>
+      <view class="rate-current">
+        <text class="rate-current-emoji">{{myEmoji}}</text>
+        <text class="rate-current-text">{{ratingTarget.day}} {{ratingTarget.slotLabel}} · {{myLabel}}</text>
+      </view>
+      <view class="rate-avg" wx:if="{{slotAvg}}">该时段平均 {{avgEmoji}} {{slotAvg}} · {{slotCount}} 人评价</view>
+      <view class="rate-avg" wx:else>该时段还没有人评价</view>
+    </block>
+    <view wx:else class="empty">暂无可评价班次</view>
+  </view>
+
+  <!-- 今日班次 -->
+  <view class="card">
+    <view class="card-head">
+      <view class="card-title"><view class="card-bar"></view>今日班次</view>
+      <view class="card-meta">{{todayText}}</view>
+    </view>
+    <block wx:if="{{todayShifts.length}}">
+      <view class="shift-row" wx:for="{{todayShifts}}" wx:key="key">
+        <view class="shift-time">{{item.slotLabel}}</view>
+        <view class="shift-body">
+          <view class="shift-main">{{item.day}}值班</view>
+          <view class="shift-note">{{item.date || '当前周期'}}</view>
+        </view>
+        <view class="pill {{item.status}}">{{item.statusText}}</view>
       </view>
     </block>
     <view wx:else class="empty">今天暂无排班</view>
   </view>
 
-  <view class="action-grid">
-    <button class="btn" loading="{{checkingIn}}" bindtap="checkin">签到</button>
-    <button class="btn secondary" loading="{{checkingOut}}" bindtap="checkout">签退</button>
+  <!-- 打卡操作 -->
+  <view class="card">
+    <view class="card-head">
+      <view class="card-title"><view class="card-bar"></view>值班打卡</view>
+    </view>
+    <view class="action-grid">
+      <button class="btn btn-main" loading="{{checkingIn}}" bindtap="checkin">上班签到</button>
+      <button class="btn btn-second" loading="{{checkingOut}}" bindtap="checkout">下班签退</button>
+    </view>
+    <view class="extra-actions">
+      <button class="btn btn-ghost" bindtap="openSuppForm">补签退</button>
+      <button class="btn btn-ghost" bindtap="openOtForm">工作补报</button>
+    </view>
+    <view class="extra-tip">忘记签退？用「补签退」补上实际离开的时间，提交后由管理员审核</view>
   </view>
 
-  <view class="extra-actions">
-    <button class="btn ghost" bindtap="openSuppForm">补签退</button>
-    <button class="btn ghost" bindtap="openOtForm">工作补报</button>
-  </view>
-  <view class="extra-tip">忘记签退？用「补签退」补上实际离开时间，提交后由管理员审核。</view>
-
-  <!-- v7.6 补签退申请 -->
+  <!-- 补签退申请 -->
   <view class="modal-mask" wx:if="{{suppVisible}}" bindtap="closeSuppForm">
     <view class="modal-box" catchtap="noop">
       <view class="modal-title">申请补签退</view>
@@ -98,13 +121,13 @@
         <input class="input" value="{{suppReason}}" bindinput="onSuppReasonInput" placeholder="如：忘记打卡、系统故障等..." placeholder-class="input-placeholder" />
       </view>
       <view class="modal-actions">
-        <button class="btn secondary" bindtap="closeSuppForm">取消</button>
-        <button class="btn" loading="{{submittingSupp}}" bindtap="submitSupp">提交申请</button>
+        <button class="btn btn-second" bindtap="closeSuppForm">取消</button>
+        <button class="btn btn-main" loading="{{submittingSupp}}" bindtap="submitSupp">提交申请</button>
       </view>
     </view>
   </view>
 
-  <!-- v7.6 工作补报 -->
+  <!-- 工作补报 -->
   <view class="modal-mask" wx:if="{{otVisible}}" bindtap="closeOtForm">
     <view class="modal-box" catchtap="noop">
       <view class="modal-title">工作补报</view>
@@ -124,8 +147,8 @@
         <textarea class="textarea" value="{{otContent}}" bindinput="onOtContentInput" placeholder="简要描述工作内容..." placeholder-class="textarea-placeholder"></textarea>
       </view>
       <view class="modal-actions">
-        <button class="btn secondary" bindtap="closeOtForm">取消</button>
-        <button class="btn" loading="{{submittingOt}}" bindtap="submitOt">提交申请</button>
+        <button class="btn btn-second" bindtap="closeOtForm">取消</button>
+        <button class="btn btn-main" loading="{{submittingOt}}" bindtap="submitOt">提交申请</button>
       </view>
     </view>
   </view>

@@ -471,6 +471,44 @@ pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
 - 网页端 `backend/public/index.html`：`BUSY_EMOJI` / `BUSY_TEXT` / `busyLevelOf()` / `ratingEmojiHtml()`；管理员「班次评价」卡片与明细表改为 emoji + 文案；表头「星级」→「忙碌程度」
 - 平均分 → emoji 的取整规则：`Math.round(avg)`（3.2 → 😐，3.6 → 😫）
 
+## 小程序整体视觉重构（v7.8，2026-11-28）
+
+目标：**正式**（层级清晰、配色克制、组件统一）+ **可爱**（emoji、圆角、柔和装饰）。
+
+### 设计规范（`app.wxss` 统一维护，各页只写页面级样式）
+
+- 底色 `#f2f4f7`，卡片白底 + `20rpx` 圆角 + `0 8rpx 24rpx rgba(15,23,42,.05)` 阴影
+- 主色深酒红 `#8B1A1A`，辅色金 `#C4A35A`
+- `.hero-card`：深酒红渐变头部（打卡页 / 换代班页 / 我的页统一），右侧金色装饰圆 `.hero-dot`
+- `.card-head` + `.card-title` + `.card-bar`：卡片标题左侧渐变竖条（正式感的关键）
+- `.card-meta` / `.card-desc`：右侧次要信息与说明文字
+- 按钮三档：`.btn-main`（酒红渐变，主操作）、`.btn-second`（深灰渐变，次操作）、`.btn-ghost`（描边浅底，次要入口）
+
+### 打卡页 `pages/index/`
+
+- **四宫格只放只读数据**：本月值班 / 总工时 / 预计薪酬 / 我的评价（第四格显示 emoji + 文案）
+- **评价交互独立成卡片**：5 个 emoji 按钮（带文字标签，选中项高亮 + 描边）、当前档位说明、平均分、重评按钮
+- 今日班次改成「时间 / 内容 / 状态」三段式行
+- 打卡区独立成卡片：上班签到 / 下班签退 两个主按钮 + 补签退 / 工作补报 两个描边次要按钮
+
+### 班次页 `pages/shifts/`（本次改动最大）
+
+- **周概览卡**：深酒红渐变，三个指标（全部班次 / 我的班次 / 平均忙碌度 emoji）+ 忙碌度图例
+- **时间轴布局**：左侧固定日期列（周几 + 日期 + 今天标签），右侧时段块列表
+- 时段块：时间 + 成员 + 右侧忙碌度徽章；徽章按 1–5 档配色（`.busy-1` 绿 → `.busy-5` 红）
+- 我的班次改成 chip 卡片流
+- `shifts.js` 新增 `stats`（totalSlots / myCount / avgAll / avgEmoji / busyClass）与 `busyClassOf()`
+
+### 换代班页 / 我的页 / 登录页
+
+- 统一 hero 头部与 `.card-title` 竖条标题；申请条目改成带边框的浅底卡片
+- 登录页品牌标改成圆角方形渐变徽标，登录按钮改主色渐变
+
+### 踩坑
+
+NaN
+- WXML 里 `wx:for` 嵌套要用 `wx:for-item` 区分变量名（如 `day` / `slot`），否则内层会覆盖外层 `item`
+
 ### 部署注意
 
 - **Render 的 rootDir 是 `backend`**（不是仓库根）—— 所以 `exceljs` 只加在 `backend/package.json` 就够，root 的 package.json 没动

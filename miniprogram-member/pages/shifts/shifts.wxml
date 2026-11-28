@@ -1,44 +1,63 @@
 <view class="page shifts-page">
-  <view class="card header-card">
-    <view class="title">本周排班</view>
-    <view class="subtitle">{{weekRange}} · 当前生效排班</view>
-    <view class="rate-legend">😌 轻松 · 😊 比较轻松 · 😐 一般 · 😫 有点忙 · 🤯 忙到飞起</view>
+  <!-- 周概览 -->
+  <view class="week-summary">
+    <view class="ws-top">
+      <view>
+        <view class="ws-title">本周排班</view>
+        <view class="ws-range">{{weekRange}} · 当前生效</view>
+      </view>
+      <view class="ws-badge {{stats.busyClass}}" wx:if="{{stats.avgAll}}">{{stats.avgEmoji}} {{stats.avgAll}}</view>
+    </view>
+    <view class="ws-stats">
+      <view class="ws-item">
+        <view class="ws-val">{{stats.totalSlots}}</view>
+        <view class="ws-label">全部班次</view>
+      </view>
+      <view class="ws-item">
+        <view class="ws-val">{{stats.myCount}}</view>
+        <view class="ws-label">我的班次</view>
+      </view>
+      <view class="ws-item">
+        <view class="ws-val">{{stats.avgEmoji || '—'}}</view>
+        <view class="ws-label">平均忙碌度</view>
+      </view>
+    </view>
+    <view class="ws-legend">😌 轻松 · 😊 较轻松 · 😐 一般 · 😫 有点忙 · 🤯 忙到飞起</view>
   </view>
 
-  <view class="week-board">
-    <view class="day-panel {{item.isToday ? 'today' : ''}}" wx:for="{{weekDays}}" wx:key="date">
-      <view class="day-head">
-        <view>
-          <view class="day-name">{{item.weekday}}</view>
-          <view class="day-date">{{item.shortDate}}</view>
-        </view>
-        <view wx:if="{{item.isToday}}" class="today-tag">今天</view>
+  <!-- 按天时间轴 -->
+  <view class="timeline">
+    <view class="tl-day {{day.isToday ? 'today' : ''}}" wx:for="{{weekDays}}" wx:for-item="day" wx:key="date">
+      <view class="tl-date">
+        <view class="tl-weekday">{{day.weekday}}</view>
+        <view class="tl-datestr">{{day.shortDate}}</view>
+        <view class="tl-today" wx:if="{{day.isToday}}">今天</view>
       </view>
-
-      <block wx:if="{{item.slots.length}}">
-        <view class="slot-line" wx:for="{{item.slots}}" wx:key="key">
-          <view class="slot-time">
-            <text>{{item.slotLabel}}</text>
-            <text class="slot-rate" wx:if="{{item.avgRating}}">{{item.avgEmoji}} {{item.avgRating}}</text>
+      <view class="tl-body">
+        <block wx:if="{{day.slots.length}}">
+          <view class="tl-slot" wx:for="{{day.slots}}" wx:for-item="slot" wx:key="key">
+            <view class="tl-slot-time">{{slot.slotLabel}}</view>
+            <view class="tl-slot-members">{{slot.membersText}}</view>
+            <view class="tl-slot-busy {{slot.busyClass}}" wx:if="{{slot.avgRating}}">{{slot.avgEmoji}} {{slot.avgRating}}</view>
           </view>
-          <view class="slot-members">{{item.membersText}}</view>
-        </view>
-      </block>
-      <view wx:else class="slot-empty">无班</view>
+        </block>
+        <view class="tl-empty" wx:else>无班</view>
+      </view>
     </view>
   </view>
 
-  <view class="card mine-card">
-    <view class="section-row">
-      <view class="section-title">我的班次</view>
-      <view class="muted">{{shifts.length}} 个</view>
+  <!-- 我的班次 -->
+  <view class="card">
+    <view class="card-head">
+      <view class="card-title"><view class="card-bar"></view>我的班次</view>
+      <view class="card-meta">{{shifts.length}} 个</view>
     </view>
-    <block wx:if="{{shifts.length}}">
-      <view class="mine-line" wx:for="{{shifts}}" wx:key="key">
-        <view class="mine-date">{{item.date || item.day}}</view>
-        <view class="mine-slot">{{item.slotLabel}}</view>
+    <view class="mine-chips" wx:if="{{shifts.length}}">
+      <view class="mine-chip" wx:for="{{shifts}}" wx:key="key">
+        <view class="mine-chip-date">{{item.date || item.day}}</view>
+        <view class="mine-chip-slot">{{item.slotLabel}}</view>
       </view>
-    </block>
-    <view wx:else class="empty compact-empty">暂无已确认班次</view>
+    </view>
+    <view wx:else class="empty">暂无已确认班次</view>
   </view>
 </view>

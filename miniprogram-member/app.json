@@ -11,7 +11,7 @@
     "navigationBarTitleText": "学工办助理排班",
     "navigationBarBackgroundColor": "#8B1A1A",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f6f7f9"
+    "backgroundColor": "#f2f4f7"
   },
   "tabBar": {
     "color": "#6b7280",
