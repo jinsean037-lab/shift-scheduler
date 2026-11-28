@@ -138,20 +138,21 @@
   line-height: 1.6;
 }
 
-.stars {
+.emojis {
   display: flex;
-  gap: 4rpx;
+  gap: 6rpx;
   margin-bottom: 4rpx;
 }
 
-.star {
-  font-size: 40rpx;
-  line-height: 1;
-  color: #e5e7eb;
+.emoji {
+  font-size: 42rpx;
+  line-height: 1.1;
+  opacity: 0.32;
 }
 
-.star.on {
-  color: #f59e0b;
+.emoji.on {
+  opacity: 1;
+  transform: scale(1.12);
 }
 
 .stat-rate-avg {

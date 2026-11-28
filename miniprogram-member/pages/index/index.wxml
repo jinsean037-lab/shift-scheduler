@@ -29,20 +29,20 @@
         <view class="stat-label">班次评价（忙碌程度）</view>
         <view class="rate-reset" wx:if="{{ratingTarget && myStars}}" bindtap="reRate">重评</view>
       </view>
-      <view class="stars" wx:if="{{ratingTarget}}">
+      <view class="emojis" wx:if="{{ratingTarget}}">
         <text
-          class="star {{item <= myStars ? 'on' : ''}}"
-          wx:for="{{[1,2,3,4,5]}}"
-          wx:key="*this"
-          data-stars="{{item}}"
-          bindtap="pickStar">★</text>
+          class="emoji {{item.value === myStars ? 'on' : ''}}"
+          wx:for="{{busyLevels}}"
+          wx:key="value"
+          data-stars="{{item.value}}"
+          bindtap="pickStar">{{item.emoji}}</text>
       </view>
-      <view class="stat-value stat-rate-num" wx:if="{{ratingTarget}}">{{myStars || '-'}}<text class="stat-unit">星</text></view>
+      <view class="stat-value stat-rate-num" wx:if="{{ratingTarget}}">{{myEmoji}}<text class="stat-unit">{{myLabel}}</text></view>
       <view class="stat-sub" wx:if="{{ratingTarget}}">
         {{ratingTarget.day}} {{ratingTarget.slotLabel}}
       </view>
       <view class="stat-sub stat-rate-avg" wx:if="{{ratingTarget && slotAvg}}">
-        平均 {{slotAvg}} 星 · {{slotCount}} 人评
+        平均 {{avgEmoji}} {{slotAvg}} · {{slotCount}} 人评
       </view>
       <view class="stat-sub" wx:elif="{{ratingTarget}}">尚未有人评价该时段</view>
       <view class="stat-sub" wx:else>暂无可评价班次</view>

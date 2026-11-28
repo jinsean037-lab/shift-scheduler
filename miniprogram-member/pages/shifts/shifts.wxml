@@ -2,6 +2,7 @@
   <view class="card header-card">
     <view class="title">本周排班</view>
     <view class="subtitle">{{weekRange}} · 当前生效排班</view>
+    <view class="rate-legend">😌 轻松 · 😊 比较轻松 · 😐 一般 · 😫 有点忙 · 🤯 忙到飞起</view>
   </view>
 
   <view class="week-board">
@@ -18,7 +19,7 @@
         <view class="slot-line" wx:for="{{item.slots}}" wx:key="key">
           <view class="slot-time">
             <text>{{item.slotLabel}}</text>
-            <text class="slot-rate" wx:if="{{item.avgRating}}">{{item.avgRating}}★</text>
+            <text class="slot-rate" wx:if="{{item.avgRating}}">{{item.avgEmoji}} {{item.avgRating}}</text>
           </view>
           <view class="slot-members">{{item.membersText}}</view>
         </view>

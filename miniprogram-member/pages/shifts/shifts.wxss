@@ -118,7 +118,7 @@
   padding: 16rpx 0 4rpx;
 }
 
-/* v7.3 班次平均星级（选班参考） */
+** v7.3 班次平均星级（选班参考） */
 .slot-time {
   display: flex;
   align-items: center;
@@ -133,4 +133,11 @@
   border: 1rpx solid #fde68a;
   border-radius: 999rpx;
   padding: 1rpx 10rpx;
+}
+
+.rate-legend {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #9ca3af;
+  line-height: 1.6;
 }

@@ -12,17 +12,36 @@ function todayStr() {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
 }
 
+// v7.7 忙碌程度五档（emoji 表达）
+const BUSY_LEVELS = [
+  { value: 1, emoji: '😌', label: '轻松' },
+  { value: 2, emoji: '😊', label: '比较轻松' },
+  { value: 3, emoji: '😐', label: '一般' },
+  { value: 4, emoji: '😫', label: '有点忙' },
+  { value: 5, emoji: '🤯', label: '忙到飞起' }
+]
+
+function busyLevel(v) {
+  const n = Math.round(Number(v) || 0)
+  if (!n) return { value: 0, emoji: '—', label: '未评价' }
+  return BUSY_LEVELS[Math.min(Math.max(n, 1), 5) - 1]
+}
+
 Page({
   data: {
     userName: '',
     todayText: '',
     todayShifts: [],
     monthly: { shiftCount: 0, totalHours: 0, totalPay: 0, year: '', month: '' },
-    // v7.3 班次评价
+    // v7.3 班次评价（v7.7 星级改 emoji 表达）
     ratingTarget: null,        // 可评价的班次 { date, day, slotId, slotLabel }
-    myStars: 0,                // 我已选的星级
-    slotAvg: null,             // 该时段历史平均星级
+    myStars: 0,                // 我已选的等级（1-5）
+    myEmoji: '',               // 当前等级的 emoji
+    myLabel: '',               // 当前等级的文案
+    slotAvg: null,             // 该时段历史平均等级
     slotCount: 0,              // 该时段评价人数
+    avgEmoji: '',              // 平均等级对应的 emoji
+    busyLevels: BUSY_LEVELS,   // 五档 emoji
     checkingIn: false,
     checkingOut: false,
     // v7.6 补签退申请
@@ -143,11 +162,16 @@ Page({
       }
       const slotAverages = myData.slotAverages || {}
       const agg = target ? slotAverages[target.day + '|' + target.slotId] : null
+      const myLv = busyLevel(myStars)
+      const avgLv = busyLevel(agg ? agg.avg : 0)
       this.setData({
         ratingTarget: target,
         myStars: myStars,
+        myEmoji: myLv.emoji,
+        myLabel: myLv.label,
         slotAvg: agg ? agg.avg : null,
-        slotCount: agg ? agg.count : 0
+        slotCount: agg ? agg.count : 0,
+        avgEmoji: agg ? avgLv.emoji : ''
       })
     } catch (e) {
       console.error('loadRating', e)
@@ -157,7 +181,7 @@ Page({
   async reRate() {
     const target = this.data.ratingTarget
     if (!target) return
-    if (!this.data.myStars) { toast('还没有评价，先点星星打分'); return }
+    if (!this.data.myStars) { toast('还没有评价，先点表情打分'); return }
     try {
       const data = await deleteShiftRating({
         name: currentUserName(),
@@ -166,7 +190,15 @@ Page({
         slotId: target.slotId
       })
       if (data && data.ok) {
-        this.setData({ myStars: 0, slotAvg: data.slotAvg, slotCount: data.slotCount })
+        const avgLv = busyLevel(data.slotAvg)
+        this.setData({
+          myStars: 0,
+          myEmoji: '',
+          myLabel: '',
+          slotAvg: data.slotAvg,
+          slotCount: data.slotCount,
+          avgEmoji: data.slotAvg ? avgLv.emoji : ''
+        })
         toast(data.msg || '已清除，可重新评价')
       } else {
         toast((data && data.msg) || '清除失败')
@@ -190,7 +222,15 @@ Page({
         stars: stars
       })
       if (data && data.ok) {
-        this.setData({ slotAvg: data.slotAvg, slotCount: data.slotCount })
+        const lv = busyLevel(stars)
+        const avgLv = busyLevel(data.slotAvg)
+        this.setData({
+          myEmoji: lv.emoji,
+          myLabel: lv.label,
+          slotAvg: data.slotAvg,
+          slotCount: data.slotCount,
+          avgEmoji: data.slotAvg ? avgLv.emoji : ''
+        })
         toast(data.msg || '评价成功', 'success')
       } else {
         toast((data && data.msg) || '评价失败')

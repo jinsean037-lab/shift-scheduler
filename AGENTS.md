@@ -453,6 +453,24 @@ pm2: { startMin:  960, endMin: 1050 },  // 16:00-17:30
 - `utils/api.js` 新增 `suppCheckout()` / `reportOvertime()`
 - 两者提交后都进管理员端审核队列（补签退审核 / 工作补报审核）
 
+## 班次评价改用 emoji 表达忙碌程度（v7.7，2026-11-28）
+
+星级（★）换成五档 emoji，**后端数据模型不变**（`stars` 仍是 1–5 整数，聚合口径不变，历史数据直接以 emoji 呈现）。
+
+| 等级 | emoji | 文案 |
+| --- | --- | --- |
+| 1 | 😌 | 轻松 |
+| 2 | 😊 | 比较轻松 |
+| 3 | 😐 | 一般 |
+| 4 | 😫 | 有点忙 |
+| 5 | 🤯 | 忙到飞起 |
+
+- 小程序 `pages/index/index.js`：`BUSY_LEVELS` 常量 + `busyLevel(v)`；data 增加 `myEmoji` / `myLabel` / `avgEmoji` / `busyLevels`
+- 小程序 `pages/index/index.wxml`：星星行改成 emoji 行（**选中项不透明 + 放大，其余 0.32 透明**）；大号数字改成 emoji + 文案
+- 小程序 `pages/shifts/shifts.js`：`BUSY_EMOJI` + `avgEmojiOf(v)`；时段徽章显示 `😫 3.6`；页面顶部加图例行
+- 网页端 `backend/public/index.html`：`BUSY_EMOJI` / `BUSY_TEXT` / `busyLevelOf()` / `ratingEmojiHtml()`；管理员「班次评价」卡片与明细表改为 emoji + 文案；表头「星级」→「忙碌程度」
+- 平均分 → emoji 的取整规则：`Math.round(avg)`（3.2 → 😐，3.6 → 😫）
+
 ### 部署注意
 
 - **Render 的 rootDir 是 `backend`**（不是仓库根）—— 所以 `exceljs` 只加在 `backend/package.json` 就够，root 的 package.json 没动

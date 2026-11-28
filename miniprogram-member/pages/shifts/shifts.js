@@ -1,5 +1,14 @@
 const { request, requireUser, toast, slotLabel } = require('../../utils/api')
 
+// v7.7 忙碌程度五档（与打卡页一致）
+const BUSY_EMOJI = { 1: '😌', 2: '😊', 3: '😐', 4: '😫', 5: '🤯' }
+
+function avgEmojiOf(v) {
+  if (v === undefined || v === null || v === '') return ''
+  const n = Math.round(Number(v))
+  return BUSY_EMOJI[n] || ''
+}
+
 Page({
   data: {
     shifts: [],
@@ -38,7 +47,8 @@ Page({
           slotId: slot.slotId,
           slotLabel: slot.label || slotLabel(slot.slotId),
           membersText: (slot.members || []).join('、') || '—',
-          avgRating: (slot.avgRating === undefined ? null : slot.avgRating)
+          avgRating: (slot.avgRating === undefined ? null : slot.avgRating),
+          avgEmoji: avgEmojiOf(slot.avgRating)
         }))
       }))
       const weekRange = week.weekStart && week.weekEnd
